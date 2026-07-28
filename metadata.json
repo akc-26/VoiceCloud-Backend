@@ -1,0 +1,6 @@
+{
+  "name": "VoiceCloud Backend",
+  "description": "VoiceCloud Audio Platform Backend with Chat & Messaging, Storage, Media, Moderation, Notifications, and Admin Panel",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
