@@ -1,0 +1,60 @@
+src/app.module.ts(6,29): error TS2307: Cannot find module './redis/redis.module' or its corresponding type declarations.
+src/app.module.ts(12,29): error TS2307: Cannot find module './modules/users/users.module' or its corresponding type declarations.
+src/app.module.ts(15,30): error TS2307: Cannot find module './modules/wallet/wallet.module' or its corresponding type declarations.
+src/app.module.ts(17,27): error TS2307: Cannot find module './modules/vip/vip.module' or its corresponding type declarations.
+src/app.module.ts(20,30): error TS2307: Cannot find module './modules/search/search.module' or its corresponding type declarations.
+src/app.module.ts(38,29): error TS2307: Cannot find module './queue/queue.module' or its corresponding type declarations.
+src/common/events/gateways/presence.gateway.ts(13,35): error TS2307: Cannot find module '../../../redis/redis-state.service' or its corresponding type declarations.
+src/common/events/gateways/reactions.gateway.ts(13,35): error TS2307: Cannot find module '../../../redis/redis-state.service' or its corresponding type declarations.
+src/common/events/gateways/room.gateway.ts(26,35): error TS2307: Cannot find module '../../../redis/redis-state.service' or its corresponding type declarations.
+src/common/events/phase3a-realtime.spec.ts(348,18): error TS2339: Property 'title' does not exist on type '{ roomId: string; title: string; description: string; category: string; updatedAt: string; success: boolean; error?: undefined; message?: undefined; } | { success: boolean; error: any; message: any; }'.
+  Property 'title' does not exist on type '{ success: boolean; error: any; message: any; }'.
+src/common/events/phase3b-redis.spec.ts(4,30): error TS2307: Cannot find module '../../redis/redis.constants' or its corresponding type declarations.
+src/common/events/phase3b-redis.spec.ts(5,35): error TS2307: Cannot find module '../../redis/redis-state.service' or its corresponding type declarations.
+src/common/events/phase3b-redis.spec.ts(6,42): error TS2307: Cannot find module '../../redis/redis-keys.constant' or its corresponding type declarations.
+src/common/events/services/realtime-room-state.service.ts(12,8): error TS2307: Cannot find module '../../../redis/redis-state.service' or its corresponding type declarations.
+src/modules/admin/admin.module.ts(26,29): error TS2307: Cannot find module '../../redis/redis.module' or its corresponding type declarations.
+src/modules/agencies/agencies.service.ts(21,31): error TS2307: Cannot find module '../storage/enums/media-category.enum' or its corresponding type declarations.
+src/modules/announcements/announcements.service.ts(13,31): error TS2307: Cannot find module '../storage/enums/media-category.enum' or its corresponding type declarations.
+src/modules/backup/backup.module.ts(12,29): error TS2307: Cannot find module '../../redis/redis.module' or its corresponding type declarations.
+src/modules/backup/backup.service.ts(7,35): error TS2307: Cannot find module '../../redis/redis-state.service' or its corresponding type declarations.
+src/modules/backup/disaster-recovery.service.ts(5,35): error TS2307: Cannot find module '../../redis/redis-state.service' or its corresponding type declarations.
+src/modules/chat/chat.service.ts(3,31): error TS2307: Cannot find module '../storage/enums/media-category.enum' or its corresponding type declarations.
+src/modules/clubs/clubs.spec.ts(85,13): error TS2352: Conversion of type 'User' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'User'.
+src/modules/clubs/clubs.spec.ts(86,13): error TS2352: Conversion of type 'User' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'User'.
+src/modules/config/config.module.ts(8,29): error TS2307: Cannot find module '../../redis/redis.module' or its corresponding type declarations.
+src/modules/creator/creator-business.spec.ts(11,29): error TS2307: Cannot find module '../users/entities/creator-plan.entity' or its corresponding type declarations.
+src/modules/creator/creator-business.spec.ts(12,37): error TS2307: Cannot find module '../users/entities/creator-subscription.entity' or its corresponding type declarations.
+src/modules/creator/creator-business.spec.ts(13,38): error TS2307: Cannot find module '../users/entities/creator-payout-request.entity' or its corresponding type declarations.
+src/modules/creator/creator-business.spec.ts(15,31): error TS2307: Cannot find module '../wallet/entities/wallet-balance.entity' or its corresponding type declarations.
+src/modules/creator/creator.module.ts(3,29): error TS2307: Cannot find module '../users/entities/creator-plan.entity' or its corresponding type declarations.
+src/modules/creator/creator.module.ts(4,37): error TS2307: Cannot find module '../users/entities/creator-subscription.entity' or its corresponding type declarations.
+src/modules/creator/creator.module.ts(5,38): error TS2307: Cannot find module '../users/entities/creator-payout-request.entity' or its corresponding type declarations.
+src/modules/creator/creator.module.ts(7,31): error TS2307: Cannot find module '../wallet/entities/wallet-balance.entity' or its corresponding type declarations.
+src/modules/creator/creator.service.ts(10,29): error TS2307: Cannot find module '../users/entities/creator-plan.entity' or its corresponding type declarations.
+src/modules/creator/creator.service.ts(11,37): error TS2307: Cannot find module '../users/entities/creator-subscription.entity' or its corresponding type declarations.
+src/modules/creator/creator.service.ts(12,38): error TS2307: Cannot find module '../users/entities/creator-payout-request.entity' or its corresponding type declarations.
+src/modules/creator/creator.service.ts(14,31): error TS2307: Cannot find module '../wallet/entities/wallet-balance.entity' or its corresponding type declarations.
+src/modules/gifts/gifts.service.ts(3,31): error TS2307: Cannot find module '../storage/enums/media-category.enum' or its corresponding type declarations.
+src/modules/health/health.module.ts(4,29): error TS2307: Cannot find module '../../redis/redis.module' or its corresponding type declarations.
+src/modules/hosts/hosts.service.ts(17,31): error TS2307: Cannot find module '../storage/enums/media-category.enum' or its corresponding type declarations.
+src/modules/rankings/rankings.module.ts(11,25): error TS2307: Cannot find module '../vip/entities/user-vip.entity' or its corresponding type declarations.
+src/modules/rankings/recommendations.service.ts(7,25): error TS2307: Cannot find module '../vip/entities/user-vip.entity' or its corresponding type declarations.
+src/modules/rooms/rooms.service.ts(3,31): error TS2307: Cannot find module '../storage/enums/media-category.enum' or its corresponding type declarations.
+src/modules/rtc/rtc.module.ts(16,29): error TS2307: Cannot find module '../../redis/redis.module' or its corresponding type declarations.
+src/modules/search/search.controller.ts(17,31): error TS2307: Cannot find module './search.service' or its corresponding type declarations.
+src/modules/storage/drivers/s3-storage.driver.ts(6,8): error TS2307: Cannot find module './storage-driver.interface' or its corresponding type declarations.
+src/modules/storage/drivers/s3-storage.driver.ts(7,31): error TS2307: Cannot find module '../enums/media-category.enum' or its corresponding type declarations.
+src/modules/storage/storage.factory.ts(4,36): error TS2307: Cannot find module './drivers/local-storage.driver' or its corresponding type declarations.
+src/modules/storage/storage.factory.ts(6,32): error TS2307: Cannot find module './drivers/storage-driver.interface' or its corresponding type declarations.
+src/modules/storage/storage.module.ts(3,27): error TS2307: Cannot find module './entities/media-file.entity' or its corresponding type declarations.
+src/modules/storage/storage.module.ts(5,35): error TS2307: Cannot find module './storage.controller' or its corresponding type declarations.
+src/modules/storage/storage.module.ts(6,36): error TS2307: Cannot find module './drivers/local-storage.driver' or its corresponding type declarations.
+src/modules/storage/storage.service.ts(10,27): error TS2307: Cannot find module './entities/media-file.entity' or its corresponding type declarations.
+src/modules/storage/storage.service.ts(12,31): error TS2307: Cannot find module './enums/media-category.enum' or its corresponding type declarations.
+src/modules/storage/storage.service.ts(13,32): error TS2307: Cannot find module './dto/upload-media.dto' or its corresponding type declarations.
+src/modules/storage/storage.service.ts(14,31): error TS2307: Cannot find module './dto/query-media.dto' or its corresponding type declarations.
+src/modules/users/entities/user.entity.ts(19,31): error TS2307: Cannot find module '../../wallet/entities/wallet-balance.entity' or its corresponding type declarations.
+src/redis/redis.service.ts(3,30): error TS2307: Cannot find module './redis.constants' or its corresponding type declarations.

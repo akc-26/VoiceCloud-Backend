@@ -1,0 +1,6 @@
+{
+  "name": "VoiceCloud Backend",
+  "description": "Voice Cloud Audio Platform Backend with Storage, Media, Moderation, Notifications, Infrastructure Backup & Disaster Recovery Engine",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
