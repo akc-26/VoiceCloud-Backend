@@ -1,0 +1,26 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { SubscriptionCycle } from '../entities/vip-membership.entity';
+
+export class RenewVipDto {
+  @ApiPropertyOptional({ example: 'vip-tier-1-id' })
+  @IsOptional()
+  @IsString()
+  tierId?: string;
+
+  @ApiPropertyOptional({
+    example: 'vip-tier-1-id',
+    description: 'Alias for tierId',
+  })
+  @IsOptional()
+  @IsString()
+  planId?: string;
+
+  @ApiPropertyOptional({
+    enum: SubscriptionCycle,
+    example: SubscriptionCycle.MONTHLY,
+  })
+  @IsOptional()
+  @IsEnum(SubscriptionCycle)
+  cycle?: SubscriptionCycle;
+}
