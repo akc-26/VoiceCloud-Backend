@@ -1,0 +1,6 @@
+{
+  "name": "VoiceCloud Backend",
+  "description": "VoiceCloud Audio Platform - Phase VC-PH03 Enterprise Platform Foundation & Multi-Application Hosting Infrastructure",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
