@@ -1,0 +1,6 @@
+{
+  "name": "VoiceCloud Backend",
+  "description": "VoiceCloud Audio Platform - Phase VC-PH06 Release Candidate 1 (RC1) Enterprise Quality Assurance & Production Validation Baseline",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
