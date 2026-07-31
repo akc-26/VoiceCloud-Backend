@@ -1,0 +1,6 @@
+{
+  "name": "VoiceCloud Enterprise Platform",
+  "description": "VC-PH08-WP04 – Creator Economy Integration, Business Flow Reconciliation & Production Completion",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
