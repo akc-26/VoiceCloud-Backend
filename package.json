@@ -1,6 +1,7 @@
 {
   "name": "VoiceCloud-Backend",
   "version": "1.0.0",
+  "packageManager": "npm@10.9.8",
   "description": "",
   "author": "",
   "private": true,

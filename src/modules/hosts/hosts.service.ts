@@ -59,6 +59,13 @@ export class HostsService {
     userId: string,
     dto: ApplyHostDto,
   ): Promise<HostProfile> {
+    // Reject identity inputs containing masking characters
+    if (dto.idNumber && /[*•●]/.test(dto.idNumber)) {
+      throw new BadRequestException(
+        'Identity numbers containing masking characters (*, •, ●) are not accepted',
+      );
+    }
+
     let existing = await this.hostRepository.findOne({ where: { userId } });
     if (existing) {
       if (existing.status === HostVerificationStatus.APPROVED) {
@@ -69,21 +76,45 @@ export class HostsService {
           'Host verification application is currently pending review',
         );
       }
-      // If rejected, re-apply
+      // If rejected, re-apply: reuse stored values for empty/omitted replacement fields
       const idNumberToUse =
-        dto.idNumber &&
-        !dto.idNumber.includes('*') &&
-        dto.idNumber.trim() !== ''
-          ? dto.idNumber
+        dto.idNumber && dto.idNumber.trim() !== ''
+          ? dto.idNumber.trim()
           : existing.idNumber;
       const documentUrlToUse =
-        dto.documentUrl && !dto.documentUrl.includes('sample_')
-          ? dto.documentUrl
+        dto.documentUrl &&
+        dto.documentUrl.trim() !== '' &&
+        !dto.documentUrl.includes('sample_')
+          ? dto.documentUrl.trim()
           : existing.documentUrl;
       const selfieUrlToUse =
-        dto.selfieUrl && !dto.selfieUrl.includes('sample_')
-          ? dto.selfieUrl
+        dto.selfieUrl &&
+        dto.selfieUrl.trim() !== '' &&
+        !dto.selfieUrl.includes('sample_')
+          ? dto.selfieUrl.trim()
           : existing.selfieUrl;
+
+      if (
+        !idNumberToUse ||
+        idNumberToUse.trim() === '' ||
+        /[*•●]/.test(idNumberToUse)
+      ) {
+        throw new BadRequestException('A valid unmasked ID number is required');
+      }
+      if (
+        !documentUrlToUse ||
+        documentUrlToUse.trim() === '' ||
+        documentUrlToUse.includes('sample_')
+      ) {
+        throw new BadRequestException('Government ID document is required');
+      }
+      if (
+        !selfieUrlToUse ||
+        selfieUrlToUse.trim() === '' ||
+        selfieUrlToUse.includes('sample_')
+      ) {
+        throw new BadRequestException('Selfie photo is required');
+      }
 
       Object.assign(existing, {
         ...dto,
@@ -107,9 +138,33 @@ export class HostsService {
       return existing;
     }
 
+    // New application requires unmasked ID number, documentUrl, and selfieUrl
+    const idNumberToUse = dto.idNumber ? dto.idNumber.trim() : '';
+    const documentUrlToUse =
+      dto.documentUrl && !dto.documentUrl.includes('sample_')
+        ? dto.documentUrl.trim()
+        : '';
+    const selfieUrlToUse =
+      dto.selfieUrl && !dto.selfieUrl.includes('sample_')
+        ? dto.selfieUrl.trim()
+        : '';
+
+    if (!idNumberToUse || /[*•●]/.test(idNumberToUse)) {
+      throw new BadRequestException('A valid unmasked ID number is required');
+    }
+    if (!documentUrlToUse) {
+      throw new BadRequestException('Government ID document is required');
+    }
+    if (!selfieUrlToUse) {
+      throw new BadRequestException('Selfie photo is required');
+    }
+
     const host = this.hostRepository.create({
       userId,
       ...dto,
+      idNumber: idNumberToUse,
+      documentUrl: documentUrlToUse,
+      selfieUrl: selfieUrlToUse,
       status: HostVerificationStatus.PENDING,
     });
     const saved = await this.hostRepository.save(host);

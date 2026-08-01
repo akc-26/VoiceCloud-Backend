@@ -5,8 +5,8 @@ export interface HostProfileData {
   userId: string;
   realName: string;
   idNumber: string;
-  documentUrl: string;
-  selfieUrl: string;
+  documentUrl?: string;
+  selfieUrl?: string;
   bio?: string;
   languages?: string[];
   categories?: string[];
@@ -17,7 +17,7 @@ export interface HostProfileData {
   hostLevel: number;
   xp: number;
   performanceScore: number;
-  hostRating: number;
+  hostRating?: number;
   followersCount: number;
   totalRoomsHosted: number;
   totalSpeakingTimeMinutes: number;

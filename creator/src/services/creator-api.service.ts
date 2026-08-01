@@ -924,7 +924,7 @@ export class CreatorApiService {
   }
 
   async getPublicConfig(signal?: AbortSignal): Promise<any> {
-    return this.request('/public/config', { signal });
+    return this.request('/config/public', { signal });
   }
 }
 

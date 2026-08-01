@@ -29,6 +29,8 @@ import StarsIcon from '@mui/icons-material/Stars';
 
 import { DataTable, Column } from '../components/common/DataTable';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { ErrorState } from '../components/common/ErrorState';
+import { EmptyState } from '../components/common/EmptyState';
 import { useNotificationsStore } from '../store/notifications.store';
 import {
   hostsAdminService,
@@ -46,6 +48,7 @@ export const HostsPage: React.FC = () => {
   const [topHosts, setTopHosts] = useState<HostProfileData[]>([]);
   const [earningsData, setEarningsData] = useState<HostEarningsData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Dialog States
   const [rejectDialogHost, setRejectDialogHost] = useState<HostProfileData | null>(null);
@@ -64,61 +67,40 @@ export const HostsPage: React.FC = () => {
     amount: number;
   } | null>(null);
 
-  const fetchApplications = async () => {
+  const fetchAllData = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const data = await hostsAdminService.getApplications('PENDING');
-      setApplications(data || []);
-    } catch {
-      setApplications([]);
+      const [appsData, activeData, earnings, top] = await Promise.all([
+        hostsAdminService.getApplications('PENDING'),
+        hostsAdminService.getApplications(),
+        hostsAdminService.getEarningsOverview().catch(() => null),
+        hostsAdminService.getTopHosts(10).catch(() => null),
+      ]);
+      setApplications(appsData || []);
+      setActiveHosts((activeData || []).filter((h) => h.status !== 'PENDING'));
+      setEarningsData(earnings);
+      setTopHosts(top || []);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Failed to connect to host management services.',
+      );
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchActiveHosts = async () => {
-    try {
-      setLoading(true);
-      const data = await hostsAdminService.getApplications();
-      setActiveHosts((data || []).filter((h) => h.status !== 'PENDING'));
-    } catch {
-      setActiveHosts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchEarnings = async () => {
-    try {
-      const data = await hostsAdminService.getEarningsOverview();
-      setEarningsData(data);
-    } catch {
-      setEarningsData(null);
-    }
-  };
-
-  const fetchTopHosts = async () => {
-    try {
-      const data = await hostsAdminService.getTopHosts(10);
-      setTopHosts(data || []);
-    } catch {
-      setTopHosts([]);
     }
   };
 
   useEffect(() => {
-    fetchApplications();
-    fetchActiveHosts();
-    fetchEarnings();
-    fetchTopHosts();
+    fetchAllData();
   }, []);
 
   const handleApprove = async (host: HostProfileData) => {
     try {
       await hostsAdminService.approveHost(host.id);
       addToast('success', `Approved host application for @${host.realName}`);
-      fetchApplications();
-      fetchActiveHosts();
+      fetchAllData();
     } catch (err: any) {
       addToast('error', err?.response?.data?.message || 'Approval failed');
     }
@@ -127,12 +109,14 @@ export const HostsPage: React.FC = () => {
   const handleRejectConfirm = async () => {
     if (!rejectDialogHost) return;
     try {
-      await hostsAdminService.rejectHost(rejectDialogHost.id, rejectionReason || 'Rejected by compliance');
+      await hostsAdminService.rejectHost(
+        rejectDialogHost.id,
+        rejectionReason || 'Rejected by compliance',
+      );
       addToast('success', `Rejected application for @${rejectDialogHost.realName}`);
       setRejectDialogHost(null);
       setRejectionReason('');
-      fetchApplications();
-      fetchActiveHosts();
+      fetchAllData();
     } catch (err: any) {
       addToast('error', err?.response?.data?.message || 'Rejection failed');
     }
@@ -147,7 +131,7 @@ export const HostsPage: React.FC = () => {
         await hostsAdminService.suspendHost(host.id);
         addToast('success', `Suspended host @${host.realName}`);
       }
-      fetchActiveHosts();
+      fetchAllData();
     } catch (err: any) {
       addToast('error', err?.response?.data?.message || 'Status update failed');
     }
@@ -423,136 +407,171 @@ export const HostsPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val)}>
-          <Tab label={`Applications Queue (${applications.length})`} icon={<VerifiedIcon />} iconPosition="start" />
-          <Tab label={`Verified Hosts (${activeHosts.length})`} icon={<RecordVoiceOverIcon />} iconPosition="start" />
-          <Tab label="Earnings & Settlements" icon={<AttachMoneyIcon />} iconPosition="start" />
-          <Tab label="Top Hosts Leaderboard" icon={<LeaderboardIcon />} iconPosition="start" />
-        </Tabs>
-      </Box>
+      {error ? (
+        <ErrorState
+          title="Failed to Load Host Management Data"
+          message={error}
+          onRetry={fetchAllData}
+        />
+      ) : (
+        <>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val)}>
+              <Tab label={`Applications Queue (${applications.length})`} icon={<VerifiedIcon />} iconPosition="start" />
+              <Tab label={`Verified Hosts (${activeHosts.length})`} icon={<RecordVoiceOverIcon />} iconPosition="start" />
+              <Tab label="Earnings & Settlements" icon={<AttachMoneyIcon />} iconPosition="start" />
+              <Tab label="Top Hosts Leaderboard" icon={<LeaderboardIcon />} iconPosition="start" />
+            </Tabs>
+          </Box>
 
-      {/* Tab 0: Verification Applications */}
-      {activeTab === 0 && (
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-            Verification Applications Queue
-          </Typography>
-          <DataTable columns={applicationColumns} rows={applications} loading={loading} />
-        </Box>
-      )}
-
-      {/* Tab 1: Verified Hosts */}
-      {activeTab === 1 && (
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-            Active & Suspended Host Directory
-          </Typography>
-          <DataTable columns={activeHostColumns} rows={activeHosts} loading={loading} />
-        </Box>
-      )}
-
-      {/* Tab 2: Earnings & Settlements */}
-      {activeTab === 2 && (
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-            Host Earnings & Settlement Withdrawals Overview
-          </Typography>
-          {earningsData?.earningsList && earningsData.earningsList.length > 0 ? (
-            <DataTable
-              columns={[
-                { id: 'hostProfileId', label: 'Host ID', render: (row) => row.hostProfileId },
-                { id: 'userId', label: 'User ID', render: (row) => row.userId },
-                {
-                  id: 'lifetimeEarnings',
-                  label: 'Lifetime Earnings',
-                  render: (row) => `$${Number(row.lifetimeEarnings).toFixed(2)}`,
-                },
-                {
-                  id: 'pendingSettlements',
-                  label: 'Pending Settlement',
-                  render: (row) => `$${Number(row.pendingSettlements).toFixed(2)}`,
-                },
-                {
-                  id: 'completedSettlements',
-                  label: 'Completed Settlement',
-                  render: (row) => `$${Number(row.completedSettlements).toFixed(2)}`,
-                },
-                {
-                  id: 'actions',
-                  label: 'Actions',
-                  align: 'right',
-                  render: (row) =>
-                    Number(row.pendingSettlements) > 0 ? (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="success"
-                        onClick={() =>
-                          setSettlementDialog({
-                            hostProfileId: row.hostProfileId,
-                            amount: Number(row.pendingSettlements),
-                          })
-                        }
-                      >
-                        Complete Payout
-                      </Button>
-                    ) : (
-                      <Chip label="Settled" color="default" size="small" />
-                    ),
-                },
-              ]}
-              rows={earningsData.earningsList}
-            />
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              No host earnings records recorded yet.
-            </Typography>
+          {/* Tab 0: Verification Applications */}
+          {activeTab === 0 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                Verification Applications Queue
+              </Typography>
+              {applications.length > 0 ? (
+                <DataTable columns={applicationColumns} rows={applications} loading={loading} />
+              ) : (
+                <EmptyState
+                  title="No Applications Pending"
+                  description="There are currently no host verification applications waiting in the compliance queue."
+                />
+              )}
+            </Box>
           )}
-        </Box>
-      )}
 
-      {/* Tab 3: Top Hosts Leaderboard */}
-      {activeTab === 3 && (
-        <Box>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
-            Top Performing Hosts Leaderboard
-          </Typography>
-          <DataTable
-            columns={[
-              {
-                id: 'realName',
-                label: 'Host Name',
-                render: (row) => (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <StarsIcon color="warning" />
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {row.realName}
-                    </Typography>
-                  </Box>
-                ),
-              },
-              { id: 'hostLevel', label: 'Level', render: (row) => `Lvl ${row.hostLevel}` },
-              { id: 'xp', label: 'Total XP', render: (row) => (row.xp || 0).toLocaleString() },
-              {
-                id: 'performanceScore',
-                label: 'Performance Score',
-                render: (row) => `${Number(row.performanceScore || 0).toFixed(1)} / 100`,
-              },
-              {
-                id: 'hostRating',
-                label: 'Rating',
-                render: (row) => `⭐ ${Number(row.hostRating || 5.0).toFixed(1)}`,
-              },
-              {
-                id: 'followersCount',
-                label: 'Followers',
-                render: (row) => (row.followersCount || 0).toLocaleString(),
-              },
-            ]}
-            rows={topHosts}
-          />
-        </Box>
+          {/* Tab 1: Verified Hosts */}
+          {activeTab === 1 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                Active & Suspended Host Directory
+              </Typography>
+              {activeHosts.length > 0 ? (
+                <DataTable columns={activeHostColumns} rows={activeHosts} loading={loading} />
+              ) : (
+                <EmptyState
+                  title="No Hosts Found"
+                  description="No active or suspended host profiles currently exist in the database."
+                />
+              )}
+            </Box>
+          )}
+
+          {/* Tab 2: Earnings & Settlements */}
+          {activeTab === 2 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                Host Earnings & Settlement Withdrawals Overview
+              </Typography>
+              {earningsData?.earningsList && earningsData.earningsList.length > 0 ? (
+                <DataTable
+                  columns={[
+                    { id: 'hostProfileId', label: 'Host ID', render: (row) => row.hostProfileId },
+                    { id: 'userId', label: 'User ID', render: (row) => row.userId },
+                    {
+                      id: 'lifetimeEarnings',
+                      label: 'Lifetime Earnings',
+                      render: (row) => `$${Number(row.lifetimeEarnings).toFixed(2)}`,
+                    },
+                    {
+                      id: 'pendingSettlements',
+                      label: 'Pending Settlement',
+                      render: (row) => `$${Number(row.pendingSettlements).toFixed(2)}`,
+                    },
+                    {
+                      id: 'completedSettlements',
+                      label: 'Completed Settlement',
+                      render: (row) => `$${Number(row.completedSettlements).toFixed(2)}`,
+                    },
+                    {
+                      id: 'actions',
+                      label: 'Actions',
+                      align: 'right',
+                      render: (row) =>
+                        Number(row.pendingSettlements) > 0 ? (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            onClick={() =>
+                              setSettlementDialog({
+                                hostProfileId: row.hostProfileId,
+                                amount: Number(row.pendingSettlements),
+                              })
+                            }
+                          >
+                            Complete Payout
+                          </Button>
+                        ) : (
+                          <Chip label="Settled" color="default" size="small" />
+                        ),
+                    },
+                  ]}
+                  rows={earningsData.earningsList}
+                />
+              ) : (
+                <EmptyState
+                  title="No Earnings Records"
+                  description="No host earnings or settlement withdrawal records recorded yet."
+                />
+              )}
+            </Box>
+          )}
+
+          {/* Tab 3: Top Hosts Leaderboard */}
+          {activeTab === 3 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
+                Top Performing Hosts Leaderboard
+              </Typography>
+              {topHosts.length > 0 ? (
+                <DataTable
+                  columns={[
+                    {
+                      id: 'realName',
+                      label: 'Host Name',
+                      render: (row) => (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <StarsIcon color="warning" />
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {row.realName}
+                          </Typography>
+                        </Box>
+                      ),
+                    },
+                    { id: 'hostLevel', label: 'Level', render: (row) => `Lvl ${row.hostLevel}` },
+                    { id: 'xp', label: 'Total XP', render: (row) => (row.xp || 0).toLocaleString() },
+                    {
+                      id: 'performanceScore',
+                      label: 'Performance Score',
+                      render: (row) => `${Number(row.performanceScore || 0).toFixed(1)} / 100`,
+                    },
+                    {
+                      id: 'hostRating',
+                      label: 'Rating',
+                      render: (row) =>
+                        row.hostRating != null && Number(row.hostRating) > 0
+                          ? `⭐ ${Number(row.hostRating).toFixed(1)}`
+                          : 'N/A',
+                    },
+                    {
+                      id: 'followersCount',
+                      label: 'Followers',
+                      render: (row) => (row.followersCount || 0).toLocaleString(),
+                    },
+                  ]}
+                  rows={topHosts}
+                />
+              ) : (
+                <EmptyState
+                  title="No Top Hosts"
+                  description="No host performance metrics available for the leaderboard yet."
+                />
+              )}
+            </Box>
+          )}
+        </>
       )}
 
       {/* Reject Reason Dialog */}

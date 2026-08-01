@@ -7,20 +7,20 @@ export class ApplyHostDto {
   @IsNotEmpty()
   realName: string;
 
-  @ApiProperty({ example: 'ID-987654321' })
+  @ApiPropertyOptional({ example: 'ID-987654321' })
   @IsString()
-  @IsNotEmpty()
-  idNumber: string;
+  @IsOptional()
+  idNumber?: string;
 
-  @ApiProperty({ example: 'https://cdn.voicecloud.app/documents/id-front.jpg' })
+  @ApiPropertyOptional({ example: 'https://cdn.voicecloud.app/documents/id-front.jpg' })
   @IsString()
-  @IsNotEmpty()
-  documentUrl: string;
+  @IsOptional()
+  documentUrl?: string;
 
-  @ApiProperty({ example: 'https://cdn.voicecloud.app/documents/selfie.jpg' })
+  @ApiPropertyOptional({ example: 'https://cdn.voicecloud.app/documents/selfie.jpg' })
   @IsString()
-  @IsNotEmpty()
-  selfieUrl: string;
+  @IsOptional()
+  selfieUrl?: string;
 
   @ApiPropertyOptional({
     example: 'Professional live streamer with 3 years of podcast experience.',

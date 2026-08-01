@@ -2,6 +2,8 @@ import {
   INestApplication,
   ForbiddenException,
   NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -449,20 +451,27 @@ describe('Host Security and Privacy Unit Tests', () => {
               role: UserRole.ADMIN,
             });
           }
-          throw new Error('Invalid token');
+          throw new UnauthorizedException('Invalid token');
         }),
       };
+
+      const reflector = new Reflector();
+      const jwtAuthGuard = new JwtAuthGuard(reflector, mockJwtTokenService as any);
+      const rolesGuard = new RolesGuard(reflector);
 
       const moduleRef: TestingModule = await Test.createTestingModule({
         controllers: [HostsController],
         providers: [
           { provide: HostsService, useValue: mockHostsService },
           { provide: JwtTokenService, useValue: mockJwtTokenService },
-          Reflector,
-          JwtAuthGuard,
-          RolesGuard,
+          { provide: Reflector, useValue: reflector },
         ],
-      }).compile();
+      })
+        .overrideGuard(JwtAuthGuard)
+        .useValue(jwtAuthGuard)
+        .overrideGuard(RolesGuard)
+        .useValue(rolesGuard)
+        .compile();
 
       app = moduleRef.createNestApplication();
       app.setGlobalPrefix('api/v1');
