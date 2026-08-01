@@ -18,7 +18,9 @@ export class AppController {
   }
 
   @Get('api/info')
-  @ApiOperation({ summary: 'VoiceCloud Monolith API Information Detail Endpoint' })
+  @ApiOperation({
+    summary: 'VoiceCloud Monolith API Information Detail Endpoint',
+  })
   getHello() {
     return {
       name: 'VoiceCloud Monolith API',

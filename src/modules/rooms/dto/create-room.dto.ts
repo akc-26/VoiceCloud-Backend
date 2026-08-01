@@ -18,12 +18,18 @@ export class CreateRoomDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Room category', default: 'Audio Lounge' })
+  @ApiPropertyOptional({
+    description: 'Room category',
+    default: 'Audio Lounge',
+  })
   @IsOptional()
   @IsString()
   category?: string;
 
-  @ApiPropertyOptional({ description: 'Audio quality profile', default: '324kbps Ultra HD' })
+  @ApiPropertyOptional({
+    description: 'Audio quality profile',
+    default: '324kbps Ultra HD',
+  })
   @IsOptional()
   @IsString()
   audioQuality?: string;
@@ -58,7 +64,10 @@ export class CreateRoomDto {
   @IsBoolean()
   isPremium?: boolean;
 
-  @ApiPropertyOptional({ description: 'Is ticket required to enter', default: false })
+  @ApiPropertyOptional({
+    description: 'Is ticket required to enter',
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   isTicketRequired?: boolean;

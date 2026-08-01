@@ -566,18 +566,31 @@ export class CreatorService {
 
   private generateSecureStreamKey(length = 32): string {
     const byteCount = Math.ceil(length / 2);
-    const hex = crypto.randomBytes(byteCount).toString('hex').substring(0, length);
+    const hex = crypto
+      .randomBytes(byteCount)
+      .toString('hex')
+      .substring(0, length);
     return `live_vc_sk_${hex}`;
   }
 
   private async validateCreatorAuth(creatorId: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: creatorId } });
+    const user = await this.userRepository.findOne({
+      where: { id: creatorId },
+    });
     if (!user) {
-      throw new NotFoundException(`Creator account with ID "${creatorId}" not found`);
+      throw new NotFoundException(
+        `Creator account with ID "${creatorId}" not found`,
+      );
     }
     const u = user as any;
-    if (u.isActive === false || u.isSuspended === true || u.status === 'suspended') {
-      throw new ForbiddenException('Creator account is inactive, suspended, or prohibited from streaming');
+    if (
+      u.isActive === false ||
+      u.isSuspended === true ||
+      u.status === 'suspended'
+    ) {
+      throw new ForbiddenException(
+        'Creator account is inactive, suspended, or prohibited from streaming',
+      );
     }
     if (user.lockoutUntil && new Date(user.lockoutUntil) > new Date()) {
       throw new ForbiddenException('Creator account is currently locked out');

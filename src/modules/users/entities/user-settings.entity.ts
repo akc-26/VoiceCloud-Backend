@@ -81,7 +81,9 @@ export class UserSettings {
   @IsString()
   timezone: string;
 
-  @ApiPropertyOptional({ description: 'Audio quality bitrate preset (e.g. 324, 256, 128)' })
+  @ApiPropertyOptional({
+    description: 'Audio quality bitrate preset (e.g. 324, 256, 128)',
+  })
   @Column({ type: 'varchar', default: '324' })
   @IsOptional()
   @IsString()
@@ -129,13 +131,17 @@ export class UserSettings {
   @IsBoolean()
   emailAlerts: boolean;
 
-  @ApiPropertyOptional({ description: 'Preferred streaming protocol (rtmp, webrtc)' })
+  @ApiPropertyOptional({
+    description: 'Preferred streaming protocol (rtmp, webrtc)',
+  })
   @Column({ type: 'varchar', default: 'rtmp' })
   @IsOptional()
   @IsString()
   preferredProtocol: string;
 
-  @ApiPropertyOptional({ description: 'Latency mode (ultra_low, low, standard)' })
+  @ApiPropertyOptional({
+    description: 'Latency mode (ultra_low, low, standard)',
+  })
   @Column({ type: 'varchar', default: 'ultra_low' })
   @IsOptional()
   @IsString()

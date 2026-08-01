@@ -574,11 +574,15 @@ describe('Phase 2D Creator Economy Business APIs', () => {
 
     it('should return stream credentials and allow key regeneration with persistence', async () => {
       let storedCreds: any = null;
-      mockStreamCredentialRepository.findOne.mockImplementation(async () => storedCreds);
-      mockStreamCredentialRepository.save.mockImplementation(async (entity: any) => {
-        storedCreds = entity;
-        return entity;
-      });
+      mockStreamCredentialRepository.findOne.mockImplementation(
+        async () => storedCreds,
+      );
+      mockStreamCredentialRepository.save.mockImplementation(
+        async (entity: any) => {
+          storedCreds = entity;
+          return entity;
+        },
+      );
 
       const creds = await service.getStreamCredentials('user-1');
       expect(creds.rtmpUrl).toBe('rtmps://live.voicecloud.app:443/live');
@@ -590,18 +594,24 @@ describe('Phase 2D Creator Economy Business APIs', () => {
       expect(regen.streamKey).toContain('live_vc_sk_');
       expect(regen.streamKey).not.toBe(creds.streamKey);
 
-      const controllerGet = await controller.getStreamCredentials('user-1', '127.0.0.1');
+      const controllerGet = await controller.getStreamCredentials(
+        'user-1',
+        '127.0.0.1',
+      );
       expect(controllerGet.streamKey).toBe(regen.streamKey);
 
-      const controllerRegen = await controller.regenerateStreamKey('user-1', '127.0.0.1');
+      const controllerRegen = await controller.regenerateStreamKey(
+        'user-1',
+        '127.0.0.1',
+      );
       expect(controllerRegen.streamKey).toContain('live_vc_sk_');
     });
 
     it('should throw NotFoundException if creator account does not exist', async () => {
       mockUserRepository.findOne.mockResolvedValueOnce(null);
-      await expect(service.getStreamCredentials('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.getStreamCredentials('non-existent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

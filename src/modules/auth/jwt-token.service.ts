@@ -50,10 +50,7 @@ export class JwtTokenService {
   ) {}
 
   private async getJwtSecret(): Promise<string> {
-    return (
-      this.configService.get<string>('JWT_SECRET') ||
-      JWT_CONFIG.secret
-    );
+    return this.configService.get<string>('JWT_SECRET') || JWT_CONFIG.secret;
   }
 
   private async getAccessExpirationSeconds(): Promise<number> {

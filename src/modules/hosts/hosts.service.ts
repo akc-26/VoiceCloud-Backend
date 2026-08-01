@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
   Inject,
   Optional,
 } from '@nestjs/common';
@@ -179,9 +180,18 @@ export class HostsService {
   }
 
   async approveHost(id: string, adminId = 'ADMIN'): Promise<HostProfile> {
-    const host = await this.hostRepository.findOne({ where: { id } });
+    let host = await this.hostRepository.findOne({ where: { id } });
+    if (!host) {
+      host = await this.hostRepository.findOne({ where: { userId: id } });
+    }
     if (!host) {
       throw new NotFoundException(`Host application with ID ${id} not found`);
+    }
+
+    if (adminId && (adminId === host.userId || adminId === host.id)) {
+      throw new ForbiddenException(
+        'Administrators cannot approve their own host application',
+      );
     }
 
     host.status = HostVerificationStatus.APPROVED;
@@ -212,9 +222,18 @@ export class HostsService {
     reason?: string,
     adminId = 'ADMIN',
   ): Promise<HostProfile> {
-    const host = await this.hostRepository.findOne({ where: { id } });
+    let host = await this.hostRepository.findOne({ where: { id } });
+    if (!host) {
+      host = await this.hostRepository.findOne({ where: { userId: id } });
+    }
     if (!host) {
       throw new NotFoundException(`Host application with ID ${id} not found`);
+    }
+
+    if (adminId && (adminId === host.userId || adminId === host.id)) {
+      throw new ForbiddenException(
+        'Administrators cannot reject their own host application',
+      );
     }
 
     host.status = HostVerificationStatus.REJECTED;
@@ -238,9 +257,18 @@ export class HostsService {
   }
 
   async suspendHost(id: string, adminId = 'ADMIN'): Promise<HostProfile> {
-    const host = await this.hostRepository.findOne({ where: { id } });
+    let host = await this.hostRepository.findOne({ where: { id } });
+    if (!host) {
+      host = await this.hostRepository.findOne({ where: { userId: id } });
+    }
     if (!host) {
       throw new NotFoundException(`Host application with ID ${id} not found`);
+    }
+
+    if (adminId && (adminId === host.userId || adminId === host.id)) {
+      throw new ForbiddenException(
+        'Administrators cannot suspend their own host profile',
+      );
     }
 
     host.status = HostVerificationStatus.SUSPENDED;
@@ -262,9 +290,18 @@ export class HostsService {
   }
 
   async reactivateHost(id: string, adminId = 'ADMIN'): Promise<HostProfile> {
-    const host = await this.hostRepository.findOne({ where: { id } });
+    let host = await this.hostRepository.findOne({ where: { id } });
+    if (!host) {
+      host = await this.hostRepository.findOne({ where: { userId: id } });
+    }
     if (!host) {
       throw new NotFoundException(`Host application with ID ${id} not found`);
+    }
+
+    if (adminId && (adminId === host.userId || adminId === host.id)) {
+      throw new ForbiddenException(
+        'Administrators cannot reactivate their own host profile',
+      );
     }
 
     host.status = HostVerificationStatus.APPROVED;
@@ -530,8 +567,24 @@ export class HostsService {
     amount: number,
     adminId = 'ADMIN',
   ): Promise<HostEarnings> {
+    let host = await this.hostRepository.findOne({
+      where: { id: hostProfileId },
+    });
+    if (!host) {
+      host = await this.hostRepository.findOne({
+        where: { userId: hostProfileId },
+      });
+    }
+
+    if (host && adminId && (adminId === host.userId || adminId === host.id)) {
+      throw new ForbiddenException(
+        'Administrators cannot complete settlement payout for their own host profile',
+      );
+    }
+
+    const targetProfileId = host ? host.id : hostProfileId;
     const earnings = await this.earningsRepository.findOne({
-      where: { hostProfileId },
+      where: { hostProfileId: targetProfileId },
     });
     if (!earnings) {
       throw new NotFoundException('Host earnings record not found');
@@ -546,7 +599,7 @@ export class HostsService {
     const saved = await this.earningsRepository.save(earnings);
 
     await this.logAuditNote(
-      hostProfileId,
+      targetProfileId,
       adminId,
       `Completed settlement payment of $${amount.toFixed(2)}`,
       'SETTLEMENT_COMPLETED',
@@ -786,14 +839,26 @@ export class HostsService {
     amount: number,
     type = 'PERFORMANCE_BONUS',
     currency = 'DIAMONDS',
+    adminId = 'ADMIN',
   ): Promise<HostReward> {
-    const host = await this.hostRepository.findOne({
+    let host = await this.hostRepository.findOne({
       where: { id: hostProfileId },
     });
+    if (!host) {
+      host = await this.hostRepository.findOne({
+        where: { userId: hostProfileId },
+      });
+    }
     if (!host) throw new NotFoundException('Host profile not found');
 
+    if (adminId && (adminId === host.userId || adminId === host.id)) {
+      throw new ForbiddenException(
+        'Administrators cannot grant rewards to their own host profile',
+      );
+    }
+
     const reward = this.rewardRepository.create({
-      hostProfileId,
+      hostProfileId: host.id,
       userId: host.userId,
       rewardName,
       amount,
@@ -801,7 +866,16 @@ export class HostsService {
       currency,
       status: 'AVAILABLE',
     });
-    return await this.rewardRepository.save(reward);
+    const saved = await this.rewardRepository.save(reward);
+
+    await this.logAuditNote(
+      host.id,
+      adminId,
+      `Granted reward '${rewardName}' of ${amount} ${currency}`,
+      'REWARD_GRANTED',
+    );
+
+    return saved;
   }
 
   // ==========================================

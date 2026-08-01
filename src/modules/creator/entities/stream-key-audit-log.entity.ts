@@ -18,7 +18,9 @@ export class StreamKeyAuditLog {
   @Column({ type: 'varchar' })
   creatorId: string;
 
-  @ApiProperty({ description: 'Action performed (GENERATED, REGENERATED, REVOKED)' })
+  @ApiProperty({
+    description: 'Action performed (GENERATED, REGENERATED, REVOKED)',
+  })
   @Column({ type: 'varchar' })
   action: string;
 

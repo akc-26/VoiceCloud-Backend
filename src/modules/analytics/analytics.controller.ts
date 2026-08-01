@@ -30,7 +30,10 @@ export class AnalyticsController {
     @CurrentUser('userId') userId: string,
     @Query('period') period: '24h' | '7d' | '30d' | '1y' = '30d',
   ) {
-    return this.roomAnalyticsService.getCreatorAnalyticsOverview(period, userId);
+    return this.roomAnalyticsService.getCreatorAnalyticsOverview(
+      period,
+      userId,
+    );
   }
 
   @Get('rooms/:id/realtime')

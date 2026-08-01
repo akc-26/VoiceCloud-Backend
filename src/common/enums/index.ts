@@ -1,3 +1,11 @@
+export enum UserRole {
+  USER = 'USER',
+  GUEST = 'GUEST',
+  CREATOR = 'CREATOR',
+  ADMIN = 'ADMIN',
+  SUPER_ADMIN = 'SUPER_ADMIN',
+}
+
 export enum ClubRole {
   OWNER = 'OWNER',
   ADMIN = 'ADMIN',

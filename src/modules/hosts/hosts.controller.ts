@@ -33,7 +33,16 @@ import { ClaimRewardDto } from './dto/claim-reward.dto';
 import { SettlementActionDto } from './dto/settlement-action.dto';
 import { HostVerificationStatus } from './entities/host-profile.entity';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import {
+  PublicHostResponseDto,
+  OwnerHostResponseDto,
+  AdminHostResponseDto,
+  MapperUtils,
+} from './dto/host-response.dto';
 
 @ApiTags('Host Verification & Management')
 @Controller('hosts')
@@ -50,44 +59,84 @@ export class HostsController {
   @ApiOperation({ summary: 'Apply for Host Verification' })
   @ApiResponse({
     status: 201,
+    type: OwnerHostResponseDto,
     description: 'Application submitted successfully.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 409,
+    description: 'Already verified or pending application',
   })
   async apply(
     @CurrentUser('userId') userId: string,
     @Body() dto: ApplyHostDto,
   ) {
-    return this.hostsService.applyForVerification(userId, dto);
+    const profile = await this.hostsService.applyForVerification(userId, dto);
+    return MapperUtils.toOwnerHostDto(profile);
   }
 
   @Get('profile')
   @ApiOperation({ summary: 'Get current user host profile' })
-  @ApiResponse({ status: 200, description: 'Host profile retrieved.' })
+  @ApiResponse({
+    status: 200,
+    type: OwnerHostResponseDto,
+    description: 'Owner host profile retrieved.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Host profile not found' })
   async getMyProfile(@CurrentUser('userId') userId: string) {
-    return this.hostsService.getHostProfile(userId);
+    const profile = await this.hostsService.getHostProfile(userId);
+    return MapperUtils.toOwnerHostDto(profile);
   }
 
   @Get('profile/:userId')
   @ApiOperation({ summary: 'Get host profile by User ID' })
-  @ApiResponse({ status: 200, description: 'Host profile retrieved.' })
-  async getProfileByUserId(@Param('userId') targetUserId: string) {
-    return this.hostsService.getHostProfile(targetUserId);
+  @ApiResponse({
+    status: 200,
+    type: PublicHostResponseDto,
+    description: 'Public host profile retrieved.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Host profile not found' })
+  async getProfileByUserId(
+    @Param('userId') targetUserId: string,
+    @CurrentUser('userId') currentUserId: string,
+  ) {
+    const profile = await this.hostsService.getHostProfile(targetUserId);
+    if (currentUserId && currentUserId === targetUserId) {
+      return MapperUtils.toOwnerHostDto(profile);
+    }
+    return MapperUtils.toPublicHostDto(profile);
   }
 
   @Put('profile')
   @ApiOperation({ summary: 'Update current host profile information' })
-  @ApiResponse({ status: 200, description: 'Host profile updated.' })
+  @ApiResponse({
+    status: 200,
+    type: OwnerHostResponseDto,
+    description: 'Host profile updated.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Host profile not found' })
   async updateProfile(
     @CurrentUser('userId') userId: string,
     @Body() dto: UpdateHostProfileDto,
   ) {
-    return this.hostsService.updateHostProfile(userId, dto);
+    const profile = await this.hostsService.updateHostProfile(userId, dto);
+    return MapperUtils.toOwnerHostDto(profile);
   }
 
   @Get('search')
   @ApiOperation({ summary: 'Search verified host profiles' })
-  @ApiResponse({ status: 200, description: 'Matching hosts retrieved.' })
+  @ApiResponse({
+    status: 200,
+    type: [PublicHostResponseDto],
+    description: 'Matching hosts retrieved.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async search(@Query() dto: SearchHostsDto) {
-    return this.hostsService.searchHosts(dto);
+    const hosts = await this.hostsService.searchHosts(dto);
+    return hosts.map((h) => MapperUtils.toPublicHostDto(h));
   }
 
   @Get('progression')
@@ -95,6 +144,7 @@ export class HostsController {
     summary: 'Get host progression requirements and level progress',
   })
   @ApiResponse({ status: 200, description: 'Progression stats retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProgression(@CurrentUser('userId') userId: string) {
     return this.hostsService.checkPromotionRequirements(userId);
   }
@@ -119,6 +169,7 @@ export class HostsController {
     status: 201,
     description: 'Government ID uploaded successfully.',
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseInterceptors(FileInterceptor('file'))
   async uploadGovernmentId(
     @CurrentUser('userId') userId: string,
@@ -144,6 +195,7 @@ export class HostsController {
     status: 201,
     description: 'Profile photo uploaded successfully.',
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseInterceptors(FileInterceptor('file'))
   async uploadProfilePhoto(
     @CurrentUser('userId') userId: string,
@@ -169,6 +221,7 @@ export class HostsController {
     status: 201,
     description: 'Verification document uploaded successfully.',
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseInterceptors(FileInterceptor('file'))
   async uploadVerificationDocument(
     @CurrentUser('userId') userId: string,
@@ -185,6 +238,7 @@ export class HostsController {
   @Get('earnings')
   @ApiOperation({ summary: 'Get current host earnings dashboard' })
   @ApiResponse({ status: 200, description: 'Host earnings retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getEarnings(@CurrentUser('userId') userId: string) {
     return this.hostsService.getEarnings(userId);
   }
@@ -192,6 +246,8 @@ export class HostsController {
   @Post('earnings/settlement/request')
   @ApiOperation({ summary: 'Request earnings settlement withdrawal' })
   @ApiResponse({ status: 201, description: 'Settlement requested.' })
+  @ApiResponse({ status: 400, description: 'Insufficient earnings balance' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async requestSettlement(
     @CurrentUser('userId') userId: string,
     @Body() dto: SettlementActionDto,
@@ -206,15 +262,24 @@ export class HostsController {
   @Get('performance')
   @ApiOperation({ summary: 'Get host performance analytics' })
   @ApiResponse({ status: 200, description: 'Performance metrics retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getPerformance(@CurrentUser('userId') userId: string) {
     return this.hostsService.getPerformanceAnalytics(userId);
   }
 
   @Get('top-hosts')
   @ApiOperation({ summary: 'Get top performing hosts leaderboard' })
-  @ApiResponse({ status: 200, description: 'Top hosts retrieved.' })
+  @ApiResponse({
+    status: 200,
+    type: [PublicHostResponseDto],
+    description: 'Top hosts retrieved.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getTopHosts(@Query('limit') limit?: number) {
-    return this.hostsService.getTopHosts(limit ? Number(limit) : 10);
+    const hosts = await this.hostsService.getTopHosts(
+      limit ? Number(limit) : 10,
+    );
+    return hosts.map((h) => MapperUtils.toPublicHostDto(h));
   }
 
   // ==========================================
@@ -224,6 +289,8 @@ export class HostsController {
   @Post('rooms')
   @ApiOperation({ summary: 'Create or schedule a host room' })
   @ApiResponse({ status: 201, description: 'Host room created.' })
+  @ApiResponse({ status: 400, description: 'Host not approved' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async createRoom(
     @CurrentUser('userId') userId: string,
     @Body() dto: CreateHostRoomDto,
@@ -234,6 +301,7 @@ export class HostsController {
   @Get('rooms/history')
   @ApiOperation({ summary: 'Get host room history' })
   @ApiResponse({ status: 200, description: 'Room history retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getRoomHistory(@CurrentUser('userId') userId: string) {
     return this.hostsService.getHostRoomHistory(userId);
   }
@@ -241,6 +309,8 @@ export class HostsController {
   @Get('rooms/analytics/:roomId')
   @ApiOperation({ summary: 'Get host room analytics' })
   @ApiResponse({ status: 200, description: 'Room analytics retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Room not found' })
   async getRoomAnalytics(@Param('roomId') roomId: string) {
     return this.hostsService.getHostRoomAnalytics(roomId);
   }
@@ -248,6 +318,8 @@ export class HostsController {
   @Post('rooms/cancel/:roomId')
   @ApiOperation({ summary: 'Cancel scheduled host room' })
   @ApiResponse({ status: 200, description: 'Room cancelled.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Room not found' })
   async cancelRoom(
     @CurrentUser('userId') userId: string,
     @Param('roomId') roomId: string,
@@ -262,6 +334,7 @@ export class HostsController {
   @Post('moderation/action')
   @ApiOperation({ summary: 'Perform host room moderation action' })
   @ApiResponse({ status: 200, description: 'Moderation action executed.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async performModeration(
     @CurrentUser('userId') userId: string,
     @Body() dto: HostModerationActionDto,
@@ -272,6 +345,7 @@ export class HostsController {
   @Get('moderation/incidents/:roomId')
   @ApiOperation({ summary: 'Get room incident logs' })
   @ApiResponse({ status: 200, description: 'Incident logs retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getIncidents(@Param('roomId') roomId: string) {
     return this.hostsService.getIncidentLogs(roomId);
   }
@@ -283,6 +357,7 @@ export class HostsController {
   @Get('rewards')
   @ApiOperation({ summary: 'Get available host rewards' })
   @ApiResponse({ status: 200, description: 'Available rewards retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getRewards(@CurrentUser('userId') userId: string) {
     return this.hostsService.getAvailableRewards(userId);
   }
@@ -290,6 +365,9 @@ export class HostsController {
   @Post('rewards/claim')
   @ApiOperation({ summary: 'Claim available host reward' })
   @ApiResponse({ status: 200, description: 'Reward claimed.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Reward not found' })
+  @ApiResponse({ status: 409, description: 'Reward already claimed' })
   async claimReward(
     @CurrentUser('userId') userId: string,
     @Body() dto: ClaimRewardDto,
@@ -302,90 +380,155 @@ export class HostsController {
   // ==========================================
 
   @Get('admin/applications')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Get host verification applications' })
   @ApiQuery({ name: 'status', enum: HostVerificationStatus, required: false })
-  @ApiResponse({ status: 200, description: 'Applications retrieved.' })
+  @ApiResponse({
+    status: 200,
+    type: [AdminHostResponseDto],
+    description: 'Applications retrieved.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Admin access required' })
   async getApplications(@Query('status') status?: HostVerificationStatus) {
-    return this.hostsService.getApplications(status);
+    const apps = await this.hostsService.getApplications(status);
+    return apps.map((app) => MapperUtils.toAdminHostDto(app, true));
   }
 
   @Get('admin/earnings')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Get global host earnings overview' })
   @ApiResponse({ status: 200, description: 'Earnings overview retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Admin access required' })
   async getAdminEarnings() {
     return this.hostsService.getEarningsOverviewAdmin();
   }
 
   @Get('admin/audit-history/:hostId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Get audit history for a host profile' })
   @ApiResponse({ status: 200, description: 'Audit history retrieved.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Admin access required' })
+  @ApiResponse({ status: 404, description: 'Host not found' })
   async getAuditHistory(@Param('hostId') hostId: string) {
     return this.hostsService.getAuditHistory(hostId);
   }
 
   @Post('admin/approve/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Approve host application' })
-  @ApiResponse({ status: 200, description: 'Host application approved.' })
+  @ApiResponse({
+    status: 200,
+    type: AdminHostResponseDto,
+    description: 'Host application approved.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden: Admin access required or self-approval prohibited',
+  })
+  @ApiResponse({ status: 404, description: 'Host application not found' })
   async approveHost(
     @Param('id') id: string,
     @CurrentUser('userId') adminId: string,
   ) {
-    return this.hostsService.approveHost(id, adminId || 'ADMIN');
+    const res = await this.hostsService.approveHost(id, adminId);
+    return MapperUtils.toAdminHostDto(res, true);
   }
 
   @Post('admin/reject/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Reject host application' })
-  @ApiResponse({ status: 200, description: 'Host application rejected.' })
+  @ApiResponse({
+    status: 200,
+    type: AdminHostResponseDto,
+    description: 'Host application rejected.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Host application not found' })
   async rejectHost(
     @Param('id') id: string,
     @Body() dto: RejectHostDto,
     @CurrentUser('userId') adminId: string,
   ) {
-    return this.hostsService.rejectHost(id, dto?.reason, adminId || 'ADMIN');
+    const res = await this.hostsService.rejectHost(id, dto?.reason, adminId);
+    return MapperUtils.toAdminHostDto(res, true);
   }
 
   @Post('admin/suspend/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Suspend host status' })
-  @ApiResponse({ status: 200, description: 'Host status suspended.' })
+  @ApiResponse({
+    status: 200,
+    type: AdminHostResponseDto,
+    description: 'Host status suspended.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Host application not found' })
   async suspendHost(
     @Param('id') id: string,
     @CurrentUser('userId') adminId: string,
   ) {
-    return this.hostsService.suspendHost(id, adminId || 'ADMIN');
+    const res = await this.hostsService.suspendHost(id, adminId);
+    return MapperUtils.toAdminHostDto(res, true);
   }
 
   @Post('admin/reactivate/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Reactivate host status' })
-  @ApiResponse({ status: 200, description: 'Host status reactivated.' })
+  @ApiResponse({
+    status: 200,
+    type: AdminHostResponseDto,
+    description: 'Host status reactivated.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Host application not found' })
   async reactivateHost(
     @Param('id') id: string,
     @CurrentUser('userId') adminId: string,
   ) {
-    return this.hostsService.reactivateHost(id, adminId || 'ADMIN');
+    const res = await this.hostsService.reactivateHost(id, adminId);
+    return MapperUtils.toAdminHostDto(res, true);
   }
 
   @Post('admin/audit-note/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Add audit note to host profile' })
   @ApiResponse({ status: 201, description: 'Audit note added.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   async addAuditNote(
     @Param('id') id: string,
     @Body() dto: AddHostAuditNoteDto,
     @CurrentUser('userId') adminId: string,
   ) {
-    return this.hostsService.logAuditNote(
-      id,
-      adminId || 'ADMIN',
-      dto.note,
-      'NOTE_ADDED',
-    );
+    return this.hostsService.logAuditNote(id, adminId, dto.note, 'NOTE_ADDED');
   }
 
   @Post('admin/grant-reward/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Grant bonus reward to host' })
   @ApiResponse({ status: 201, description: 'Reward granted.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   async grantReward(
     @Param('id') id: string,
     @Body() dto: { rewardName: string; amount: number },
+    @CurrentUser('userId') adminId: string,
   ) {
     return this.hostsService.grantReward(
       id,
@@ -393,21 +536,22 @@ export class HostsController {
       dto.amount,
       'PERFORMANCE_BONUS',
       'DIAMONDS',
+      adminId,
     );
   }
 
   @Post('admin/settlement/complete/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Complete host settlement payout' })
   @ApiResponse({ status: 200, description: 'Settlement completed.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
   async completeSettlement(
     @Param('id') id: string,
     @Body() dto: SettlementActionDto,
     @CurrentUser('userId') adminId: string,
   ) {
-    return this.hostsService.completeSettlement(
-      id,
-      dto.amount,
-      adminId || 'ADMIN',
-    );
+    return this.hostsService.completeSettlement(id, dto.amount, adminId);
   }
 }

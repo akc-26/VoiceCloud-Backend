@@ -60,7 +60,9 @@ export class Room {
   @IsBoolean()
   isLive: boolean;
 
-  @ApiProperty({ description: 'Room Lifecycle Status (offline, live, paused, ended)' })
+  @ApiProperty({
+    description: 'Room Lifecycle Status (offline, live, paused, ended)',
+  })
   @Column({ type: 'varchar', default: 'offline' })
   @IsString()
   status: string;

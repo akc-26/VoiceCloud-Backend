@@ -1,0 +1,207 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  HostVerificationStatus,
+  HostProfile,
+} from '../entities/host-profile.entity';
+import { maskIdentityNumber } from '../../../common/utils/masking.util';
+
+export class PublicHostResponseDto {
+  @ApiProperty({ description: 'Host Profile ID' })
+  id: string;
+
+  @ApiProperty({ description: 'User ID' })
+  userId: string;
+
+  @ApiProperty({ enum: HostVerificationStatus })
+  status: HostVerificationStatus;
+
+  @ApiProperty()
+  hostLevel: number;
+
+  @ApiProperty()
+  realName: string;
+
+  @ApiPropertyOptional()
+  bio?: string;
+
+  @ApiPropertyOptional()
+  country?: string;
+
+  @ApiProperty()
+  xp: number;
+
+  @ApiProperty()
+  performanceScore: number;
+
+  @ApiProperty()
+  totalRoomsHosted: number;
+
+  @ApiProperty({ description: 'Verification status badge flag' })
+  verificationBadge: boolean;
+
+  @ApiProperty({ description: 'Host registration/approval date' })
+  hostSince: Date;
+
+  @ApiPropertyOptional({ type: [String] })
+  achievements?: string[];
+}
+
+export class OwnerHostResponseDto {
+  @ApiProperty({ description: 'Host Profile ID' })
+  id: string;
+
+  @ApiProperty({ description: 'User ID' })
+  userId: string;
+
+  @ApiProperty({ enum: HostVerificationStatus })
+  status: HostVerificationStatus;
+
+  @ApiProperty()
+  hostLevel: number;
+
+  @ApiProperty()
+  realName: string;
+
+  @ApiPropertyOptional()
+  bio?: string;
+
+  @ApiPropertyOptional()
+  country?: string;
+
+  @ApiPropertyOptional({
+    description: 'Masked government ID / passport number',
+  })
+  idNumber?: string;
+
+  @ApiPropertyOptional({ description: 'Applicant-facing rejection reason' })
+  rejectionReason?: string;
+
+  @ApiProperty({ description: 'Whether government ID document was uploaded' })
+  hasGovernmentIdUploaded: boolean;
+
+  @ApiProperty({ description: 'Whether profile selfie photo was uploaded' })
+  hasProfilePhotoUploaded: boolean;
+
+  @ApiProperty({
+    description: 'Whether additional verification documents were uploaded',
+  })
+  hasSupportingDocumentsUploaded: boolean;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+}
+
+export class AdminHostResponseDto {
+  @ApiProperty({ description: 'Host Profile ID' })
+  id: string;
+
+  @ApiProperty({ description: 'User ID' })
+  userId: string;
+
+  @ApiProperty({ enum: HostVerificationStatus })
+  status: HostVerificationStatus;
+
+  @ApiProperty()
+  hostLevel: number;
+
+  @ApiProperty()
+  realName: string;
+
+  @ApiPropertyOptional()
+  bio?: string;
+
+  @ApiPropertyOptional()
+  country?: string;
+
+  @ApiPropertyOptional({
+    description: 'Masked identity number for review list',
+  })
+  idNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'Government ID Document URL for admin verification',
+  })
+  documentUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Selfie Profile Photo URL for admin verification',
+  })
+  selfieUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Rejection reason' })
+  rejectionReason?: string;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+}
+
+export class MapperUtils {
+  static toPublicHostDto(host: HostProfile): PublicHostResponseDto {
+    return {
+      id: host.id,
+      userId: host.userId,
+      status: host.status,
+      hostLevel: host.hostLevel || 1,
+      realName: host.realName || '',
+      bio: host.bio || '',
+      country: host.country || '',
+      xp: host.xp || 0,
+      performanceScore: Number(host.performanceScore || 0),
+      totalRoomsHosted: host.totalRoomsHosted || 0,
+      verificationBadge: host.status === HostVerificationStatus.APPROVED,
+      hostSince: host.createdAt,
+      achievements: host.growthMilestones
+        ? host.growthMilestones.split(',')
+        : [],
+    };
+  }
+
+  static toOwnerHostDto(host: HostProfile): OwnerHostResponseDto {
+    return {
+      id: host.id,
+      userId: host.userId,
+      status: host.status,
+      hostLevel: host.hostLevel || 1,
+      realName: host.realName || '',
+      bio: host.bio || '',
+      country: host.country || '',
+      idNumber: maskIdentityNumber(host.idNumber),
+      rejectionReason:
+        host.status === HostVerificationStatus.REJECTED
+          ? host.rejectionReason || undefined
+          : undefined,
+      hasGovernmentIdUploaded: !!host.documentUrl,
+      hasProfilePhotoUploaded: !!host.selfieUrl,
+      hasSupportingDocumentsUploaded: !!host.documentUrl,
+      createdAt: host.createdAt,
+      updatedAt: host.updatedAt,
+    };
+  }
+
+  static toAdminHostDto(
+    host: HostProfile,
+    maskId = true,
+  ): AdminHostResponseDto {
+    return {
+      id: host.id,
+      userId: host.userId,
+      status: host.status,
+      hostLevel: host.hostLevel || 1,
+      realName: host.realName || '',
+      bio: host.bio || '',
+      country: host.country || '',
+      idNumber: maskId ? maskIdentityNumber(host.idNumber) : host.idNumber,
+      documentUrl: host.documentUrl || undefined,
+      selfieUrl: host.selfieUrl || undefined,
+      rejectionReason: host.rejectionReason || undefined,
+      createdAt: host.createdAt,
+      updatedAt: host.updatedAt,
+    };
+  }
+}

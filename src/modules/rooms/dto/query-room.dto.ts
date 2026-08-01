@@ -13,7 +13,9 @@ export class QueryRoomDto {
   @IsString()
   category?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by status (live, offline, paused, ended)' })
+  @ApiPropertyOptional({
+    description: 'Filter by status (live, offline, paused, ended)',
+  })
   @IsOptional()
   @IsString()
   status?: string;

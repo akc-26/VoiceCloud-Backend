@@ -98,7 +98,9 @@ export class WalletService {
         });
         user = await this.userRepository.save(user);
       } catch (err) {
-        this.logger.warn(`Could not auto-provision user '${userId}' for wallet: ${(err as Error).message}`);
+        this.logger.warn(
+          `Could not auto-provision user '${userId}' for wallet: ${(err as Error).message}`,
+        );
       }
     }
 

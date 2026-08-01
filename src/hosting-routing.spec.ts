@@ -125,7 +125,9 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
   it('GET /admin/users should serve Admin Portal HTML if built', async () => {
     const adminIndex = path.join(process.cwd(), 'dist/admin/index.html');
     if (fs.existsSync(adminIndex)) {
-      const res = await request(app.getHttpServer()).get('/admin/users').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/admin/users')
+        .expect(200);
       expect(res.text).toContain('<html');
     }
   });
@@ -133,13 +135,17 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
   it('GET /creator/dashboard should serve Creator Studio HTML if built', async () => {
     const creatorIndex = path.join(process.cwd(), 'dist/creator/index.html');
     if (fs.existsSync(creatorIndex)) {
-      const res = await request(app.getHttpServer()).get('/creator/dashboard').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/creator/dashboard')
+        .expect(200);
       expect(res.text).toContain('<html');
     }
   });
 
   it('GET /api/nonexistent-route should return 404 JSON, not SPA HTML', async () => {
-    const res = await request(app.getHttpServer()).get('/api/v1/nonexistent-route');
+    const res = await request(app.getHttpServer()).get(
+      '/api/v1/nonexistent-route',
+    );
     expect(res.status).toBe(404);
     expect(res.text).not.toContain('<html');
   });

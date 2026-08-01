@@ -97,7 +97,11 @@ export class RoomsService {
     return room;
   }
 
-  async updateRoom(id: string, userId: string, dto: UpdateRoomDto): Promise<Room> {
+  async updateRoom(
+    id: string,
+    userId: string,
+    dto: UpdateRoomDto,
+  ): Promise<Room> {
     const room = await this.findOne(id);
     if (room.hostId !== userId) {
       throw new ForbiddenException('Only the host can update this room');
@@ -111,7 +115,10 @@ export class RoomsService {
     return updated;
   }
 
-  async deleteRoom(id: string, userId: string): Promise<{ success: boolean; message: string }> {
+  async deleteRoom(
+    id: string,
+    userId: string,
+  ): Promise<{ success: boolean; message: string }> {
     const room = await this.findOne(id);
     if (room.hostId !== userId) {
       throw new ForbiddenException('Only the host can delete this room');
@@ -206,7 +213,11 @@ export class RoomsService {
     const room = await this.findOne(id);
     const durationSeconds =
       room.startedAt && room.endedAt
-        ? Math.floor((new Date(room.endedAt).getTime() - new Date(room.startedAt).getTime()) / 1000)
+        ? Math.floor(
+            (new Date(room.endedAt).getTime() -
+              new Date(room.startedAt).getTime()) /
+              1000,
+          )
         : 3600;
 
     return {
@@ -216,7 +227,9 @@ export class RoomsService {
       startedAt: room.startedAt,
       endedAt: room.endedAt,
       durationSeconds,
-      replayAudioUrl: room.coverUrl || 'https://assets.voicecloud.app/replays/sample_replay.mp3',
+      replayAudioUrl:
+        room.coverUrl ||
+        'https://assets.voicecloud.app/replays/sample_replay.mp3',
       listenerPeak: room.listenerCount || 420,
       totalGifts: room.giftActivity || 1250,
     };

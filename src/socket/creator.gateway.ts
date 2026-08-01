@@ -102,7 +102,9 @@ export class CreatorGateway
           `[AuthDebug] Creator socket auth failed (${client.id}): ${err?.message || err}`,
         );
       }
-      client.emit('auth_error', { message: err?.message || 'Invalid or expired JWT token' });
+      client.emit('auth_error', {
+        message: err?.message || 'Invalid or expired JWT token',
+      });
       client.disconnect(true);
     }
   }
