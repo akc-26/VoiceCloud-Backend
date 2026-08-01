@@ -1,7 +1,14 @@
-import { ForbiddenException } from '@nestjs/common';
+import {
+  INestApplication,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Test, TestingModule } from '@nestjs/testing';
+import * as request from 'supertest';
 import { maskIdentityNumber } from '../../common/utils/masking.util';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { UserRole } from '../../common/enums';
 import {
   HostProfile,
@@ -14,6 +21,8 @@ import {
   AdminHostResponseDto,
 } from './dto/host-response.dto';
 import { HostsService } from './hosts.service';
+import { HostsController } from './hosts.controller';
+import { JwtTokenService } from '../auth/jwt-token.service';
 
 describe('Host Security and Privacy Unit Tests', () => {
   describe('1. Identity Masking Utility', () => {
@@ -329,6 +338,237 @@ describe('Host Security and Privacy Unit Tests', () => {
       );
       expect(result.status).toBe(HostVerificationStatus.APPROVED);
       expect(mockHostRepo.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('5. HTTP Security & Response Privacy Endpoints', () => {
+    let app: INestApplication;
+    let mockHostsService: any;
+    let mockJwtTokenService: any;
+
+    const approvedHost: HostProfile = {
+      id: 'approved-host-id',
+      userId: 'approved-user-id',
+      realName: 'Jane Verified',
+      idNumber: '1234567890',
+      documentUrl: 'https://s3.cloud/private/gov-id-approved.pdf',
+      selfieUrl: 'https://s3.cloud/private/selfie-approved.jpg',
+      bio: 'Verified host bio',
+      languages: ['English'],
+      categories: ['Talk Show'],
+      country: 'US',
+      experience: '3 years',
+      isFeatured: true,
+      availabilitySchedule: null,
+      status: HostVerificationStatus.APPROVED,
+      hostLevel: 2,
+      xp: 800,
+      performanceScore: 95,
+      growthMilestones: null,
+      hostRating: 4.9,
+      totalRatings: 10,
+      followersCount: 500,
+      totalRoomsHosted: 20,
+      peakListeners: 150,
+      totalSpeakingTimeMinutes: 300,
+      totalAudience: 2000,
+      rejectionReason: null,
+      createdAt: new Date('2025-01-01'),
+      updatedAt: new Date('2025-01-02'),
+    };
+
+    const pendingHost: HostProfile = {
+      ...approvedHost,
+      id: 'pending-host-id',
+      userId: 'pending-user-id',
+      status: HostVerificationStatus.PENDING,
+    };
+
+    const selfApprovalHost: HostProfile = {
+      ...approvedHost,
+      id: 'creator-admin-host-id',
+      userId: 'creator-admin-id',
+      status: HostVerificationStatus.PENDING,
+    };
+
+    beforeAll(async () => {
+      mockHostsService = {
+        getApplications: jest.fn().mockResolvedValue([pendingHost]),
+        getHostProfile: jest.fn().mockImplementation((userId: string) => {
+          if (userId === 'approved-user-id')
+            return Promise.resolve(approvedHost);
+          if (userId === 'pending-user-id') return Promise.resolve(pendingHost);
+          if (userId === 'creator-admin-id')
+            return Promise.resolve(selfApprovalHost);
+          throw new NotFoundException(
+            `Host profile for user ${userId} not found`,
+          );
+        }),
+        approveHost: jest
+          .fn()
+          .mockImplementation((id: string, adminId: string) => {
+            if (
+              id === 'creator-admin-host-id' &&
+              adminId === 'creator-admin-id'
+            ) {
+              throw new ForbiddenException(
+                'Administrators cannot approve their own host verification application',
+              );
+            }
+            return Promise.resolve({ ...approvedHost, id });
+          }),
+        searchHosts: jest.fn().mockResolvedValue([approvedHost]),
+      };
+
+      mockJwtTokenService = {
+        verifyAccessToken: jest.fn().mockImplementation((token: string) => {
+          if (token === 'creator-token') {
+            return Promise.resolve({
+              userId: 'creator-1',
+              role: UserRole.USER,
+            });
+          }
+          if (token === 'approved-user-token') {
+            return Promise.resolve({
+              userId: 'approved-user-id',
+              role: UserRole.USER,
+            });
+          }
+          if (token === 'admin-token') {
+            return Promise.resolve({ userId: 'admin-1', role: UserRole.ADMIN });
+          }
+          if (token === 'superadmin-token') {
+            return Promise.resolve({
+              userId: 'superadmin-1',
+              role: UserRole.SUPER_ADMIN,
+            });
+          }
+          if (token === 'creator-admin-token') {
+            return Promise.resolve({
+              userId: 'creator-admin-id',
+              role: UserRole.ADMIN,
+            });
+          }
+          throw new Error('Invalid token');
+        }),
+      };
+
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        controllers: [HostsController],
+        providers: [
+          { provide: HostsService, useValue: mockHostsService },
+          { provide: JwtTokenService, useValue: mockJwtTokenService },
+          Reflector,
+          JwtAuthGuard,
+          RolesGuard,
+        ],
+      }).compile();
+
+      app = moduleRef.createNestApplication();
+      app.setGlobalPrefix('api/v1');
+      await app.init();
+    });
+
+    afterAll(async () => {
+      if (app) {
+        await app.close();
+      }
+    });
+
+    it('1. HTTP 401 when requesting /api/v1/hosts/admin/applications without token', async () => {
+      const res = await request(app.getHttpServer()).get(
+        '/api/v1/hosts/admin/applications',
+      );
+      expect(res.status).toBe(401);
+    });
+
+    it('2. HTTP 403 when Creator token requests Host admin endpoint', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/hosts/admin/applications')
+        .set('Authorization', 'Bearer creator-token');
+      expect(res.status).toBe(403);
+    });
+
+    it('3. HTTP 200 (Allowed) when Admin token requests Host admin endpoint', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/hosts/admin/applications')
+        .set('Authorization', 'Bearer admin-token');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('4. HTTP 200 (Allowed) when Super Admin token requests Host admin endpoint', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/hosts/admin/applications')
+        .set('Authorization', 'Bearer superadmin-token');
+      expect(res.status).toBe(200);
+    });
+
+    it('5. HTTP 403 when Creator attempts self-approval', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/hosts/admin/approve/creator-admin-host-id')
+        .set('Authorization', 'Bearer creator-admin-token');
+      expect(res.status).toBe(403);
+    });
+
+    it('6. Public Host profile contains NO identity/document fields, storage paths, or review notes', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/hosts/profile/approved-user-id')
+        .set('Authorization', 'Bearer creator-token');
+      expect(res.status).toBe(200);
+      const body = res.body;
+
+      // Must NOT expose identity or document fields
+      expect(body.idNumber).toBeUndefined();
+      expect(body.documentUrl).toBeUndefined();
+      expect(body.selfieUrl).toBeUndefined();
+      expect(body.supportingDocumentUrls).toBeUndefined();
+      expect(body.supportingDocumentAssetIds).toBeUndefined();
+      expect(body.rejectionReason).toBeUndefined();
+      expect(JSON.stringify(body)).not.toContain('s3.cloud');
+      expect(JSON.stringify(body)).not.toContain('private');
+    });
+
+    it('7. Owner Host profile contains masked identity ONLY and NO document URLs or physical storage paths', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/hosts/profile')
+        .set('Authorization', 'Bearer approved-user-token');
+      expect(res.status).toBe(200);
+      const body = res.body;
+
+      expect(body.idNumber).toBe('••••••7890');
+      expect(body.documentUrl).toBeUndefined();
+      expect(body.selfieUrl).toBeUndefined();
+      expect(body.supportingDocumentUrls).toBeUndefined();
+      expect(body.supportingDocumentAssetIds).toBeUndefined();
+      expect(body.hasGovernmentIdUploaded).toBe(true);
+      expect(body.hasProfilePhotoUploaded).toBe(true);
+      expect(JSON.stringify(body)).not.toContain('s3.cloud');
+    });
+
+    it('8. profile/:userId returns Public DTO only', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/hosts/profile/approved-user-id')
+        .set('Authorization', 'Bearer creator-token');
+      expect(res.status).toBe(200);
+      expect(res.body.verificationBadge).toBe(true);
+      expect(res.body.idNumber).toBeUndefined();
+    });
+
+    it('9. HTTP 404 when requesting public profile of a non-approved Host', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/hosts/profile/pending-user-id')
+        .set('Authorization', 'Bearer creator-token');
+      expect(res.status).toBe(404);
+    });
+
+    it('10. Public Host search returns approved Hosts only', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/hosts/search')
+        .set('Authorization', 'Bearer creator-token');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(mockHostsService.searchHosts).toHaveBeenCalled();
     });
   });
 });

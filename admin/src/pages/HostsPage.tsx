@@ -70,30 +70,7 @@ export const HostsPage: React.FC = () => {
       const data = await hostsAdminService.getApplications('PENDING');
       setApplications(data || []);
     } catch {
-      // Fallback sample
-      setApplications([
-        {
-          id: 'app-1',
-          userId: 'user-101',
-          realName: 'Sarah Jenkins',
-          idNumber: 'ID-882910',
-          documentUrl: 'https://via.placeholder.com/150',
-          selfieUrl: 'https://via.placeholder.com/150',
-          bio: 'Top voice talent with 4 years experience in podcasting and music host.',
-          languages: ['English', 'Spanish'],
-          categories: ['Music', 'Talk Show'],
-          country: 'United States',
-          status: 'PENDING',
-          hostLevel: 1,
-          xp: 250,
-          performanceScore: 92.5,
-          hostRating: 5.0,
-          followersCount: 1240,
-          totalRoomsHosted: 12,
-          totalSpeakingTimeMinutes: 420,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      setApplications([]);
     } finally {
       setLoading(false);
     }

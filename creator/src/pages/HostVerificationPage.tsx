@@ -79,12 +79,13 @@ export const HostVerificationPage: React.FC = () => {
 
       if (pData) {
         setHostProfile(pData);
-        setRealName(pData.realName || '');
-        setIdNumber(pData.idNumber || '');
+        setRealName(pData.realName || profile?.displayName || '');
+        setIdNumber(''); // Keep editable replacement field empty by default
         setCountry(pData.country || 'United States');
         setBio(pData.bio || '');
-        if (pData.documentUrl) setIdUploadedUrl(pData.documentUrl);
-        if (pData.selfieUrl) setSelfieUploadedUrl(pData.selfieUrl);
+        if (pData.languages) setLanguages(Array.isArray(pData.languages) ? pData.languages.join(', ') : pData.languages);
+        if (pData.categories) setCategories(Array.isArray(pData.categories) ? pData.categories.join(', ') : pData.categories);
+        if (pData.experience) setExperience(pData.experience);
 
         // Fetch progression stats if host profile exists
         const prog = await creatorApi.getHostProgression().catch(() => null);
@@ -133,27 +134,40 @@ export const HostVerificationPage: React.FC = () => {
     }
   };
 
+  const hasGovIdUploaded = !!hostProfile?.hasGovernmentIdUploaded || !!idUploadedUrl;
+  const hasSelfieUploaded = !!hostProfile?.hasProfilePhotoUploaded || !!selfieUploadedUrl;
+
   const handleSubmitApplication = async () => {
-    if (!realName || !idNumber) {
-      setSubmitError('Please complete all required fields (Real Name and Government ID Number)');
+    if (!realName) {
+      setSubmitError('Please complete all required fields (Real Name)');
       return;
     }
+    if (!hostProfile?.idNumber && !idNumber.trim()) {
+      setSubmitError('Please enter your Government ID / Passport Number');
+      return;
+    }
+    if (!hasGovIdUploaded || !hasSelfieUploaded) {
+      setSubmitError('Government ID document and selfie photo uploads are required before submitting your application.');
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     setSubmitSuccess(null);
 
     try {
-      const dto = {
+      const dto: any = {
         realName,
-        idNumber,
+        idNumber: idNumber.trim() ? idNumber.trim() : undefined,
         country,
         bio,
-        languages: languages.split(',').map((s) => s.trim()),
-        categories: categories.split(',').map((s) => s.trim()),
+        languages: languages.split(',').map((s) => s.trim()).filter(Boolean),
+        categories: categories.split(',').map((s) => s.trim()).filter(Boolean),
         experience,
-        documentUrl: idUploadedUrl || 'https://storage.voicecloud.app/docs/sample_id.png',
-        selfieUrl: selfieUploadedUrl || 'https://storage.voicecloud.app/docs/sample_selfie.png',
       };
+
+      if (idUploadedUrl) dto.documentUrl = idUploadedUrl;
+      if (selfieUploadedUrl) dto.selfieUrl = selfieUploadedUrl;
 
       const res = await creatorApi.applyForHostVerification(dto);
       setHostProfile(res);
@@ -285,7 +299,7 @@ export const HostVerificationPage: React.FC = () => {
                         />
                         <Chip
                           icon={<Star size={14} color="#eab308" />}
-                          label={`Rating ⭐ ${Number(hostProfile?.hostRating || 5.0).toFixed(1)}`}
+                          label={`Rating ⭐ ${hostProfile?.hostRating !== undefined && hostProfile?.hostRating !== null && Number(hostProfile.hostRating) > 0 ? Number(hostProfile.hostRating).toFixed(1) : 'N/A'}`}
                           size="small"
                         />
                       </Stack>
@@ -303,11 +317,11 @@ export const HostVerificationPage: React.FC = () => {
                     </Grid>
                     <Grid xs={6}>
                       <Typography variant="caption" color="text.secondary">Total Rooms Hosted</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{hostProfile?.totalRoomsHosted || 12} Lounges</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{hostProfile?.totalRoomsHosted !== undefined ? `${hostProfile.totalRoomsHosted} Lounges` : '0 Lounges'}</Typography>
                     </Grid>
                     <Grid xs={6}>
                       <Typography variant="caption" color="text.secondary">Peak Live Listeners</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{(hostProfile?.peakListeners || 1280).toLocaleString()}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{hostProfile?.peakListeners !== undefined ? hostProfile.peakListeners.toLocaleString() : '0'}</Typography>
                     </Grid>
                   </Grid>
 
@@ -351,6 +365,17 @@ export const HostVerificationPage: React.FC = () => {
                 )}
 
                 <Stack spacing={2.5}>
+                  {hostProfile?.idNumber && (
+                    <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 2 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                        Current Stored Government ID: <strong>{hostProfile.idNumber}</strong>
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Leave replacement field below empty to preserve stored ID.
+                      </Typography>
+                    </Box>
+                  )}
+
                   <Grid container spacing={2}>
                     <Grid xs={12} sm={6}>
                       <TextField
@@ -364,9 +389,15 @@ export const HostVerificationPage: React.FC = () => {
                     </Grid>
                     <Grid xs={12} sm={6}>
                       <TextField
-                        label="Government ID / Passport No. *"
+                        label={hostProfile?.idNumber ? "New / Replacement Government ID Number" : "Government ID / Passport No. *"}
                         value={idNumber}
-                        onChange={(e) => setIdNumber(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val.includes('*')) {
+                            setIdNumber(val);
+                          }
+                        }}
+                        helperText={hostProfile?.idNumber ? "Leave empty to keep current ID" : "Enter unmasked ID number"}
                         fullWidth
                         size="small"
                         disabled={status === 'PENDING'}
@@ -433,7 +464,7 @@ export const HostVerificationPage: React.FC = () => {
                         <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 1 }}>
                           Government ID Document
                         </Typography>
-                        {idUploadedUrl ? (
+                        {hasGovIdUploaded ? (
                           <Chip icon={<CheckCircle2 size={14} />} label="Uploaded" color="success" size="small" />
                         ) : (
                           <Button
@@ -461,7 +492,7 @@ export const HostVerificationPage: React.FC = () => {
                         <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 1 }}>
                           Verification Selfie Photo
                         </Typography>
-                        {selfieUploadedUrl ? (
+                        {hasSelfieUploaded ? (
                           <Chip icon={<CheckCircle2 size={14} />} label="Uploaded" color="success" size="small" />
                         ) : (
                           <Button

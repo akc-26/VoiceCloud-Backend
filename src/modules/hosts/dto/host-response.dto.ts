@@ -68,6 +68,15 @@ export class OwnerHostResponseDto {
   @ApiPropertyOptional()
   country?: string;
 
+  @ApiPropertyOptional({ type: [String] })
+  languages?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  categories?: string[];
+
+  @ApiPropertyOptional()
+  experience?: string;
+
   @ApiPropertyOptional({
     description: 'Masked government ID / passport number',
   })
@@ -86,6 +95,24 @@ export class OwnerHostResponseDto {
     description: 'Whether additional verification documents were uploaded',
   })
   hasSupportingDocumentsUploaded: boolean;
+
+  @ApiProperty()
+  hostRating: number;
+
+  @ApiProperty()
+  totalRoomsHosted: number;
+
+  @ApiProperty()
+  peakListeners: number;
+
+  @ApiProperty()
+  xp: number;
+
+  @ApiProperty()
+  performanceScore: number;
+
+  @ApiProperty()
+  followersCount: number;
 
   @ApiProperty()
   createdAt: Date;
@@ -115,6 +142,33 @@ export class AdminHostResponseDto {
 
   @ApiPropertyOptional()
   country?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  languages?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  categories?: string[];
+
+  @ApiPropertyOptional()
+  experience?: string;
+
+  @ApiProperty()
+  xp: number;
+
+  @ApiProperty()
+  performanceScore: number;
+
+  @ApiProperty()
+  hostRating: number;
+
+  @ApiProperty()
+  followersCount: number;
+
+  @ApiProperty()
+  totalRoomsHosted: number;
+
+  @ApiProperty()
+  totalSpeakingTimeMinutes: number;
 
   @ApiPropertyOptional({
     description: 'Masked identity number for review list',
@@ -171,6 +225,9 @@ export class MapperUtils {
       realName: host.realName || '',
       bio: host.bio || '',
       country: host.country || '',
+      languages: host.languages || [],
+      categories: host.categories || [],
+      experience: host.experience || '',
       idNumber: maskIdentityNumber(host.idNumber),
       rejectionReason:
         host.status === HostVerificationStatus.REJECTED
@@ -179,6 +236,12 @@ export class MapperUtils {
       hasGovernmentIdUploaded: !!host.documentUrl,
       hasProfilePhotoUploaded: !!host.selfieUrl,
       hasSupportingDocumentsUploaded: !!host.documentUrl,
+      hostRating: Number(host.hostRating || 0),
+      totalRoomsHosted: host.totalRoomsHosted || 0,
+      peakListeners: host.peakListeners || 0,
+      xp: host.xp || 0,
+      performanceScore: Number(host.performanceScore || 0),
+      followersCount: host.followersCount || 0,
       createdAt: host.createdAt,
       updatedAt: host.updatedAt,
     };
@@ -196,6 +259,15 @@ export class MapperUtils {
       realName: host.realName || '',
       bio: host.bio || '',
       country: host.country || '',
+      languages: host.languages || [],
+      categories: host.categories || [],
+      experience: host.experience || '',
+      xp: host.xp || 0,
+      performanceScore: Number(host.performanceScore || 0),
+      hostRating: Number(host.hostRating || 0),
+      followersCount: host.followersCount || 0,
+      totalRoomsHosted: host.totalRoomsHosted || 0,
+      totalSpeakingTimeMinutes: host.totalSpeakingTimeMinutes || 0,
       idNumber: maskId ? maskIdentityNumber(host.idNumber) : host.idNumber,
       documentUrl: host.documentUrl || undefined,
       selfieUrl: host.selfieUrl || undefined,

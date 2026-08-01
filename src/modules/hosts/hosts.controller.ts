@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -98,13 +99,12 @@ export class HostsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Host profile not found' })
-  async getProfileByUserId(
-    @Param('userId') targetUserId: string,
-    @CurrentUser('userId') currentUserId: string,
-  ) {
+  async getProfileByUserId(@Param('userId') targetUserId: string) {
     const profile = await this.hostsService.getHostProfile(targetUserId);
-    if (currentUserId && currentUserId === targetUserId) {
-      return MapperUtils.toOwnerHostDto(profile);
+    if (profile.status !== HostVerificationStatus.APPROVED) {
+      throw new NotFoundException(
+        `Host profile for user ${targetUserId} not found`,
+      );
     }
     return MapperUtils.toPublicHostDto(profile);
   }

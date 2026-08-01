@@ -111,10 +111,10 @@ export const AnalyticsPage: React.FC = () => {
                 </Typography>
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                {(data.totalListenHours ?? 1240).toLocaleString()} hrs
+                {(data.totalListenHours ?? 0).toLocaleString()} hrs
               </Typography>
-              <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
-                +12.4% vs previous period
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                {data.listenHoursGrowth ? `${data.listenHoursGrowth > 0 ? '+' : ''}${data.listenHoursGrowth}% vs previous period` : 'Not available'}
               </Typography>
             </CardContent>
           </Card>
@@ -129,10 +129,10 @@ export const AnalyticsPage: React.FC = () => {
                 </Typography>
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                {(data.peakConcurrentListeners ?? 1850).toLocaleString()}
+                {(data.peakConcurrentListeners ?? 0).toLocaleString()}
               </Typography>
-              <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
-                High: Live Audio Lounge
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                Peak concurrency
               </Typography>
             </CardContent>
           </Card>
@@ -147,10 +147,10 @@ export const AnalyticsPage: React.FC = () => {
                 </Typography>
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                {data.listenerRetentionRate ?? 84.2}%
+                {data.listenerRetentionRate !== undefined && data.listenerRetentionRate !== null ? `${data.listenerRetentionRate}%` : 'N/A'}
               </Typography>
-              <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
-                42 mins avg session
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                {data.avgSessionMinutes ? `${data.avgSessionMinutes} mins avg session` : 'Session retention'}
               </Typography>
             </CardContent>
           </Card>
@@ -165,10 +165,10 @@ export const AnalyticsPage: React.FC = () => {
                 </Typography>
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 800, color: 'success.main' }}>
-                ${(data.netRevenueUsd ?? 2840.5).toFixed(2)} USD
+                ${(data.netRevenueUsd ?? 0).toFixed(2)} USD
               </Typography>
-              <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
-                +18.2% Growth
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                {data.revenueGrowth ? `${data.revenueGrowth > 0 ? '+' : ''}${data.revenueGrowth}% Growth` : 'Revenue tracking'}
               </Typography>
             </CardContent>
           </Card>

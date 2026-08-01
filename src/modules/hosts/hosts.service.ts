@@ -70,8 +70,26 @@ export class HostsService {
         );
       }
       // If rejected, re-apply
+      const idNumberToUse =
+        dto.idNumber &&
+        !dto.idNumber.includes('*') &&
+        dto.idNumber.trim() !== ''
+          ? dto.idNumber
+          : existing.idNumber;
+      const documentUrlToUse =
+        dto.documentUrl && !dto.documentUrl.includes('sample_')
+          ? dto.documentUrl
+          : existing.documentUrl;
+      const selfieUrlToUse =
+        dto.selfieUrl && !dto.selfieUrl.includes('sample_')
+          ? dto.selfieUrl
+          : existing.selfieUrl;
+
       Object.assign(existing, {
         ...dto,
+        idNumber: idNumberToUse,
+        documentUrl: documentUrlToUse,
+        selfieUrl: selfieUrlToUse,
         status: HostVerificationStatus.PENDING,
         rejectionReason: null,
       });
@@ -142,13 +160,9 @@ export class HostsService {
   async searchHosts(dto: SearchHostsDto): Promise<HostProfile[]> {
     const queryBuilder = this.hostRepository.createQueryBuilder('host');
 
-    if (dto.status) {
-      queryBuilder.andWhere('host.status = :status', { status: dto.status });
-    } else {
-      queryBuilder.andWhere('host.status = :status', {
-        status: HostVerificationStatus.APPROVED,
-      });
-    }
+    queryBuilder.andWhere('host.status = :status', {
+      status: HostVerificationStatus.APPROVED,
+    });
 
     if (dto.query) {
       queryBuilder.andWhere(
