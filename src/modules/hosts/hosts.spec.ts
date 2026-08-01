@@ -181,33 +181,187 @@ describe('HostsService (Phase 25)', () => {
   });
 
   describe('applyForVerification', () => {
-    it('should submit application when user is not existing host', async () => {
-      mockHostRepository.findOne.mockResolvedValue(null);
-      const dto = {
-        realName: 'Jane Smith',
-        idNumber: 'ID-999',
-        documentUrl: 'https://doc.jpg',
-        selfieUrl: 'https://selfie.jpg',
-      };
+    describe('1. New Application Requirements', () => {
+      it('should submit application when user is not existing host and all required fields are provided', async () => {
+        mockHostRepository.findOne.mockResolvedValue(null);
+        const dto = {
+          realName: 'Jane Smith',
+          idNumber: 'ID-999',
+          documentUrl: 'https://cdn.example.com/doc.jpg',
+          selfieUrl: 'https://cdn.example.com/selfie.jpg',
+        };
 
-      const result = await service.applyForVerification('user-uuid-9', dto);
-      expect(result).toBeDefined();
-      expect(result.status).toEqual(HostVerificationStatus.PENDING);
+        const result = await service.applyForVerification('user-uuid-9', dto);
+        expect(result).toBeDefined();
+        expect(result.status).toEqual(HostVerificationStatus.PENDING);
+        expect(result.idNumber).toEqual('ID-999');
+        expect(result.documentUrl).toEqual('https://cdn.example.com/doc.jpg');
+        expect(result.selfieUrl).toEqual('https://cdn.example.com/selfie.jpg');
+      });
+
+      it('should throw BadRequestException if new application is missing ID number', async () => {
+        mockHostRepository.findOne.mockResolvedValue(null);
+        await expect(
+          service.applyForVerification('user-uuid-9', {
+            realName: 'Jane Smith',
+            idNumber: '',
+            documentUrl: 'https://cdn.example.com/doc.jpg',
+            selfieUrl: 'https://cdn.example.com/selfie.jpg',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw BadRequestException if new application is missing government ID document', async () => {
+        mockHostRepository.findOne.mockResolvedValue(null);
+        await expect(
+          service.applyForVerification('user-uuid-9', {
+            realName: 'Jane Smith',
+            idNumber: 'ID-999',
+            documentUrl: '',
+            selfieUrl: 'https://cdn.example.com/selfie.jpg',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw BadRequestException if new application is missing selfie photo', async () => {
+        mockHostRepository.findOne.mockResolvedValue(null);
+        await expect(
+          service.applyForVerification('user-uuid-9', {
+            realName: 'Jane Smith',
+            idNumber: 'ID-999',
+            documentUrl: 'https://cdn.example.com/doc.jpg',
+            selfieUrl: '',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw ConflictException if host is already approved', async () => {
+        mockHostRepository.findOne.mockResolvedValue({
+          ...mockHostProfile,
+          status: HostVerificationStatus.APPROVED,
+        });
+        await expect(
+          service.applyForVerification('user-uuid-1', {
+            realName: 'Jane',
+            idNumber: 'ID',
+            documentUrl: 'doc',
+            selfieUrl: 'selfie',
+          }),
+        ).rejects.toThrow(ConflictException);
+      });
     });
 
-    it('should throw ConflictException if host is already approved', async () => {
-      mockHostRepository.findOne.mockResolvedValue({
+    describe('2. Reapplication Requirements', () => {
+      const getRejectedHost = () => ({
         ...mockHostProfile,
-        status: HostVerificationStatus.APPROVED,
+        id: 'host-rejected-1',
+        userId: 'user-rejected-1',
+        idNumber: 'ORIGINAL-ID-123',
+        documentUrl: 'https://cdn.example.com/stored-doc.jpg',
+        selfieUrl: 'https://cdn.example.com/stored-selfie.jpg',
+        status: HostVerificationStatus.REJECTED,
       });
-      await expect(
-        service.applyForVerification('user-uuid-1', {
-          realName: 'Jane',
-          idNumber: 'ID',
-          documentUrl: 'doc',
-          selfieUrl: 'selfie',
-        }),
-      ).rejects.toThrow(ConflictException);
+
+      it('should allow reapplication reusing valid stored identity and documents when blank replacement fields are supplied', async () => {
+        mockHostRepository.findOne.mockResolvedValue(getRejectedHost());
+
+        const result = await service.applyForVerification('user-rejected-1', {
+          realName: 'Jane Reapplicant',
+          idNumber: '',
+          documentUrl: '',
+          selfieUrl: '',
+        });
+
+        expect(result.status).toEqual(HostVerificationStatus.PENDING);
+        expect(result.idNumber).toEqual('ORIGINAL-ID-123');
+        expect(result.documentUrl).toEqual('https://cdn.example.com/stored-doc.jpg');
+        expect(result.selfieUrl).toEqual('https://cdn.example.com/stored-selfie.jpg');
+      });
+
+      it('should replace stored identity number with newly supplied valid replacement identity', async () => {
+        mockHostRepository.findOne.mockResolvedValue(getRejectedHost());
+
+        const result = await service.applyForVerification('user-rejected-1', {
+          realName: 'Jane Reapplicant',
+          idNumber: 'NEW-VALID-ID-999',
+          documentUrl: '',
+          selfieUrl: '',
+        });
+
+        expect(result.status).toEqual(HostVerificationStatus.PENDING);
+        expect(result.idNumber).toEqual('NEW-VALID-ID-999');
+        expect(result.documentUrl).toEqual('https://cdn.example.com/stored-doc.jpg');
+      });
+
+      it('should throw BadRequestException if both submitted and stored required values are missing', async () => {
+        const brokenRejectedHost = {
+          ...getRejectedHost(),
+          idNumber: '',
+          documentUrl: '',
+          selfieUrl: '',
+        };
+        mockHostRepository.findOne.mockResolvedValue(brokenRejectedHost);
+
+        await expect(
+          service.applyForVerification('user-rejected-1', {
+            realName: 'Jane Reapplicant',
+            idNumber: '',
+            documentUrl: '',
+            selfieUrl: '',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should not persist mask placeholders during reapplication', async () => {
+        mockHostRepository.findOne.mockResolvedValue(getRejectedHost());
+
+        await expect(
+          service.applyForVerification('user-rejected-1', {
+            realName: 'Jane Reapplicant',
+            idNumber: '••••••3210',
+            documentUrl: '',
+            selfieUrl: '',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe('3. Mask Validation in Service Path', () => {
+      it('should reject identity values containing asterisk (*)', async () => {
+        mockHostRepository.findOne.mockResolvedValue(null);
+        await expect(
+          service.applyForVerification('user-1', {
+            realName: 'Jane',
+            idNumber: '1234****5678',
+            documentUrl: 'https://doc.jpg',
+            selfieUrl: 'https://selfie.jpg',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should reject identity values containing bullet (•)', async () => {
+        mockHostRepository.findOne.mockResolvedValue(null);
+        await expect(
+          service.applyForVerification('user-1', {
+            realName: 'Jane',
+            idNumber: '••••••7890',
+            documentUrl: 'https://doc.jpg',
+            selfieUrl: 'https://selfie.jpg',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should reject identity values containing black circle (●)', async () => {
+        mockHostRepository.findOne.mockResolvedValue(null);
+        await expect(
+          service.applyForVerification('user-1', {
+            realName: 'Jane',
+            idNumber: '●●●●●●7890',
+            documentUrl: 'https://doc.jpg',
+            selfieUrl: 'https://selfie.jpg',
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
     });
   });
 
