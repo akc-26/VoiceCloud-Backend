@@ -7,6 +7,7 @@ import { HostPerformance } from './entities/host-performance.entity';
 import { HostRoom } from './entities/host-room.entity';
 import { HostIncidentLog } from './entities/host-incident-log.entity';
 import { HostReward } from './entities/host-reward.entity';
+import { HostVerificationAsset } from './entities/host-verification-asset.entity';
 import { HostsService } from './hosts.service';
 import { HostsController } from './hosts.controller';
 import { StorageModule } from '../storage/storage.module';
@@ -21,6 +22,7 @@ import { StorageModule } from '../storage/storage.module';
       HostRoom,
       HostIncidentLog,
       HostReward,
+      HostVerificationAsset,
     ]),
     StorageModule,
   ],
