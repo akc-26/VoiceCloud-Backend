@@ -29,4 +29,12 @@ export interface IStorageDriver {
   generatePublicUrl(filePath: string): string;
 
   generateInternalUrl(filePath: string): string;
+
+  writePrivate(key: string, data: Buffer, mimeType?: string): Promise<void>;
+
+  readPrivate(key: string): Promise<Buffer>;
+
+  existsPrivate(key: string): Promise<boolean>;
+
+  deletePrivate(key: string): Promise<boolean>;
 }

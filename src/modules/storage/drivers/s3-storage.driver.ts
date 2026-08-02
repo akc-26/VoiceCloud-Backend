@@ -82,4 +82,32 @@ export class S3StorageDriver implements IStorageDriver {
   generateInternalUrl(filePath: string): string {
     return `s3://${this.config.bucket}/${filePath}`;
   }
+
+  async writePrivate(
+    _key: string,
+    _data: Buffer,
+    _mimeType?: string,
+  ): Promise<void> {
+    throw new Error(
+      'S3 private storage operations are unsupported in this subpart',
+    );
+  }
+
+  async readPrivate(_key: string): Promise<Buffer> {
+    throw new Error(
+      'S3 private storage operations are unsupported in this subpart',
+    );
+  }
+
+  async existsPrivate(_key: string): Promise<boolean> {
+    throw new Error(
+      'S3 private storage operations are unsupported in this subpart',
+    );
+  }
+
+  async deletePrivate(_key: string): Promise<boolean> {
+    throw new Error(
+      'S3 private storage operations are unsupported in this subpart',
+    );
+  }
 }

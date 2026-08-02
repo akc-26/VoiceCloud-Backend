@@ -27,6 +27,10 @@ export function validateProductionEnvironment(): void {
     { name: 'DATABASE_PASSWORD', description: 'PostgreSQL database password' },
     { name: 'REDIS_HOST', description: 'Redis host address' },
     { name: 'REDIS_PORT', description: 'Redis port number' },
+    {
+      name: 'PRIVATE_STORAGE_PATH',
+      description: 'Explicit private storage directory path',
+    },
   ];
 
   const missingVars: string[] = [];

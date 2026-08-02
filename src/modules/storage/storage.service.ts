@@ -12,6 +12,8 @@ import { StorageFactory } from './storage.factory';
 import { MediaCategory } from './enums/media-category.enum';
 import { UploadMediaDto } from './dto/upload-media.dto';
 import { QueryMediaDto } from './dto/query-media.dto';
+import { PrivateDocumentCategory } from './enums/private-document-category.enum';
+import { generateOpaquePrivateStorageKey } from './utils/private-storage-key.util';
 
 @Injectable()
 export class StorageService {
@@ -326,5 +328,37 @@ export class StorageService {
   async generateInternalUrl(filePath: string): Promise<string> {
     const driver = await this.storageFactory.getActiveDriver();
     return driver.generateInternalUrl(filePath);
+  }
+
+  async writePrivateObject(
+    key: string,
+    data: Buffer,
+    mimeType?: string,
+  ): Promise<void> {
+    const driver = await this.storageFactory.getActiveDriver();
+    await driver.writePrivate(key, data, mimeType);
+  }
+
+  async readPrivateObject(key: string): Promise<Buffer> {
+    const driver = await this.storageFactory.getActiveDriver();
+    return driver.readPrivate(key);
+  }
+
+  async existsPrivateObject(key: string): Promise<boolean> {
+    const driver = await this.storageFactory.getActiveDriver();
+    return driver.existsPrivate(key);
+  }
+
+  async deletePrivateObject(key: string): Promise<boolean> {
+    const driver = await this.storageFactory.getActiveDriver();
+    return driver.deletePrivate(key);
+  }
+
+  generatePrivateStorageKey(
+    ownerScope: string,
+    category: PrivateDocumentCategory | string,
+    extension?: string,
+  ): string {
+    return generateOpaquePrivateStorageKey(ownerScope, category, extension);
   }
 }

@@ -9,4 +9,14 @@ export const validationSchema = Joi.object({
   DATABASE_PASSWORD: Joi.string().default('postgres'),
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().default(6379),
+  PRIVATE_STORAGE_PATH: Joi.string().default('private_uploads'),
+  HOST_GOVERNMENT_ID_MAX_SIZE: Joi.number()
+    .integer()
+    .positive()
+    .default(10485760),
+  HOST_SELFIE_MAX_SIZE: Joi.number().integer().positive().default(5242880),
+  HOST_SUPPORTING_DOCUMENT_MAX_SIZE: Joi.number()
+    .integer()
+    .positive()
+    .default(20971520),
 });

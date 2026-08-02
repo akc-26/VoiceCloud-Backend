@@ -1,0 +1,5 @@
+export enum PrivateDocumentCategory {
+  GOVERNMENT_ID = 'GOVERNMENT_ID',
+  SELFIE = 'SELFIE',
+  SUPPORTING_DOCUMENT = 'SUPPORTING_DOCUMENT',
+}
