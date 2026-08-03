@@ -35,6 +35,7 @@ import {
 } from './host-verification-asset.service';
 import { HostVerificationAsset } from './entities/host-verification-asset.entity';
 import { HostEligibilityService } from './host-eligibility.service';
+import { HostLevelConfigService } from './host-level-config.service';
 
 @Injectable()
 export class HostsService {
@@ -60,6 +61,8 @@ export class HostsService {
     private readonly hostVerificationAssetService?: HostVerificationAssetService,
     @Optional()
     private readonly hostEligibilityService?: HostEligibilityService,
+    @Optional()
+    private readonly hostLevelConfigService?: HostLevelConfigService,
   ) {}
 
   // ==========================================
@@ -727,6 +730,14 @@ export class HostsService {
     );
   }
 
+
+  private getHostLevelConfigService(): HostLevelConfigService {
+    if (!this.hostLevelConfigService) {
+      throw new Error('Host level configuration service is unavailable');
+    }
+    return this.hostLevelConfigService;
+  }
+
   private getPrivateAssetService(): HostVerificationAssetService {
     if (!this.hostVerificationAssetService) {
       throw new Error('Private Host verification asset service is unavailable');
@@ -746,32 +757,28 @@ export class HostsService {
   }
 
   private async calculateAndApplyLevel(host: HostProfile): Promise<number> {
-    // Level formula:
-    // Level 1: 0 XP
-    // Level 2: 1,000 XP
-    // Level 3: 5,000 XP
-    // Level 4: 15,000 XP
-    // Level 5: 50,000 XP
-    let newLevel = 1;
-    const xp = host.xp || 0;
-    if (xp >= 50000) newLevel = 5;
-    else if (xp >= 15000) newLevel = 4;
-    else if (xp >= 5000) newLevel = 3;
-    else if (xp >= 1000) newLevel = 2;
+    const levelConfig = this.getHostLevelConfigService();
+    const definitions = await levelConfig.getDefinitions();
+    const configuredLevel = levelConfig.getLevelForXp(
+      definitions,
+      host.xp || 0,
+    );
 
-    if (newLevel > host.hostLevel) {
+    if (configuredLevel.level > host.hostLevel) {
       const oldLevel = host.hostLevel;
-      host.hostLevel = newLevel;
+      host.hostLevel = configuredLevel.level;
       await this.logAuditNote(
         host.id,
         'SYSTEM',
-        `Host promoted from Level ${oldLevel} to Level ${newLevel}`,
+        `Host promoted from Level ${oldLevel} to Level ${configuredLevel.level} (${configuredLevel.name})`,
         'LEVEL_PROMOTED',
       );
       this.eventsGateway.broadcastHostEvent('host:level_up', {
         userId: host.userId,
         oldLevel,
-        newLevel,
+        newLevel: configuredLevel.level,
+        levelName: configuredLevel.name,
+        benefits: configuredLevel.benefits,
       });
     }
     return host.hostLevel;
@@ -779,24 +786,32 @@ export class HostsService {
 
   async checkPromotionRequirements(userId: string) {
     const host = await this.getHostProfile(userId);
-    const currentLevel = host.hostLevel;
-    const nextLevel = currentLevel + 1;
-
-    let requiredXP = 1000;
-    if (nextLevel === 3) requiredXP = 5000;
-    if (nextLevel === 4) requiredXP = 15000;
-    if (nextLevel === 5) requiredXP = 50000;
+    const levelConfig = this.getHostLevelConfigService();
+    const definitions = await levelConfig.getDefinitions();
+    const currentXP = Math.max(0, host.xp || 0);
+    const configuredCurrent = levelConfig.getLevelForXp(
+      definitions,
+      currentXP,
+    );
+    const next = levelConfig.getNextLevel(
+      definitions,
+      configuredCurrent.level,
+    );
 
     return {
-      currentLevel,
-      nextLevel,
-      currentXP: host.xp || 0,
-      requiredXP,
-      progressPercentage: Math.min(
-        100,
-        Math.round(((host.xp || 0) / requiredXP) * 100),
-      ),
-      isEligible: (host.xp || 0) >= requiredXP,
+      currentLevel: configuredCurrent.level,
+      currentLevelName: configuredCurrent.name,
+      nextLevel: next?.level ?? null,
+      nextLevelName: next?.name ?? null,
+      currentXP,
+      requiredXP: next?.minimumXp ?? null,
+      progressPercentage: next
+        ? Math.min(100, Math.round((currentXP / next.minimumXp) * 100))
+        : 100,
+      isEligible: next ? currentXP >= next.minimumXp : true,
+      isMaximumLevel: next === null,
+      currentBenefits: configuredCurrent.benefits,
+      nextBenefits: next?.benefits ?? [],
     };
   }
 

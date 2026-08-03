@@ -293,6 +293,68 @@ const DEFAULT_SYSTEM_SETTINGS = [
     isPublic: true,
   },
   {
+    key: 'host_level_definitions',
+    group: 'host',
+    title: 'Host Level Definitions',
+    description:
+      'JSON configuration for Host XP thresholds, level names and benefits',
+    value: JSON.stringify([
+      {
+        level: 1,
+        name: 'Starter Host',
+        minimumXp: 0,
+        benefits: [
+          { key: 'host_badge', label: 'Host badge and standard room tools' },
+        ],
+      },
+      {
+        level: 2,
+        name: 'Rising Host',
+        minimumXp: 1000,
+        benefits: [
+          {
+            key: 'priority_discovery',
+            label: 'Priority placement in Host discovery',
+          },
+        ],
+      },
+      {
+        level: 3,
+        name: 'Established Host',
+        minimumXp: 5000,
+        benefits: [
+          { key: 'enhanced_analytics', label: 'Enhanced Host analytics' },
+        ],
+      },
+      {
+        level: 4,
+        name: 'Elite Host',
+        minimumXp: 15000,
+        benefits: [
+          {
+            key: 'featured_eligibility',
+            label: 'Eligibility for featured placement',
+          },
+        ],
+      },
+      {
+        level: 5,
+        name: 'Premier Host',
+        minimumXp: 50000,
+        benefits: [
+          {
+            key: 'premier_support',
+            label: 'Premier Host support benefits',
+          },
+        ],
+      },
+    ]),
+    valueType: SettingValueType.JSON,
+    defaultValue: '[]',
+    isEditable: true,
+    isPublic: true,
+  },
+  {
     key: 'agency_commission_pct',
     group: 'agency',
     title: 'Agency Commission %',

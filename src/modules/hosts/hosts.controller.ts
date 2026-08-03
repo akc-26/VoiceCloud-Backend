@@ -59,6 +59,7 @@ import {
 } from './interceptors/host-verification-upload.interceptor';
 import { ReplaceHostVerificationAssetDto } from './dto/replace-host-verification-asset.dto';
 import { HostEligibilityResponseDto } from './dto/host-eligibility-response.dto';
+import { HostProgressionResponseDto } from './dto/host-progression-response.dto';
 
 @ApiTags('Host Verification & Management')
 @Controller('hosts')
@@ -172,7 +173,11 @@ export class HostsController {
   @ApiOperation({
     summary: 'Get host progression requirements and level progress',
   })
-  @ApiResponse({ status: 200, description: 'Progression stats retrieved.' })
+  @ApiResponse({
+    status: 200,
+    type: HostProgressionResponseDto,
+    description: 'Backend-configured Host progression stats retrieved.',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProgression(@CurrentUser('userId') userId: string) {
     return this.hostsService.checkPromotionRequirements(userId);

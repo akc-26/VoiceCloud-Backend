@@ -20,6 +20,7 @@ import { Room } from '../rooms/entities/room.entity';
 import { ModerationAction } from '../moderation/entities/moderation-action.entity';
 import { SystemSetting } from '../admin/entities/system-setting.entity';
 import { HostEligibilityService } from './host-eligibility.service';
+import { HostLevelConfigService } from './host-level-config.service';
 
 @Module({
   imports: [
@@ -47,12 +48,14 @@ import { HostEligibilityService } from './host-eligibility.service';
     HostVerificationUploadInterceptor,
     LegacyHostVerificationMigrationService,
     HostEligibilityService,
+    HostLevelConfigService,
   ],
   exports: [
     HostsService,
     HostVerificationAssetService,
     LegacyHostVerificationMigrationService,
     HostEligibilityService,
+    HostLevelConfigService,
   ],
 })
 export class HostsModule {}

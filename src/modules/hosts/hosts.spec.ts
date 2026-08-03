@@ -14,6 +14,7 @@ import { HostReward } from './entities/host-reward.entity';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { StorageService } from '../storage/storage.service';
 import { HostEligibilityService } from './host-eligibility.service';
+import { HostLevelConfigService } from './host-level-config.service';
 import {
   NotFoundException,
   ConflictException,
@@ -144,6 +145,24 @@ describe('HostsService (Phase 25)', () => {
     assertEligible: jest.fn().mockResolvedValue({ eligible: true }),
   };
 
+  const hostLevelDefinitions = [
+    { level: 1, name: 'Starter Host', minimumXp: 0, benefits: [] },
+    { level: 2, name: 'Rising Host', minimumXp: 1000, benefits: [] },
+    { level: 3, name: 'Established Host', minimumXp: 5000, benefits: [] },
+    { level: 4, name: 'Elite Host', minimumXp: 15000, benefits: [] },
+    { level: 5, name: 'Premier Host', minimumXp: 50000, benefits: [] },
+  ];
+
+  const mockHostLevelConfigService = {
+    getDefinitions: jest.fn().mockResolvedValue(hostLevelDefinitions),
+    getLevelForXp: jest.fn((definitions, xp) =>
+      [...definitions].reverse().find((definition) => xp >= definition.minimumXp),
+    ),
+    getNextLevel: jest.fn((definitions, currentLevel) =>
+      definitions.find((definition) => definition.level > currentLevel) || null,
+    ),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -178,6 +197,10 @@ describe('HostsService (Phase 25)', () => {
         {
           provide: HostEligibilityService,
           useValue: mockHostEligibilityService,
+        },
+        {
+          provide: HostLevelConfigService,
+          useValue: mockHostLevelConfigService,
         },
       ],
     }).compile();
@@ -433,6 +456,22 @@ describe('HostsService (Phase 25)', () => {
         'host:level_up',
         expect.anything(),
       );
+    });
+
+    it('returns configured level names, thresholds and benefits', async () => {
+      mockHostRepository.findOne.mockResolvedValue({
+        ...mockHostProfile,
+        hostLevel: 2,
+        xp: 1200,
+      });
+
+      const progression = await service.checkPromotionRequirements(
+        'user-uuid-1',
+      );
+      expect(progression.currentLevelName).toBe('Rising Host');
+      expect(progression.nextLevel).toBe(3);
+      expect(progression.requiredXP).toBe(5000);
+      expect(progression.isMaximumLevel).toBe(false);
     });
   });
 
