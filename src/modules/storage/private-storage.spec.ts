@@ -187,14 +187,22 @@ describe('Secure Private Storage Driver Foundation (B2A-1A)', () => {
 
     it('15. Opaque key generation conceals phone number', () => {
       const phone = '+15551234567';
+      const phoneDigits = phone.replace(/\D/g, '');
       const key = generateOpaquePrivateStorageKey(
         phone,
         PrivateDocumentCategory.SELFIE,
         '.jpg',
       );
+      const segments = key.split('/');
+      const uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-      expect(key.includes('15551234567')).toBe(false);
-      expect(key.includes('555')).toBe(false);
+      expect(key).not.toContain(phoneDigits);
+      expect(segments).toHaveLength(4);
+      expect(segments[0]).toBe('host-verification');
+      expect(segments[1]).toMatch(uuidPattern);
+      expect(segments[2]).toBe(PrivateDocumentCategory.SELFIE);
+      expect(segments[3].replace(/\.jpg$/i, '')).toMatch(uuidPattern);
     });
 
     it('16. Opaque key generation conceals username and UUID owner ID', () => {

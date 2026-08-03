@@ -156,10 +156,14 @@ describe('HostsService (Phase 25)', () => {
   const mockHostLevelConfigService = {
     getDefinitions: jest.fn().mockResolvedValue(hostLevelDefinitions),
     getLevelForXp: jest.fn((definitions, xp) =>
-      [...definitions].reverse().find((definition) => xp >= definition.minimumXp),
+      [...definitions]
+        .reverse()
+        .find((definition) => xp >= definition.minimumXp),
     ),
-    getNextLevel: jest.fn((definitions, currentLevel) =>
-      definitions.find((definition) => definition.level > currentLevel) || null,
+    getNextLevel: jest.fn(
+      (definitions, currentLevel) =>
+        definitions.find((definition) => definition.level > currentLevel) ||
+        null,
     ),
   };
 
@@ -307,8 +311,12 @@ describe('HostsService (Phase 25)', () => {
 
         expect(result.status).toEqual(HostVerificationStatus.PENDING);
         expect(result.idNumber).toEqual('ORIGINAL-ID-123');
-        expect(result.documentUrl).toEqual('https://cdn.example.com/stored-doc.jpg');
-        expect(result.selfieUrl).toEqual('https://cdn.example.com/stored-selfie.jpg');
+        expect(result.documentUrl).toEqual(
+          'https://cdn.example.com/stored-doc.jpg',
+        );
+        expect(result.selfieUrl).toEqual(
+          'https://cdn.example.com/stored-selfie.jpg',
+        );
       });
 
       it('should replace stored identity number with newly supplied valid replacement identity', async () => {
@@ -323,7 +331,9 @@ describe('HostsService (Phase 25)', () => {
 
         expect(result.status).toEqual(HostVerificationStatus.PENDING);
         expect(result.idNumber).toEqual('NEW-VALID-ID-999');
-        expect(result.documentUrl).toEqual('https://cdn.example.com/stored-doc.jpg');
+        expect(result.documentUrl).toEqual(
+          'https://cdn.example.com/stored-doc.jpg',
+        );
       });
 
       it('should throw BadRequestException if both submitted and stored required values are missing', async () => {
@@ -465,9 +475,8 @@ describe('HostsService (Phase 25)', () => {
         xp: 1200,
       });
 
-      const progression = await service.checkPromotionRequirements(
-        'user-uuid-1',
-      );
+      const progression =
+        await service.checkPromotionRequirements('user-uuid-1');
       expect(progression.currentLevelName).toBe('Rising Host');
       expect(progression.nextLevel).toBe(3);
       expect(progression.requiredXP).toBe(5000);

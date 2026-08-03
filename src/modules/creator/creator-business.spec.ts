@@ -29,6 +29,7 @@ import {
 describe('Phase 2D Creator Economy Business APIs', () => {
   let service: CreatorService;
   let controller: CreatorController;
+  let moduleRef: TestingModule;
 
   const mockPlanRepository = {
     create: jest.fn(),
@@ -80,17 +81,8 @@ describe('Phase 2D Creator Economy Business APIs', () => {
     get: jest.fn((key: string, defaultVal: any) => defaultVal),
   };
 
-  beforeEach(async () => {
-    jest.clearAllMocks();
-
-    mockUserRepository.findOne.mockImplementation(async ({ where }) => {
-      if (where && where.id === 'user-1') {
-        return { id: 'user-1', isActive: true, isSuspended: false };
-      }
-      return null;
-    });
-
-    const module: TestingModule = await Test.createTestingModule({
+  beforeAll(async () => {
+    moduleRef = await Test.createTestingModule({
       controllers: [CreatorController],
       providers: [
         CreatorService,
@@ -136,8 +128,38 @@ describe('Phase 2D Creator Economy Business APIs', () => {
       ],
     }).compile();
 
-    service = module.get<CreatorService>(CreatorService);
-    controller = module.get<CreatorController>(CreatorController);
+    service = moduleRef.get<CreatorService>(CreatorService);
+    controller = moduleRef.get<CreatorController>(CreatorController);
+  });
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+
+    mockConfigService.get.mockImplementation(
+      (_key: string, defaultVal: any) => defaultVal,
+    );
+    mockUserRepository.findOne.mockImplementation(async ({ where }) => {
+      if (where && where.id === 'user-1') {
+        return { id: 'user-1', isActive: true, isSuspended: false };
+      }
+      return null;
+    });
+    mockStreamCredentialRepository.create.mockImplementation((dto) => dto);
+    mockStreamCredentialRepository.save.mockImplementation((obj) =>
+      Promise.resolve(obj),
+    );
+    mockAuditLogRepository.create.mockImplementation((dto) => dto);
+    mockAuditLogRepository.save.mockImplementation((obj) =>
+      Promise.resolve(obj),
+    );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    await moduleRef.close();
   });
 
   describe('CreatorService - Plan Management', () => {
@@ -575,7 +597,17 @@ describe('Phase 2D Creator Economy Business APIs', () => {
     it('should return stream credentials and allow key regeneration with persistence', async () => {
       let storedCreds: any = null;
       mockStreamCredentialRepository.findOne.mockImplementation(
-        async () => storedCreds,
+        async ({ where }: any) => {
+          if (where?.creatorId) {
+            return storedCreds;
+          }
+          if (where?.streamKey) {
+            return storedCreds?.streamKey === where.streamKey
+              ? storedCreds
+              : null;
+          }
+          return null;
+        },
       );
       mockStreamCredentialRepository.save.mockImplementation(
         async (entity: any) => {

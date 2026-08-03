@@ -89,13 +89,23 @@ describe('B2A-3 controlled legacy Host verification migration', () => {
     });
 
     it('rejects a symbolic-link escape in a legacy public path', async () => {
-      const outside = path.join(tempRoot, 'outside.jpg');
-      const link = path.join(publicRoot, 'host_id', 'link.jpg');
-      fs.writeFileSync(outside, JPEG);
-      fs.symlinkSync(outside, link);
+      const outsideDirectory = path.join(tempRoot, 'outside');
+      const outsideFile = path.join(outsideDirectory, 'identity.jpg');
+      const linkedDirectory = path.join(publicRoot, 'host_id', 'linked');
+      fs.mkdirSync(outsideDirectory, { recursive: true });
+      fs.writeFileSync(outsideFile, JPEG);
+
+      // Windows file symlinks require elevated privileges on many systems.
+      // Directory junctions exercise the same path-component escape check
+      // without weakening or skipping the security assertion.
+      fs.symlinkSync(
+        outsideDirectory,
+        linkedDirectory,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
 
       await expect(
-        driver.readLegacyPublic('/uploads/host_id/link.jpg'),
+        driver.readLegacyPublic('/uploads/host_id/linked/identity.jpg'),
       ).rejects.toThrow('Symbolic link');
     });
   });

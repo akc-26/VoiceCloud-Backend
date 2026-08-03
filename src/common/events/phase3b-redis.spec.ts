@@ -11,6 +11,7 @@ import { PresenceGateway } from './gateways/presence.gateway';
 import { ReactionsGateway } from './gateways/reactions.gateway';
 
 describe('Phase 3B - Redis Integration & Distributed State', () => {
+  let testingModule: TestingModule;
   let redisClient: any;
   let redisStateService: RedisStateService;
   let roomStateService: RealtimeRoomStateService;
@@ -44,11 +45,10 @@ describe('Phase 3B - Redis Integration & Distributed State', () => {
     return { to, emit };
   };
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     redisClient = new RedisMock();
-    await redisClient.flushall();
 
-    const module: TestingModule = await Test.createTestingModule({
+    testingModule = await Test.createTestingModule({
       providers: [
         {
           provide: REDIS_CLIENT,
@@ -66,27 +66,34 @@ describe('Phase 3B - Redis Integration & Distributed State', () => {
       ],
     }).compile();
 
-    redisStateService = module.get<RedisStateService>(RedisStateService);
-    roomStateService = module.get<RealtimeRoomStateService>(
+    await testingModule.init();
+
+    redisStateService = testingModule.get<RedisStateService>(RedisStateService);
+    roomStateService = testingModule.get<RealtimeRoomStateService>(
       RealtimeRoomStateService,
     );
-    roomGateway = module.get<RoomGateway>(RoomGateway);
-    presenceGateway = module.get<PresenceGateway>(PresenceGateway);
-    reactionsGateway = module.get<ReactionsGateway>(ReactionsGateway);
+    roomGateway = testingModule.get<RoomGateway>(RoomGateway);
+    presenceGateway = testingModule.get<PresenceGateway>(PresenceGateway);
+    reactionsGateway = testingModule.get<ReactionsGateway>(ReactionsGateway);
+  });
+
+  beforeEach(async () => {
+    await redisClient.flushall();
 
     roomGateway.server = createMockServer() as any;
     presenceGateway.server = createMockServer() as any;
     reactionsGateway.server = createMockServer() as any;
-
-    await redisStateService.onModuleInit();
   });
 
-  afterEach(async () => {
-    await redisStateService.onModuleDestroy();
-    if (redisClient) {
-      await redisClient.flushall();
-    }
+  afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  afterAll(async () => {
+    await redisClient.flushall();
+    await testingModule.close();
+    await redisClient.quit();
+    redisClient.removeAllListeners();
   });
 
   describe('1. Redis Infrastructure & Key Strategy', () => {

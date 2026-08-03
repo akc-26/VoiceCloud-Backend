@@ -456,7 +456,7 @@ describe('Host Security and Privacy Unit Tests', () => {
       };
 
       const reflector = new Reflector();
-      const jwtAuthGuard = new JwtAuthGuard(reflector, mockJwtTokenService as any);
+      const jwtAuthGuard = new JwtAuthGuard(reflector, mockJwtTokenService);
       const rolesGuard = new RolesGuard(reflector);
 
       const moduleRef: TestingModule = await Test.createTestingModule({

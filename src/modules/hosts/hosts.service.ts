@@ -36,6 +36,10 @@ import {
 import { HostVerificationAsset } from './entities/host-verification-asset.entity';
 import { HostEligibilityService } from './host-eligibility.service';
 import { HostLevelConfigService } from './host-level-config.service';
+import {
+  HostStateTransitionAction,
+  HostStateTransitionService,
+} from './host-state-transition.service';
 
 @Injectable()
 export class HostsService {
@@ -63,6 +67,8 @@ export class HostsService {
     private readonly hostEligibilityService?: HostEligibilityService,
     @Optional()
     private readonly hostLevelConfigService?: HostLevelConfigService,
+    @Optional()
+    private readonly hostStateTransitionService?: HostStateTransitionService,
   ) {}
 
   // ==========================================
@@ -95,6 +101,11 @@ export class HostsService {
         );
       }
 
+      this.getHostStateTransitionService().assertTransition(
+        existing.status,
+        HostVerificationStatus.PENDING,
+        HostStateTransitionAction.REAPPLY,
+      );
       await this.getEligibilityService().assertEligible(userId);
 
       if (hasPrivateAssetSelection) {
@@ -166,12 +177,16 @@ export class HostsService {
         throw new BadRequestException('Selfie photo is required');
       }
 
+      this.getHostStateTransitionService().applyTransition(
+        existing,
+        HostVerificationStatus.PENDING,
+        HostStateTransitionAction.REAPPLY,
+      );
       Object.assign(existing, {
         ...dto,
         idNumber: idNumberToUse,
         documentUrl: documentUrlToUse,
         selfieUrl: selfieUrlToUse,
-        status: HostVerificationStatus.PENDING,
         rejectionReason: null,
       });
       existing = await this.hostRepository.save(existing);
@@ -215,6 +230,11 @@ export class HostsService {
       throw new BadRequestException('Selfie photo is required');
     }
 
+    this.getHostStateTransitionService().assertTransition(
+      null,
+      HostVerificationStatus.PENDING,
+      HostStateTransitionAction.APPLY,
+    );
     const host = this.hostRepository.create({
       userId,
       ...dto,
@@ -286,6 +306,11 @@ export class HostsService {
 
     const assetService = this.getPrivateAssetService();
     await assetService.validateApplicationAssets(userId, selection);
+    this.getHostStateTransitionService().assertTransition(
+      null,
+      HostVerificationStatus.PENDING,
+      HostStateTransitionAction.APPLY,
+    );
 
     const host = this.hostRepository.create({
       userId,
@@ -354,14 +379,23 @@ export class HostsService {
       throw new BadRequestException('A private selfie asset ID is required');
     }
 
+    this.getHostStateTransitionService().assertTransition(
+      existing.status,
+      HostVerificationStatus.PENDING,
+      HostStateTransitionAction.REAPPLY,
+    );
     const linkedAssets = await assetService.linkApplicationAssets(
       userId,
       existing.id,
       effectiveSelection,
     );
+    this.getHostStateTransitionService().applyTransition(
+      existing,
+      HostVerificationStatus.PENDING,
+      HostStateTransitionAction.REAPPLY,
+    );
     Object.assign(existing, this.toHostProfileFields(dto), {
       idNumber,
-      status: HostVerificationStatus.PENDING,
       rejectionReason: null,
       verificationAssets: linkedAssets,
     });
@@ -521,7 +555,11 @@ export class HostsService {
       );
     }
 
-    host.status = HostVerificationStatus.APPROVED;
+    this.getHostStateTransitionService().applyTransition(
+      host,
+      HostVerificationStatus.APPROVED,
+      HostStateTransitionAction.APPROVE,
+    );
     host.rejectionReason = null;
     const saved = await this.hostRepository.save(host);
 
@@ -563,7 +601,11 @@ export class HostsService {
       );
     }
 
-    host.status = HostVerificationStatus.REJECTED;
+    this.getHostStateTransitionService().applyTransition(
+      host,
+      HostVerificationStatus.REJECTED,
+      HostStateTransitionAction.REJECT,
+    );
     host.rejectionReason = reason ?? 'Verification request rejected by admin';
     const saved = await this.hostRepository.save(host);
 
@@ -598,7 +640,11 @@ export class HostsService {
       );
     }
 
-    host.status = HostVerificationStatus.SUSPENDED;
+    this.getHostStateTransitionService().applyTransition(
+      host,
+      HostVerificationStatus.SUSPENDED,
+      HostStateTransitionAction.SUSPEND,
+    );
     const saved = await this.hostRepository.save(host);
 
     await this.logAuditNote(
@@ -631,7 +677,11 @@ export class HostsService {
       );
     }
 
-    host.status = HostVerificationStatus.APPROVED;
+    this.getHostStateTransitionService().applyTransition(
+      host,
+      HostVerificationStatus.APPROVED,
+      HostStateTransitionAction.REACTIVATE,
+    );
     const saved = await this.hostRepository.save(host);
 
     await this.logAuditNote(
@@ -730,6 +780,9 @@ export class HostsService {
     );
   }
 
+  private getHostStateTransitionService(): HostStateTransitionService {
+    return this.hostStateTransitionService || new HostStateTransitionService();
+  }
 
   private getHostLevelConfigService(): HostLevelConfigService {
     if (!this.hostLevelConfigService) {
@@ -789,14 +842,8 @@ export class HostsService {
     const levelConfig = this.getHostLevelConfigService();
     const definitions = await levelConfig.getDefinitions();
     const currentXP = Math.max(0, host.xp || 0);
-    const configuredCurrent = levelConfig.getLevelForXp(
-      definitions,
-      currentXP,
-    );
-    const next = levelConfig.getNextLevel(
-      definitions,
-      configuredCurrent.level,
-    );
+    const configuredCurrent = levelConfig.getLevelForXp(definitions, currentXP);
+    const next = levelConfig.getNextLevel(definitions, configuredCurrent.level);
 
     return {
       currentLevel: configuredCurrent.level,

@@ -21,6 +21,7 @@ import { ModerationAction } from '../moderation/entities/moderation-action.entit
 import { SystemSetting } from '../admin/entities/system-setting.entity';
 import { HostEligibilityService } from './host-eligibility.service';
 import { HostLevelConfigService } from './host-level-config.service';
+import { HostStateTransitionService } from './host-state-transition.service';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { HostLevelConfigService } from './host-level-config.service';
     LegacyHostVerificationMigrationService,
     HostEligibilityService,
     HostLevelConfigService,
+    HostStateTransitionService,
   ],
   exports: [
     HostsService,
@@ -56,6 +58,7 @@ import { HostLevelConfigService } from './host-level-config.service';
     LegacyHostVerificationMigrationService,
     HostEligibilityService,
     HostLevelConfigService,
+    HostStateTransitionService,
   ],
 })
 export class HostsModule {}
