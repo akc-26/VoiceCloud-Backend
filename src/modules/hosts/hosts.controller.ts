@@ -11,6 +11,9 @@ import {
   UploadedFile,
   BadRequestException,
   NotFoundException,
+  ParseUUIDPipe,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,7 +23,9 @@ import {
   ApiQuery,
   ApiConsumes,
   ApiBody,
+  ApiProduces,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { HostsService } from './hosts.service';
 import { ApplyHostDto } from './dto/apply-host.dto';
 import { UpdateHostProfileDto } from './dto/update-host-profile.dto';
@@ -32,7 +37,10 @@ import { AddHostAuditNoteDto } from './dto/add-host-audit-note.dto';
 import { ClaimRewardDto } from './dto/claim-reward.dto';
 import { SettlementActionDto } from './dto/settlement-action.dto';
 import { HostVerificationStatus } from './entities/host-profile.entity';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import {
+  AuthenticatedUser,
+  JwtAuthGuard,
+} from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums';
@@ -49,6 +57,7 @@ import {
   HostVerificationUploadCategory,
   HostVerificationUploadInterceptor,
 } from './interceptors/host-verification-upload.interceptor';
+import { ReplaceHostVerificationAssetDto } from './dto/replace-host-verification-asset.dto';
 
 @ApiTags('Host Verification & Management')
 @Controller('hosts')
@@ -248,6 +257,97 @@ export class HostsController {
     return this.hostsService.uploadVerificationDocument(userId, file);
   }
 
+  @Get('verification/assets')
+  @ApiOperation({ summary: 'List current private Host verification assets' })
+  @ApiResponse({
+    status: 200,
+    type: [HostVerificationAssetResponseDto],
+    description: 'Safe private asset metadata retrieved.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async listMyVerificationAssets(@CurrentUser('userId') userId: string) {
+    return this.hostsService.listMyVerificationAssets(userId);
+  }
+
+  @Get('verification/assets/:assetId/content')
+  @ApiOperation({
+    summary: 'Securely read a private Host verification asset',
+  })
+  @ApiProduces(
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'application/octet-stream',
+  )
+  @ApiResponse({
+    status: 200,
+    description: 'Authorized private asset content.',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Asset access is forbidden' })
+  @ApiResponse({ status: 404, description: 'Current asset was not found' })
+  async getVerificationAssetContent(
+    @Param('assetId', new ParseUUIDPipe({ version: '4' })) assetId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const content = await this.hostsService.getVerificationAssetContent(
+      assetId,
+      actor,
+    );
+    const displayFilename = content.asset.originalFilename
+      .replace(/[\r\n"\\]/g, '_')
+      .replace(/[^\x20-\x7e]/g, '_');
+    const encodedFilename = encodeURIComponent(
+      content.asset.originalFilename.replace(/[\r\n]/g, '_'),
+    );
+
+    response.setHeader('Content-Type', content.asset.verifiedMimeType);
+    response.setHeader('Content-Length', String(content.buffer.length));
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename="${displayFilename}"; filename*=UTF-8''${encodedFilename}`,
+    );
+    response.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    response.setHeader('Pragma', 'no-cache');
+    response.setHeader('Expires', '0');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    response.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; sandbox",
+    );
+
+    return new StreamableFile(content.buffer);
+  }
+
+  @Put('verification/assets/:assetId/replacement')
+  @ApiOperation({
+    summary: 'Replace a linked Host verification asset transactionally',
+  })
+  @ApiResponse({
+    status: 200,
+    type: HostVerificationAssetResponseDto,
+    description: 'Replacement asset linked and prior asset retired.',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid replacement asset' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Replacement is forbidden' })
+  @ApiResponse({ status: 404, description: 'Asset was not found' })
+  @ApiResponse({ status: 409, description: 'Replacement conflict' })
+  async replaceVerificationAsset(
+    @CurrentUser('userId') userId: string,
+    @Param('assetId', new ParseUUIDPipe({ version: '4' })) assetId: string,
+    @Body() dto: ReplaceHostVerificationAssetDto,
+  ) {
+    return this.hostsService.replaceVerificationAsset(
+      userId,
+      assetId,
+      dto.replacementAssetId,
+    );
+  }
+
   // ==========================================
   // 3. HOST EARNINGS & SETTLEMENTS
   // ==========================================
@@ -411,6 +511,26 @@ export class HostsController {
   async getApplications(@Query('status') status?: HostVerificationStatus) {
     const apps = await this.hostsService.getApplications(status);
     return apps.map((app) => MapperUtils.toAdminHostDto(app, true));
+  }
+
+  @Get('admin/applications/:hostId/verification-assets')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Admin: List current private assets for a Host application',
+  })
+  @ApiResponse({
+    status: 200,
+    type: [HostVerificationAssetResponseDto],
+    description: 'Safe linked asset metadata retrieved.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden: Admin access required' })
+  @ApiResponse({ status: 404, description: 'Host application not found' })
+  async listHostVerificationAssetsForAdmin(
+    @Param('hostId', new ParseUUIDPipe({ version: '4' })) hostId: string,
+  ) {
+    return this.hostsService.listHostVerificationAssetsForAdmin(hostId);
   }
 
   @Get('admin/earnings')

@@ -30,6 +30,7 @@ import { PrivateDocumentCategory } from '../storage/enums/private-document-categ
 import { RedisService } from '../../redis/redis.service';
 import {
   HostApplicationAssetSelection,
+  HostVerificationAssetActor,
   HostVerificationAssetService,
 } from './host-verification-asset.service';
 import { HostVerificationAsset } from './entities/host-verification-asset.entity';
@@ -672,6 +673,39 @@ export class HostsService {
       userId,
       PrivateDocumentCategory.SUPPORTING_DOCUMENT,
       file,
+    );
+  }
+
+  async listMyVerificationAssets(userId: string) {
+    return this.getPrivateAssetService().listOwnerAssets(userId);
+  }
+
+  async listHostVerificationAssetsForAdmin(hostProfileId: string) {
+    const host = await this.hostRepository.findOne({
+      where: { id: hostProfileId },
+    });
+    if (!host) {
+      throw new NotFoundException('Host application not found');
+    }
+    return this.getPrivateAssetService().listHostAssetsForAdmin(hostProfileId);
+  }
+
+  async getVerificationAssetContent(
+    assetId: string,
+    actor: HostVerificationAssetActor,
+  ) {
+    return this.getPrivateAssetService().getAuthorizedContent(assetId, actor);
+  }
+
+  async replaceVerificationAsset(
+    userId: string,
+    currentAssetId: string,
+    replacementAssetId: string,
+  ) {
+    return this.getPrivateAssetService().replaceLinkedAsset(
+      userId,
+      currentAssetId,
+      replacementAssetId,
     );
   }
 
