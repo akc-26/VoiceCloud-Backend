@@ -101,7 +101,10 @@ export class HostVerificationAsset {
   @JoinColumn({ name: 'ownerUserId' })
   owner: User;
 
-  @ManyToOne(() => HostProfile, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => HostProfile, (profile) => profile.verificationAssets, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'hostProfileId' })
   hostProfile: HostProfile | null;
 

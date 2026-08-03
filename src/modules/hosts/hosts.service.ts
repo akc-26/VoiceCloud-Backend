@@ -28,7 +28,11 @@ import { EventsGateway } from '../../common/events/events.gateway';
 import { StorageService } from '../storage/storage.service';
 import { PrivateDocumentCategory } from '../storage/enums/private-document-category.enum';
 import { RedisService } from '../../redis/redis.service';
-import { HostVerificationAssetService } from './host-verification-asset.service';
+import {
+  HostApplicationAssetSelection,
+  HostVerificationAssetService,
+} from './host-verification-asset.service';
+import { HostVerificationAsset } from './entities/host-verification-asset.entity';
 
 @Injectable()
 export class HostsService {
@@ -69,6 +73,10 @@ export class HostsService {
       );
     }
 
+    const assetSelection = this.toAssetSelection(dto);
+    const hasPrivateAssetSelection = this.hasPrivateAssetSelection(dto);
+    this.rejectMixedDocumentContracts(dto, hasPrivateAssetSelection);
+
     let existing = await this.hostRepository.findOne({ where: { userId } });
     if (existing) {
       if (existing.status === HostVerificationStatus.APPROVED) {
@@ -79,6 +87,36 @@ export class HostsService {
           'Host verification application is currently pending review',
         );
       }
+
+      if (hasPrivateAssetSelection) {
+        return this.reapplyWithPrivateAssets(
+          userId,
+          existing,
+          dto,
+          assetSelection,
+        );
+      }
+
+      if (
+        !this.hasLegacyDocumentInput(dto) &&
+        this.hostVerificationAssetService
+      ) {
+        const linkedAssets =
+          await this.hostVerificationAssetService.getActiveLinkedAssets(
+            userId,
+            existing.id,
+          );
+        if (this.hasRequiredPrivateAssets(linkedAssets)) {
+          return this.reapplyWithPrivateAssets(
+            userId,
+            existing,
+            dto,
+            {},
+            linkedAssets,
+          );
+        }
+      }
+
       // If rejected, re-apply: reuse stored values for empty/omitted replacement fields
       const idNumberToUse =
         dto.idNumber && dto.idNumber.trim() !== ''
@@ -141,6 +179,10 @@ export class HostsService {
       return existing;
     }
 
+    if (hasPrivateAssetSelection) {
+      return this.applyWithPrivateAssets(userId, dto, assetSelection);
+    }
+
     // New application requires unmasked ID number, documentUrl, and selfieUrl
     const idNumberToUse = dto.idNumber ? dto.idNumber.trim() : '';
     const documentUrlToUse =
@@ -192,11 +234,202 @@ export class HostsService {
   }
 
   async getHostProfile(userId: string): Promise<HostProfile> {
-    const profile = await this.hostRepository.findOne({ where: { userId } });
+    const profile = await this.hostRepository.findOne({
+      where: { userId },
+      relations: { verificationAssets: true },
+    });
     if (!profile) {
       throw new NotFoundException(`Host profile for user ${userId} not found`);
     }
     return profile;
+  }
+
+  private async applyWithPrivateAssets(
+    userId: string,
+    dto: ApplyHostDto,
+    selection: HostApplicationAssetSelection,
+  ): Promise<HostProfile> {
+    const idNumber = dto.idNumber?.trim() || '';
+    if (!idNumber || /[*•●]/.test(idNumber)) {
+      throw new BadRequestException('A valid unmasked ID number is required');
+    }
+    if (!selection.governmentIdAssetId) {
+      throw new BadRequestException(
+        'A private Government ID asset ID is required',
+      );
+    }
+    if (!selection.selfieAssetId) {
+      throw new BadRequestException('A private selfie asset ID is required');
+    }
+
+    const assetService = this.getPrivateAssetService();
+    await assetService.validateApplicationAssets(userId, selection);
+
+    const host = this.hostRepository.create({
+      userId,
+      ...this.toHostProfileFields(dto),
+      idNumber,
+      documentUrl: '',
+      selfieUrl: '',
+      status: HostVerificationStatus.PENDING,
+    });
+    const saved = await this.hostRepository.save(host);
+
+    try {
+      saved.verificationAssets = await assetService.linkApplicationAssets(
+        userId,
+        saved.id,
+        selection,
+      );
+    } catch (error) {
+      await this.hostRepository.remove(saved);
+      throw error;
+    }
+
+    await this.initializeNewHostApplication(saved, userId);
+    return saved;
+  }
+
+  private async reapplyWithPrivateAssets(
+    userId: string,
+    existing: HostProfile,
+    dto: ApplyHostDto,
+    selection: HostApplicationAssetSelection,
+    reusableAssets?: HostVerificationAsset[],
+  ): Promise<HostProfile> {
+    const idNumber =
+      dto.idNumber && dto.idNumber.trim() !== ''
+        ? dto.idNumber.trim()
+        : existing.idNumber;
+    if (!idNumber || /[*•●]/.test(idNumber)) {
+      throw new BadRequestException('A valid unmasked ID number is required');
+    }
+
+    const assetService = this.getPrivateAssetService();
+    const currentAssets =
+      reusableAssets ||
+      (await assetService.getActiveLinkedAssets(userId, existing.id));
+    const effectiveSelection: HostApplicationAssetSelection = {
+      governmentIdAssetId:
+        selection.governmentIdAssetId ||
+        currentAssets.find(
+          (asset) => asset.category === PrivateDocumentCategory.GOVERNMENT_ID,
+        )?.id,
+      selfieAssetId:
+        selection.selfieAssetId ||
+        currentAssets.find(
+          (asset) => asset.category === PrivateDocumentCategory.SELFIE,
+        )?.id,
+      supportingDocumentAssetIds: selection.supportingDocumentAssetIds || [],
+    };
+
+    if (!effectiveSelection.governmentIdAssetId) {
+      throw new BadRequestException(
+        'A private Government ID asset ID is required',
+      );
+    }
+    if (!effectiveSelection.selfieAssetId) {
+      throw new BadRequestException('A private selfie asset ID is required');
+    }
+
+    const linkedAssets = await assetService.linkApplicationAssets(
+      userId,
+      existing.id,
+      effectiveSelection,
+    );
+    Object.assign(existing, this.toHostProfileFields(dto), {
+      idNumber,
+      status: HostVerificationStatus.PENDING,
+      rejectionReason: null,
+      verificationAssets: linkedAssets,
+    });
+    const saved = await this.hostRepository.save(existing);
+
+    await this.logAuditNote(
+      saved.id,
+      'SYSTEM',
+      'Host re-applied for verification using private assets',
+      'RE_APPLIED',
+    );
+    this.eventsGateway.broadcastHostEvent('host:status_updated', {
+      userId,
+      status: HostVerificationStatus.PENDING,
+    });
+    return saved;
+  }
+
+  private async initializeNewHostApplication(
+    host: HostProfile,
+    userId: string,
+  ): Promise<void> {
+    await this.getOrCreateEarnings(host.id, userId);
+    await this.getOrCreatePerformance(host.id, userId);
+    await this.logAuditNote(
+      host.id,
+      'SYSTEM',
+      'Host submitted verification application using private assets',
+      'APPLIED',
+    );
+    this.eventsGateway.broadcastHostEvent('host:status_updated', {
+      userId,
+      status: HostVerificationStatus.PENDING,
+    });
+  }
+
+  private toAssetSelection(dto: ApplyHostDto): HostApplicationAssetSelection {
+    return {
+      governmentIdAssetId: dto.governmentIdAssetId,
+      selfieAssetId: dto.selfieAssetId,
+      supportingDocumentAssetIds: dto.supportingDocumentAssetIds,
+    };
+  }
+
+  private hasPrivateAssetSelection(dto: ApplyHostDto): boolean {
+    return !!(
+      dto.governmentIdAssetId ||
+      dto.selfieAssetId ||
+      (dto.supportingDocumentAssetIds?.length || 0) > 0
+    );
+  }
+
+  private hasLegacyDocumentInput(dto: ApplyHostDto): boolean {
+    return !!(dto.documentUrl?.trim() || dto.selfieUrl?.trim());
+  }
+
+  private rejectMixedDocumentContracts(
+    dto: ApplyHostDto,
+    hasPrivateAssetSelection: boolean,
+  ): void {
+    if (hasPrivateAssetSelection && this.hasLegacyDocumentInput(dto)) {
+      throw new BadRequestException(
+        'Private asset IDs cannot be combined with legacy document URLs',
+      );
+    }
+  }
+
+  private hasRequiredPrivateAssets(assets: HostVerificationAsset[]): boolean {
+    return (
+      assets.some(
+        (asset) => asset.category === PrivateDocumentCategory.GOVERNMENT_ID,
+      ) &&
+      assets.some((asset) => asset.category === PrivateDocumentCategory.SELFIE)
+    );
+  }
+
+  private toHostProfileFields(dto: ApplyHostDto): Partial<HostProfile> {
+    const fields: Partial<HostProfile> = { realName: dto.realName };
+    for (const key of [
+      'bio',
+      'languages',
+      'categories',
+      'country',
+      'experience',
+    ] as const) {
+      if (dto[key] !== undefined) {
+        Object.assign(fields, { [key]: dto[key] });
+      }
+    }
+    return fields;
   }
 
   async updateHostProfile(

@@ -4,7 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { HostVerificationAsset } from './host-verification-asset.entity';
 
 export enum HostVerificationStatus {
   PENDING = 'PENDING',
@@ -92,6 +94,9 @@ export class HostProfile {
 
   @Column({ type: 'text', nullable: true })
   rejectionReason: string | null;
+
+  @OneToMany(() => HostVerificationAsset, (asset) => asset.hostProfile)
+  verificationAssets?: HostVerificationAsset[];
 
   @CreateDateColumn()
   createdAt: Date;

@@ -4,6 +4,11 @@ import {
   HostProfile,
 } from '../entities/host-profile.entity';
 import { maskIdentityNumber } from '../../../common/utils/masking.util';
+import { PrivateDocumentCategory } from '../../storage/enums/private-document-category.enum';
+import {
+  PrivateAssetValidationStatus,
+  PrivateAssetVisibility,
+} from '../../storage/enums/private-asset.enum';
 
 export class PublicHostResponseDto {
   @ApiProperty({ description: 'Host Profile ID' })
@@ -217,6 +222,15 @@ export class MapperUtils {
   }
 
   static toOwnerHostDto(host: HostProfile): OwnerHostResponseDto {
+    const activePrivateAssets = (host.verificationAssets || []).filter(
+      (asset) =>
+        asset.visibility === PrivateAssetVisibility.PRIVATE &&
+        asset.validationStatus === PrivateAssetValidationStatus.VALIDATED &&
+        asset.isActive &&
+        !asset.retiredAt &&
+        !asset.replacedByAssetId,
+    );
+
     return {
       id: host.id,
       userId: host.userId,
@@ -233,9 +247,22 @@ export class MapperUtils {
         host.status === HostVerificationStatus.REJECTED
           ? host.rejectionReason || undefined
           : undefined,
-      hasGovernmentIdUploaded: !!host.documentUrl,
-      hasProfilePhotoUploaded: !!host.selfieUrl,
-      hasSupportingDocumentsUploaded: !!host.documentUrl,
+      hasGovernmentIdUploaded:
+        !!host.documentUrl ||
+        activePrivateAssets.some(
+          (asset) => asset.category === PrivateDocumentCategory.GOVERNMENT_ID,
+        ),
+      hasProfilePhotoUploaded:
+        !!host.selfieUrl ||
+        activePrivateAssets.some(
+          (asset) => asset.category === PrivateDocumentCategory.SELFIE,
+        ),
+      hasSupportingDocumentsUploaded:
+        !!host.documentUrl ||
+        activePrivateAssets.some(
+          (asset) =>
+            asset.category === PrivateDocumentCategory.SUPPORTING_DOCUMENT,
+        ),
       hostRating: Number(host.hostRating || 0),
       totalRoomsHosted: host.totalRoomsHosted || 0,
       peakListeners: host.peakListeners || 0,
