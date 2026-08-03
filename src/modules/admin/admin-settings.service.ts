@@ -1,17 +1,40 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   SystemSetting,
   SettingValueType,
 } from './entities/system-setting.entity';
 import { CreateSettingDto, UpdateSettingDto } from './dto/setting.dto';
+import {
+  HostBusinessSettingsResponseDto,
+  UpdateHostBusinessSettingsDto,
+} from './dto/host-business-settings.dto';
 import { RedisService } from '../../redis/redis.service';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { AdminAuditLogsService } from './admin-audit-logs.service';
+import { validateHostLevelDefinitions } from '../hosts/host-level-config.validator';
 
 const SETTINGS_ALL_CACHE = 'cache:system_settings:all';
 const SETTINGS_PUBLIC_CACHE = 'cache:system_settings:public';
+
+export const HOST_BUSINESS_SETTING_KEYS = [
+  'host_applications_enabled',
+  'min_host_followers',
+  'min_host_completed_rooms',
+  'require_host_good_standing',
+  'host_level_definitions',
+] as const;
+
+const HOST_BUSINESS_SETTING_KEY_SET = new Set<string>(
+  HOST_BUSINESS_SETTING_KEYS,
+);
 
 const DEFAULT_SYSTEM_SETTINGS = [
   // General
@@ -529,6 +552,215 @@ export class AdminSettingsService implements OnModuleInit {
     return value;
   }
 
+  async getHostBusinessSettings(): Promise<HostBusinessSettingsResponseDto> {
+    const settings = await this.settingRepo.find({
+      where: { key: In([...HOST_BUSINESS_SETTING_KEYS]) },
+    });
+    return this.parseHostBusinessSettings(settings);
+  }
+
+  async updateHostBusinessSettings(
+    dto: UpdateHostBusinessSettingsDto,
+    userId?: string,
+  ): Promise<HostBusinessSettingsResponseDto> {
+    let levels: ReturnType<typeof validateHostLevelDefinitions>;
+    try {
+      levels = validateHostLevelDefinitions(dto.levels);
+    } catch (error) {
+      throw new BadRequestException(
+        `Invalid Host level configuration: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    const transactionResult = await this.settingRepo.manager.transaction(
+      async (manager) => {
+        const repository = manager.getRepository(SystemSetting);
+        const settings = await repository.find({
+          where: { key: In([...HOST_BUSINESS_SETTING_KEYS]) },
+        });
+        const previousValue = Object.fromEntries(
+          settings.map((setting) => [setting.key, setting.value]),
+        );
+        const settingsByKey = new Map(
+          settings.map((setting) => [setting.key, setting]),
+        );
+
+        for (const key of HOST_BUSINESS_SETTING_KEYS) {
+          if (!settingsByKey.has(key)) {
+            const defaultSetting = DEFAULT_SYSTEM_SETTINGS.find(
+              (setting) => setting.key === key,
+            );
+            if (!defaultSetting) {
+              throw new ServiceUnavailableException(
+                `Required Host business setting '${key}' is unavailable`,
+              );
+            }
+            settingsByKey.set(key, repository.create(defaultSetting));
+          }
+        }
+
+        const applicationsEnabled = this.requireHostBusinessSetting(
+          settingsByKey,
+          'host_applications_enabled',
+        );
+        const minFollowers = this.requireHostBusinessSetting(
+          settingsByKey,
+          'min_host_followers',
+        );
+        const minCompletedRooms = this.requireHostBusinessSetting(
+          settingsByKey,
+          'min_host_completed_rooms',
+        );
+        const requireGoodStanding = this.requireHostBusinessSetting(
+          settingsByKey,
+          'require_host_good_standing',
+        );
+        const levelDefinitions = this.requireHostBusinessSetting(
+          settingsByKey,
+          'host_level_definitions',
+        );
+
+        applicationsEnabled.value = String(dto.applicationsEnabled);
+        minFollowers.value = String(dto.minFollowers);
+        minCompletedRooms.value = String(dto.minCompletedRooms);
+        requireGoodStanding.value = String(dto.requireGoodStanding);
+        levelDefinitions.value = JSON.stringify(levels);
+
+        const updatedSettings = await repository.save([
+          applicationsEnabled,
+          minFollowers,
+          minCompletedRooms,
+          requireGoodStanding,
+          levelDefinitions,
+        ]);
+
+        return { previousValue, updatedSettings };
+      },
+    );
+
+    await this.invalidateCache();
+    this.eventsGateway.broadcastSystemConfigEvent(
+      'host_business_settings_updated',
+      {
+        keys: [...HOST_BUSINESS_SETTING_KEYS],
+      },
+    );
+
+    const result = this.parseHostBusinessSettings(
+      transactionResult.updatedSettings,
+    );
+    await this.auditLogsService.log({
+      userId,
+      module: 'host_business_settings',
+      action: 'update',
+      previousValue: transactionResult.previousValue,
+      newValue: result,
+    });
+
+    return result;
+  }
+
+  private requireHostBusinessSetting(
+    settings: Map<string, SystemSetting>,
+    key: (typeof HOST_BUSINESS_SETTING_KEYS)[number],
+  ): SystemSetting {
+    const setting = settings.get(key);
+    if (!setting) {
+      throw new ServiceUnavailableException(
+        `Required Host business setting '${key}' is unavailable`,
+      );
+    }
+    return setting;
+  }
+
+  private parseHostBusinessSettings(
+    settings: SystemSetting[],
+  ): HostBusinessSettingsResponseDto {
+    const settingsByKey = new Map(
+      settings.map((setting) => [setting.key, setting]),
+    );
+    const applicationsEnabled = this.strictBooleanValue(
+      settingsByKey.get('host_applications_enabled')?.value,
+      true,
+    );
+    const minFollowers = this.strictNonNegativeIntegerValue(
+      settingsByKey.get('min_host_followers')?.value,
+      50,
+    );
+    const minCompletedRooms = this.strictNonNegativeIntegerValue(
+      settingsByKey.get('min_host_completed_rooms')?.value,
+      3,
+    );
+    const requireGoodStanding = this.strictBooleanValue(
+      settingsByKey.get('require_host_good_standing')?.value,
+      true,
+    );
+    const levelSetting = settingsByKey.get('host_level_definitions');
+    let levels: ReturnType<typeof validateHostLevelDefinitions>;
+    try {
+      const defaultLevels = DEFAULT_SYSTEM_SETTINGS.find(
+        (setting) => setting.key === 'host_level_definitions',
+      )?.value;
+      levels = validateHostLevelDefinitions(
+        JSON.parse(levelSetting?.value ?? defaultLevels ?? '[]'),
+      );
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        `Host business settings are invalid: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    const latestTimestamp = settings.reduce(
+      (latest, setting) =>
+        setting.updatedAt && setting.updatedAt.getTime() > latest.getTime()
+          ? setting.updatedAt
+          : latest,
+      new Date(0),
+    );
+
+    return {
+      applicationsEnabled,
+      minFollowers,
+      minCompletedRooms,
+      requireGoodStanding,
+      levels,
+      updatedAt:
+        latestTimestamp.getTime() > 0
+          ? latestTimestamp.toISOString()
+          : new Date().toISOString(),
+    };
+  }
+
+  private strictBooleanValue(
+    value: string | undefined,
+    fallback: boolean,
+  ): boolean {
+    if (value === undefined) return fallback;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    throw new ServiceUnavailableException(
+      'Host business settings contain an invalid boolean value',
+    );
+  }
+
+  private strictNonNegativeIntegerValue(
+    value: string | undefined,
+    fallback: number,
+  ): number {
+    if (value === undefined) return fallback;
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 1_000_000) {
+      throw new ServiceUnavailableException(
+        'Host business settings contain an invalid numeric value',
+      );
+    }
+    return parsed;
+  }
+
   async create(dto: CreateSettingDto, userId?: string): Promise<SystemSetting> {
     const setting = this.settingRepo.create(dto);
     const saved = await this.settingRepo.save(setting);
@@ -554,6 +786,13 @@ export class AdminSettingsService implements OnModuleInit {
     dto: UpdateSettingDto,
     userId?: string,
   ): Promise<SystemSetting> {
+    if (HOST_BUSINESS_SETTING_KEY_SET.has(key)) {
+      throw new BadRequestException(
+        'Host business settings must be updated atomically through the ' +
+          'dedicated Host business settings endpoint',
+      );
+    }
+
     const setting = await this.findByKey(key);
     if (!setting) {
       throw new Error(`Setting with key '${key}' not found`);

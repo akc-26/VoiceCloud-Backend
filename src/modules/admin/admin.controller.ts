@@ -3,12 +3,14 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Delete,
   Body,
   Param,
   Query,
   Req,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -22,6 +24,14 @@ import { AdminDashboardService } from './admin-dashboard.service';
 import { AdminUsersService } from './admin-users.service';
 
 import { CreateSettingDto, UpdateSettingDto } from './dto/setting.dto';
+import {
+  HostBusinessSettingsResponseDto,
+  UpdateHostBusinessSettingsDto,
+} from './dto/host-business-settings.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 import {
   CreateProviderConfigDto,
   UpdateProviderConfigDto,
@@ -189,6 +199,30 @@ export class AdminController {
   @ApiOperation({ summary: 'Get system settings by group' })
   async getSettingsByGroup(@Param('group') group: string) {
     return this.settingsService.findByGroup(group);
+  }
+
+  @Get('settings/host-business')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get authoritative Host business settings' })
+  async getHostBusinessSettings(): Promise<HostBusinessSettingsResponseDto> {
+    return this.settingsService.getHostBusinessSettings();
+  }
+
+  @Put('settings/host-business')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Atomically update validated Host business settings',
+  })
+  async updateHostBusinessSettings(
+    @Body() dto: UpdateHostBusinessSettingsDto,
+    @Req() req: RequestWithUser,
+  ): Promise<HostBusinessSettingsResponseDto> {
+    return this.settingsService.updateHostBusinessSettings(
+      dto,
+      req.user?.userId,
+    );
   }
 
   @Post('settings')

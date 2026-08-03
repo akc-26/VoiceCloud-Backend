@@ -1,5 +1,28 @@
 import { api } from './api';
 
+export interface HostLevelBenefitSettings {
+  key: string;
+  label: string;
+}
+
+export interface HostLevelSettings {
+  level: number;
+  name: string;
+  minimumXp: number;
+  benefits: HostLevelBenefitSettings[];
+}
+
+export interface HostBusinessSettings {
+  applicationsEnabled: boolean;
+  minFollowers: number;
+  minCompletedRooms: number;
+  requireGoodStanding: boolean;
+  levels: HostLevelSettings[];
+  updatedAt: string;
+}
+
+export type UpdateHostBusinessSettings = Omit<HostBusinessSettings, 'updatedAt'>;
+
 export interface ProviderConfigData {
   id: string;
   category: string;
@@ -52,6 +75,21 @@ export const adminService = {
 
   async updateSystemSetting(key: string, value: any) {
     const res = await api.patch(`/admin/settings/${key}`, { value });
+    return res.data;
+  },
+
+  async getHostBusinessSettings() {
+    const res = await api.get<HostBusinessSettings>(
+      '/admin/settings/host-business',
+    );
+    return res.data;
+  },
+
+  async updateHostBusinessSettings(settings: UpdateHostBusinessSettings) {
+    const res = await api.put<HostBusinessSettings>(
+      '/admin/settings/host-business',
+      settings,
+    );
     return res.data;
   },
 

@@ -25,6 +25,7 @@ import SpeedIcon from '@mui/icons-material/Speed';
 
 import { useNotificationsStore } from '../store/notifications.store';
 import { adminService } from '../services/admin.service';
+import { HostBusinessSettingsCard } from '../components/settings/HostBusinessSettingsCard';
 
 export const SystemSettingsPage: React.FC = () => {
   const addToast = useNotificationsStore((state) => state.addToast);
@@ -160,6 +161,8 @@ export const SystemSettingsPage: React.FC = () => {
           </Grid>
         </CardContent>
       </Card>
+
+      <HostBusinessSettingsCard />
 
       {/* Administrator-Managed Streaming Infrastructure */}
       <Card elevation={0} sx={{ p: 1 }}>
