@@ -39,6 +39,7 @@ import {
 import { creatorApi } from '../services/creator-api.service';
 import { useCreatorProfileStore } from '../store/creator-profile.store';
 import {
+  HostEligibilityResponse,
   HostVerificationApplicationPayload,
   HostVerificationAsset,
   OwnerHostProfile,
@@ -56,6 +57,12 @@ function getPrivateAssetLoadError(error: unknown): string {
     : 'Secure verification document status could not be loaded.';
 }
 
+function getEligibilityLoadError(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Backend Host eligibility could not be evaluated.';
+}
+
 export const HostVerificationPage: React.FC = () => {
   const profile = useCreatorProfileStore((state) => state.profile);
 
@@ -63,7 +70,9 @@ export const HostVerificationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [hostProfile, setHostProfile] = useState<OwnerHostProfile | null>(null);
   const [progression, setProgression] = useState<any | null>(null);
-  const [publicConfig, setPublicConfig] = useState<any | null>(null);
+  const [eligibility, setEligibility] =
+    useState<HostEligibilityResponse | null>(null);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
 
   // Application Form State
   const [realName, setRealName] = useState('');
@@ -92,10 +101,17 @@ export const HostVerificationPage: React.FC = () => {
   const fetchHostStatus = async () => {
     setLoading(true);
     setAssetLoadError(null);
+    setEligibilityError(null);
     try {
-      const [pData, configData, assetResult] = await Promise.all([
+      const [pData, eligibilityResult, assetResult] = await Promise.all([
         creatorApi.getHostProfile().catch(() => null),
-        creatorApi.getPublicConfig().catch(() => null),
+        creatorApi
+          .getHostEligibility()
+          .then((value) => ({ value, error: null as string | null }))
+          .catch((error: unknown) => ({
+            value: null,
+            error: getEligibilityLoadError(error),
+          })),
         creatorApi
           .getHostVerificationAssets()
           .then((assets) => ({ assets, error: null as string | null }))
@@ -129,9 +145,8 @@ export const HostVerificationPage: React.FC = () => {
         const prog = await creatorApi.getHostProgression().catch(() => null);
         if (prog) setProgression(prog);
       }
-      if (configData) {
-        setPublicConfig(configData);
-      }
+      setEligibility(eligibilityResult.value);
+      setEligibilityError(eligibilityResult.error);
       setVerificationAssets(assetResult.assets);
       setAssetLoadError(assetResult.error);
     } finally {
@@ -299,6 +314,19 @@ export const HostVerificationPage: React.FC = () => {
     (!!hostProfile?.hasProfilePhotoUploaded && !selfieAsset);
 
   const handleSubmitApplication = async () => {
+    if (eligibilityError || !eligibility) {
+      setSubmitError(
+        'Backend Host eligibility is unavailable. Retry before submitting your application.',
+      );
+      return;
+    }
+    if (!eligibility.eligible) {
+      setSubmitError(
+        eligibility.reasons.join(' ') ||
+          'Host eligibility requirements are not currently met.',
+      );
+      return;
+    }
     if (assetLoadError) {
       setSubmitError(
         'Secure verification document status is unavailable. Retry before submitting your application.',
@@ -373,9 +401,19 @@ export const HostVerificationPage: React.FC = () => {
   }
 
   const status = hostProfile?.status || 'NOT_APPLIED';
-  const minFollowers = publicConfig?.hostSettings?.minFollowersRequired || 50;
-  const currentFollowers = profile.followersCount || 0;
-  const isFollowerEligible = currentFollowers >= minFollowers;
+  const followerRequirement = eligibility?.requirements.followers;
+  const completedRoomsRequirement = eligibility?.requirements.completedRooms;
+  const communityStandingRequirement =
+    eligibility?.requirements.communityStanding;
+  const minFollowers = followerRequirement?.minimum ?? 0;
+  const currentFollowers =
+    followerRequirement?.current ?? profile.followersCount ?? 0;
+  const isFollowerEligible = followerRequirement?.met ?? false;
+  const minCompletedRooms = completedRoomsRequirement?.minimum ?? 0;
+  const currentCompletedRooms = completedRoomsRequirement?.current ?? 0;
+  const isRoomsEligible = completedRoomsRequirement?.met ?? false;
+  const isCommunityStandingEligible =
+    communityStandingRequirement?.met ?? false;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -451,6 +489,31 @@ export const HostVerificationPage: React.FC = () => {
       {submitSuccess && (
         <Alert severity="success" sx={{ borderRadius: 2 }}>
           {submitSuccess}
+        </Alert>
+      )}
+
+      {eligibilityError && (
+        <Alert
+          severity="error"
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              startIcon={<RefreshCw size={14} />}
+              onClick={() => void fetchHostStatus()}
+            >
+              Retry
+            </Button>
+          }
+        >
+          Backend Host eligibility could not be evaluated. Application
+          submission is paused.
+        </Alert>
+      )}
+
+      {eligibility && !eligibility.applicationsEnabled && (
+        <Alert severity="warning">
+          Host applications are currently disabled by platform configuration.
         </Alert>
       )}
 
@@ -973,7 +1036,11 @@ export const HostVerificationPage: React.FC = () => {
                       }
                       onClick={() => void handleSubmitApplication()}
                       disabled={
-                        submitting || status === 'PENDING' || !!assetLoadError
+                        submitting ||
+                        status === 'PENDING' ||
+                        !!assetLoadError ||
+                        !!eligibilityError ||
+                        !eligibility?.eligible
                       }
                       fullWidth
                       sx={{ fontWeight: 700, py: 1.2 }}
@@ -1026,11 +1093,16 @@ export const HostVerificationPage: React.FC = () => {
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>Broadcasting Experience</Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Min 3 public voice rooms hosted
+                          Requires min. {minCompletedRooms} completed voice rooms
                         </Typography>
                       </Box>
                     </Box>
-                    <Chip icon={<CheckCircle2 size={14} />} label="Eligible" color="success" size="small" />
+                    <Chip
+                      icon={isRoomsEligible ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                      label={`${currentCompletedRooms} / ${minCompletedRooms}`}
+                      color={isRoomsEligible ? 'success' : 'warning'}
+                      size="small"
+                    />
                   </Box>
 
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, bgcolor: 'action.hover', borderRadius: 2 }}>
@@ -1039,11 +1111,24 @@ export const HostVerificationPage: React.FC = () => {
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>Community Standing</Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Zero policy compliance strikes
+                          {communityStandingRequirement?.required
+                            ? 'No active account ban or suspension'
+                            : 'Not required by current configuration'}
                         </Typography>
                       </Box>
                     </Box>
-                    <Chip icon={<CheckCircle2 size={14} />} label="Good Standing" color="success" size="small" />
+                    <Chip
+                      icon={isCommunityStandingEligible ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                      label={
+                        communityStandingRequirement?.required
+                          ? isCommunityStandingEligible
+                            ? 'Good Standing'
+                            : 'Review Required'
+                          : 'Not Required'
+                      }
+                      color={isCommunityStandingEligible ? 'success' : 'warning'}
+                      size="small"
+                    />
                   </Box>
                 </Stack>
               </CardContent>

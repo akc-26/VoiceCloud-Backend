@@ -15,6 +15,11 @@ import { HostVerificationAssetService } from './host-verification-asset.service'
 import { HostVerificationUploadInterceptor } from './interceptors/host-verification-upload.interceptor';
 import { HostVerificationLegacyMigration } from './entities/host-verification-legacy-migration.entity';
 import { LegacyHostVerificationMigrationService } from './legacy-host-verification-migration.service';
+import { User } from '../users/entities/user.entity';
+import { Room } from '../rooms/entities/room.entity';
+import { ModerationAction } from '../moderation/entities/moderation-action.entity';
+import { SystemSetting } from '../admin/entities/system-setting.entity';
+import { HostEligibilityService } from './host-eligibility.service';
 
 @Module({
   imports: [
@@ -28,6 +33,10 @@ import { LegacyHostVerificationMigrationService } from './legacy-host-verificati
       HostReward,
       HostVerificationAsset,
       HostVerificationLegacyMigration,
+      User,
+      Room,
+      ModerationAction,
+      SystemSetting,
     ]),
     StorageModule,
   ],
@@ -37,11 +46,13 @@ import { LegacyHostVerificationMigrationService } from './legacy-host-verificati
     HostVerificationAssetService,
     HostVerificationUploadInterceptor,
     LegacyHostVerificationMigrationService,
+    HostEligibilityService,
   ],
   exports: [
     HostsService,
     HostVerificationAssetService,
     LegacyHostVerificationMigrationService,
+    HostEligibilityService,
   ],
 })
 export class HostsModule {}

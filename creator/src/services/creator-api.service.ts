@@ -20,6 +20,7 @@ import {
   RecentActivityItem,
   HostVerificationAsset,
   HostVerificationApplicationPayload,
+  HostEligibilityResponse,
   OwnerHostProfile,
 } from '../types/creator.types';
 
@@ -942,6 +943,14 @@ export class CreatorApiService {
 
   async getHostProgression(signal?: AbortSignal): Promise<any> {
     return this.request('/hosts/progression', { signal });
+  }
+
+  async getHostEligibility(
+    signal?: AbortSignal,
+  ): Promise<HostEligibilityResponse> {
+    return this.request<HostEligibilityResponse>('/hosts/eligibility', {
+      signal,
+    });
   }
 
   async uploadGovernmentId(file: File): Promise<HostVerificationAsset> {

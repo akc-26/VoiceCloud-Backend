@@ -58,6 +58,7 @@ import {
   HostVerificationUploadInterceptor,
 } from './interceptors/host-verification-upload.interceptor';
 import { ReplaceHostVerificationAssetDto } from './dto/replace-host-verification-asset.dto';
+import { HostEligibilityResponseDto } from './dto/host-eligibility-response.dto';
 
 @ApiTags('Host Verification & Management')
 @Controller('hosts')
@@ -138,6 +139,20 @@ export class HostsController {
   ) {
     const profile = await this.hostsService.updateHostProfile(userId, dto);
     return MapperUtils.toOwnerHostDto(profile);
+  }
+
+  @Get('eligibility')
+  @ApiOperation({
+    summary: 'Evaluate current backend-authoritative Host eligibility',
+  })
+  @ApiResponse({
+    status: 200,
+    type: HostEligibilityResponseDto,
+    description: 'Current Host application eligibility and requirements.',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getEligibility(@CurrentUser('userId') userId: string) {
+    return this.hostsService.getEligibility(userId);
   }
 
   @Get('search')

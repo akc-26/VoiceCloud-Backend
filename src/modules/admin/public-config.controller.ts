@@ -68,7 +68,16 @@ export class PublicConfigController {
         dailyLoginBonus: Number(publicSettings.vip_daily_login_bonus || 50),
       },
       hostSettings: {
-        minFollowersRequired: Number(publicSettings.min_host_followers || 50),
+        applicationsEnabled:
+          publicSettings.host_applications_enabled !== false &&
+          publicSettings.host_applications_enabled !== 'false',
+        minFollowersRequired: Number(publicSettings.min_host_followers ?? 50),
+        minCompletedRoomsRequired: Number(
+          publicSettings.min_host_completed_rooms ?? 3,
+        ),
+        requireGoodStanding:
+          publicSettings.require_host_good_standing !== false &&
+          publicSettings.require_host_good_standing !== 'false',
       },
       agencySettings: {
         commissionPct: Number(publicSettings.agency_commission_pct || 10),

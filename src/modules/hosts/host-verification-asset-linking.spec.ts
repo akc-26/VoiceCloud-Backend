@@ -19,6 +19,7 @@ import {
   HostVerificationStatus,
 } from './entities/host-profile.entity';
 import { HostVerificationAssetService } from './host-verification-asset.service';
+import { HostEligibilityService } from './host-eligibility.service';
 import { HostsService } from './hosts.service';
 import { MapperUtils } from './dto/host-response.dto';
 
@@ -351,6 +352,10 @@ describe('Private Host Asset Application Linking (B2A-2B)', () => {
         {} as StorageService,
         undefined,
         assetService as unknown as HostVerificationAssetService,
+        {
+          evaluate: jest.fn(),
+          assertEligible: jest.fn().mockResolvedValue({ eligible: true }),
+        } as unknown as HostEligibilityService,
       );
     });
 

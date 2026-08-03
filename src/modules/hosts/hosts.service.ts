@@ -34,6 +34,7 @@ import {
   HostVerificationAssetService,
 } from './host-verification-asset.service';
 import { HostVerificationAsset } from './entities/host-verification-asset.entity';
+import { HostEligibilityService } from './host-eligibility.service';
 
 @Injectable()
 export class HostsService {
@@ -57,6 +58,8 @@ export class HostsService {
     @Optional() private readonly redisService?: RedisService,
     @Optional()
     private readonly hostVerificationAssetService?: HostVerificationAssetService,
+    @Optional()
+    private readonly hostEligibilityService?: HostEligibilityService,
   ) {}
 
   // ==========================================
@@ -88,6 +91,8 @@ export class HostsService {
           'Host verification application is currently pending review',
         );
       }
+
+      await this.getEligibilityService().assertEligible(userId);
 
       if (hasPrivateAssetSelection) {
         return this.reapplyWithPrivateAssets(
@@ -180,6 +185,8 @@ export class HostsService {
       return existing;
     }
 
+    await this.getEligibilityService().assertEligible(userId);
+
     if (hasPrivateAssetSelection) {
       return this.applyWithPrivateAssets(userId, dto, assetSelection);
     }
@@ -243,6 +250,17 @@ export class HostsService {
       throw new NotFoundException(`Host profile for user ${userId} not found`);
     }
     return profile;
+  }
+
+  async getEligibility(userId: string) {
+    return this.getEligibilityService().evaluate(userId);
+  }
+
+  private getEligibilityService(): HostEligibilityService {
+    if (!this.hostEligibilityService) {
+      throw new Error('Host eligibility service is unavailable');
+    }
+    return this.hostEligibilityService;
   }
 
   private async applyWithPrivateAssets(

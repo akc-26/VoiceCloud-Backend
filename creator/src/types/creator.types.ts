@@ -80,6 +80,29 @@ export interface HostVerificationApplicationPayload {
   experience?: string;
 }
 
+export interface HostEligibilityResponse {
+  eligible: boolean;
+  applicationsEnabled: boolean;
+  requirements: {
+    followers: {
+      current: number;
+      minimum: number;
+      met: boolean;
+    };
+    completedRooms: {
+      current: number;
+      minimum: number;
+      met: boolean;
+    };
+    communityStanding: {
+      required: boolean;
+      met: boolean;
+    };
+  };
+  reasons: string[];
+  evaluatedAt: string;
+}
+
 export interface LiveRoomSummary {
   id: string;
   title: string;

@@ -13,6 +13,7 @@ import { HostIncidentLog } from './entities/host-incident-log.entity';
 import { HostReward } from './entities/host-reward.entity';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { StorageService } from '../storage/storage.service';
+import { HostEligibilityService } from './host-eligibility.service';
 import {
   NotFoundException,
   ConflictException,
@@ -138,6 +139,11 @@ describe('HostsService (Phase 25)', () => {
       .mockResolvedValue({ publicUrl: 'https://cdn.example.com/file.jpg' }),
   };
 
+  const mockHostEligibilityService = {
+    evaluate: jest.fn(),
+    assertEligible: jest.fn().mockResolvedValue({ eligible: true }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -169,6 +175,10 @@ describe('HostsService (Phase 25)', () => {
         },
         { provide: EventsGateway, useValue: mockEventsGateway },
         { provide: StorageService, useValue: mockStorageService },
+        {
+          provide: HostEligibilityService,
+          useValue: mockHostEligibilityService,
+        },
       ],
     }).compile();
 
