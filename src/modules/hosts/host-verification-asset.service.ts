@@ -5,10 +5,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { StorageService } from '../storage/storage.service';
 import { PrivateDocumentCategory } from '../storage/enums/private-document-category.enum';
 import {
@@ -18,6 +19,7 @@ import {
 import { HostVerificationAssetResponseDto } from './dto/host-verification-asset-response.dto';
 import { HostVerificationAsset } from './entities/host-verification-asset.entity';
 import { validateHostVerificationFile } from './utils/host-verification-file.util';
+import { UserRole } from '../../common/enums';
 
 const MAX_SIZE_CONFIG: Record<
   PrivateDocumentCategory,
@@ -41,6 +43,17 @@ export interface HostApplicationAssetSelection {
   governmentIdAssetId?: string;
   selfieAssetId?: string;
   supportingDocumentAssetIds?: string[];
+}
+
+export interface HostVerificationAssetActor {
+  userId: string;
+  role?: string;
+  roles?: string[];
+}
+
+export interface HostVerificationAssetContent {
+  asset: HostVerificationAsset;
+  buffer: Buffer;
 }
 
 @Injectable()
@@ -257,6 +270,214 @@ export class HostVerificationAssetService {
       },
       order: { createdAt: 'ASC' },
     });
+  }
+
+  async listOwnerAssets(
+    ownerUserId: string,
+  ): Promise<HostVerificationAssetResponseDto[]> {
+    const assets = await this.assetRepository.find({
+      where: {
+        ownerUserId,
+        visibility: PrivateAssetVisibility.PRIVATE,
+        validationStatus: PrivateAssetValidationStatus.VALIDATED,
+        isActive: true,
+        retiredAt: IsNull(),
+        replacedByAssetId: IsNull(),
+      },
+      order: { category: 'ASC', createdAt: 'ASC' },
+    });
+    return assets.map((asset) => this.toSafeResponse(asset));
+  }
+
+  async listHostAssetsForAdmin(
+    hostProfileId: string,
+  ): Promise<HostVerificationAssetResponseDto[]> {
+    const assets = await this.assetRepository.find({
+      where: {
+        hostProfileId,
+        visibility: PrivateAssetVisibility.PRIVATE,
+        validationStatus: PrivateAssetValidationStatus.VALIDATED,
+        isActive: true,
+        retiredAt: IsNull(),
+        replacedByAssetId: IsNull(),
+      },
+      order: { category: 'ASC', createdAt: 'ASC' },
+    });
+    return assets.map((asset) => this.toSafeResponse(asset));
+  }
+
+  async getAuthorizedContent(
+    assetId: string,
+    actor: HostVerificationAssetActor,
+  ): Promise<HostVerificationAssetContent> {
+    const asset = await this.assetRepository.findOne({
+      where: { id: assetId },
+    });
+    if (!asset) {
+      throw new NotFoundException('Host verification asset was not found');
+    }
+
+    const roles = new Set([actor.role, ...(actor.roles || [])].filter(Boolean));
+    const isAdministrator =
+      roles.has(UserRole.ADMIN) || roles.has(UserRole.SUPER_ADMIN);
+    const isOwner = asset.ownerUserId === actor.userId;
+
+    if (!isOwner && !isAdministrator) {
+      throw new ForbiddenException(
+        'Host verification asset access is restricted to its owner and administrators',
+      );
+    }
+    if (isAdministrator && !isOwner && !asset.hostProfileId) {
+      throw new ForbiddenException(
+        'Administrators can only access assets linked to a Host application',
+      );
+    }
+    this.assertCurrentPrivateAsset(asset, 'access');
+
+    try {
+      const exists = await this.storageService.existsPrivateObject(
+        asset.storageKey,
+      );
+      if (!exists) {
+        throw new NotFoundException('Host verification asset was not found');
+      }
+      const buffer = await this.storageService.readPrivateObject(
+        asset.storageKey,
+      );
+      if (buffer.length !== asset.fileSize) {
+        this.logger.error(
+          `Private Host verification asset size mismatch for asset ${asset.id}`,
+        );
+        throw new ServiceUnavailableException(
+          'Private Host verification asset content is unavailable',
+        );
+      }
+      return { asset, buffer };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ServiceUnavailableException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to read private Host verification asset ${asset.id}`,
+      );
+      throw new ServiceUnavailableException(
+        'Private Host verification asset content is unavailable',
+      );
+    }
+  }
+
+  async replaceLinkedAsset(
+    ownerUserId: string,
+    currentAssetId: string,
+    replacementAssetId: string,
+  ): Promise<HostVerificationAssetResponseDto> {
+    if (currentAssetId === replacementAssetId) {
+      throw new BadRequestException(
+        'Replacement asset must be different from the current asset',
+      );
+    }
+
+    return this.assetRepository.manager.transaction(async (manager) => {
+      const repository = manager.getRepository(HostVerificationAsset);
+      const current = await repository.findOne({
+        where: { id: currentAssetId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!current) {
+        throw new NotFoundException(
+          'Current Host verification asset was not found',
+        );
+      }
+      if (current.ownerUserId !== ownerUserId) {
+        throw new ForbiddenException(
+          'Only the asset owner can replace a Host verification asset',
+        );
+      }
+      if (!current.hostProfileId) {
+        throw new ConflictException(
+          'Only assets linked to a Host application can be replaced',
+        );
+      }
+      this.assertCurrentPrivateAsset(current, 'replace');
+
+      const replacement = await repository.findOne({
+        where: { id: replacementAssetId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!replacement) {
+        throw new NotFoundException(
+          'Replacement Host verification asset was not found',
+        );
+      }
+      if (replacement.ownerUserId !== ownerUserId) {
+        throw new ForbiddenException(
+          'Replacement asset must be owned by the authenticated user',
+        );
+      }
+      if (replacement.category !== current.category) {
+        throw new BadRequestException(
+          'Replacement asset category must match the current asset category',
+        );
+      }
+      if (replacement.hostProfileId) {
+        throw new ConflictException(
+          'Replacement asset must not already be linked to an application',
+        );
+      }
+      this.assertCurrentPrivateAsset(replacement, 'use as a replacement');
+
+      if (
+        current.category === PrivateDocumentCategory.GOVERNMENT_ID ||
+        current.category === PrivateDocumentCategory.SELFIE
+      ) {
+        const competingCurrent = await repository.findOne({
+          where: {
+            id: Not(current.id),
+            hostProfileId: current.hostProfileId,
+            category: current.category,
+            visibility: PrivateAssetVisibility.PRIVATE,
+            validationStatus: PrivateAssetValidationStatus.VALIDATED,
+            isActive: true,
+            retiredAt: IsNull(),
+            replacedByAssetId: IsNull(),
+          },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (competingCurrent) {
+          throw new ConflictException(
+            `Another active ${current.category} asset already exists for this Host application`,
+          );
+        }
+      }
+
+      replacement.hostProfileId = current.hostProfileId;
+      current.isActive = false;
+      current.retiredAt = new Date();
+      current.replacedByAssetId = replacement.id;
+
+      await repository.save([replacement, current]);
+      return this.toSafeResponse(replacement);
+    });
+  }
+
+  private assertCurrentPrivateAsset(
+    asset: HostVerificationAsset,
+    action: string,
+  ): void {
+    if (
+      asset.visibility !== PrivateAssetVisibility.PRIVATE ||
+      asset.validationStatus !== PrivateAssetValidationStatus.VALIDATED ||
+      !asset.isActive ||
+      asset.retiredAt !== null ||
+      asset.replacedByAssetId !== null
+    ) {
+      throw new NotFoundException(
+        `Host verification asset is not available to ${action}`,
+      );
+    }
   }
 
   private getCategorizedAssetIds(
