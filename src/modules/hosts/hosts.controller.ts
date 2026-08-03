@@ -12,7 +12,6 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
@@ -44,6 +43,12 @@ import {
   AdminHostResponseDto,
   MapperUtils,
 } from './dto/host-response.dto';
+import { HostVerificationAssetResponseDto } from './dto/host-verification-asset-response.dto';
+import { PrivateDocumentCategory } from '../storage/enums/private-document-category.enum';
+import {
+  HostVerificationUploadCategory,
+  HostVerificationUploadInterceptor,
+} from './interceptors/host-verification-upload.interceptor';
 
 @ApiTags('Host Verification & Management')
 @Controller('hosts')
@@ -167,10 +172,14 @@ export class HostsController {
   })
   @ApiResponse({
     status: 201,
+    type: HostVerificationAssetResponseDto,
     description: 'Government ID uploaded successfully.',
   })
+  @ApiResponse({ status: 400, description: 'File validation failed' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseInterceptors(FileInterceptor('file'))
+  @ApiResponse({ status: 413, description: 'Configured size limit exceeded' })
+  @HostVerificationUploadCategory(PrivateDocumentCategory.GOVERNMENT_ID)
+  @UseInterceptors(HostVerificationUploadInterceptor)
   async uploadGovernmentId(
     @CurrentUser('userId') userId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -193,10 +202,14 @@ export class HostsController {
   })
   @ApiResponse({
     status: 201,
+    type: HostVerificationAssetResponseDto,
     description: 'Profile photo uploaded successfully.',
   })
+  @ApiResponse({ status: 400, description: 'File validation failed' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseInterceptors(FileInterceptor('file'))
+  @ApiResponse({ status: 413, description: 'Configured size limit exceeded' })
+  @HostVerificationUploadCategory(PrivateDocumentCategory.SELFIE)
+  @UseInterceptors(HostVerificationUploadInterceptor)
   async uploadProfilePhoto(
     @CurrentUser('userId') userId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -219,10 +232,14 @@ export class HostsController {
   })
   @ApiResponse({
     status: 201,
+    type: HostVerificationAssetResponseDto,
     description: 'Verification document uploaded successfully.',
   })
+  @ApiResponse({ status: 400, description: 'File validation failed' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseInterceptors(FileInterceptor('file'))
+  @ApiResponse({ status: 413, description: 'Configured size limit exceeded' })
+  @HostVerificationUploadCategory(PrivateDocumentCategory.SUPPORTING_DOCUMENT)
+  @UseInterceptors(HostVerificationUploadInterceptor)
   async uploadVerificationDocument(
     @CurrentUser('userId') userId: string,
     @UploadedFile() file: Express.Multer.File,

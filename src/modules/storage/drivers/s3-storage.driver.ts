@@ -20,6 +20,7 @@ export interface S3DriverConfig {
 
 @Injectable()
 export class S3StorageDriver implements IStorageDriver {
+  readonly providerType = 's3-compatible';
   private readonly logger = new Logger(S3StorageDriver.name);
   private config: S3DriverConfig = {
     bucket: 'voicecloud-media',

@@ -26,8 +26,9 @@ import { CreateHostRoomDto } from './dto/create-host-room.dto';
 import { HostModerationActionDto } from './dto/host-moderation-action.dto';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { StorageService } from '../storage/storage.service';
-import { MediaCategory } from '../storage/enums/media-category.enum';
+import { PrivateDocumentCategory } from '../storage/enums/private-document-category.enum';
 import { RedisService } from '../../redis/redis.service';
+import { HostVerificationAssetService } from './host-verification-asset.service';
 
 @Injectable()
 export class HostsService {
@@ -49,6 +50,8 @@ export class HostsService {
     private readonly eventsGateway: EventsGateway,
     private readonly storageService: StorageService,
     @Optional() private readonly redisService?: RedisService,
+    @Optional()
+    private readonly hostVerificationAssetService?: HostVerificationAssetService,
   ) {}
 
   // ==========================================
@@ -416,69 +419,34 @@ export class HostsService {
 
   // Upload Helpers
   async uploadGovernmentId(userId: string, file: Express.Multer.File) {
-    const media = await this.storageService.uploadFile(
-      file,
-      {
-        category: MediaCategory.HOST_ID,
-        entityType: 'host_verification',
-        entityId: userId,
-      },
+    return this.getPrivateAssetService().uploadValidatedAsset(
       userId,
+      PrivateDocumentCategory.GOVERNMENT_ID,
+      file,
     );
-
-    const profile = await this.hostRepository.findOne({ where: { userId } });
-    if (profile) {
-      profile.documentUrl = media.publicUrl;
-      await this.hostRepository.save(profile);
-    }
-
-    return {
-      message: 'Government ID uploaded successfully',
-      documentUrl: media.publicUrl,
-      media,
-    };
   }
 
   async uploadProfilePhoto(userId: string, file: Express.Multer.File) {
-    const media = await this.storageService.uploadFile(
-      file,
-      {
-        category: MediaCategory.HOST_PHOTO,
-        entityType: 'host_verification',
-        entityId: userId,
-      },
+    return this.getPrivateAssetService().uploadValidatedAsset(
       userId,
+      PrivateDocumentCategory.SELFIE,
+      file,
     );
-
-    const profile = await this.hostRepository.findOne({ where: { userId } });
-    if (profile) {
-      profile.selfieUrl = media.publicUrl;
-      await this.hostRepository.save(profile);
-    }
-
-    return {
-      message: 'Profile photo uploaded successfully',
-      selfieUrl: media.publicUrl,
-      media,
-    };
   }
 
   async uploadVerificationDocument(userId: string, file: Express.Multer.File) {
-    const media = await this.storageService.uploadFile(
-      file,
-      {
-        category: MediaCategory.HOST_DOCUMENT,
-        entityType: 'host_verification',
-        entityId: userId,
-      },
+    return this.getPrivateAssetService().uploadValidatedAsset(
       userId,
+      PrivateDocumentCategory.SUPPORTING_DOCUMENT,
+      file,
     );
+  }
 
-    return {
-      message: 'Verification document uploaded successfully',
-      documentUrl: media.publicUrl,
-      media,
-    };
+  private getPrivateAssetService(): HostVerificationAssetService {
+    if (!this.hostVerificationAssetService) {
+      throw new Error('Private Host verification asset service is unavailable');
+    }
+    return this.hostVerificationAssetService;
   }
 
   // ==========================================

@@ -17,6 +17,8 @@ export interface StorageMetadataResult {
 }
 
 export interface IStorageDriver {
+  readonly providerType: string;
+
   upload(
     file: Express.Multer.File,
     category: MediaCategory,

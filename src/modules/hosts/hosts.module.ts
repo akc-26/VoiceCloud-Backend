@@ -11,6 +11,8 @@ import { HostVerificationAsset } from './entities/host-verification-asset.entity
 import { HostsService } from './hosts.service';
 import { HostsController } from './hosts.controller';
 import { StorageModule } from '../storage/storage.module';
+import { HostVerificationAssetService } from './host-verification-asset.service';
+import { HostVerificationUploadInterceptor } from './interceptors/host-verification-upload.interceptor';
 
 @Module({
   imports: [
@@ -27,7 +29,11 @@ import { StorageModule } from '../storage/storage.module';
     StorageModule,
   ],
   controllers: [HostsController],
-  providers: [HostsService],
-  exports: [HostsService],
+  providers: [
+    HostsService,
+    HostVerificationAssetService,
+    HostVerificationUploadInterceptor,
+  ],
+  exports: [HostsService, HostVerificationAssetService],
 })
 export class HostsModule {}

@@ -15,6 +15,7 @@ import {
 
 @Injectable()
 export class LocalStorageDriver implements IStorageDriver {
+  readonly providerType = 'local';
   private readonly logger = new Logger(LocalStorageDriver.name);
   private readonly uploadDir = path.join(process.cwd(), 'uploads');
   private readonly privateDir: string;

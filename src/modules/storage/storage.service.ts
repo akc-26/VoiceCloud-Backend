@@ -334,9 +334,10 @@ export class StorageService {
     key: string,
     data: Buffer,
     mimeType?: string,
-  ): Promise<void> {
+  ): Promise<string> {
     const driver = await this.storageFactory.getActiveDriver();
     await driver.writePrivate(key, data, mimeType);
+    return driver.providerType;
   }
 
   async readPrivateObject(key: string): Promise<Buffer> {
