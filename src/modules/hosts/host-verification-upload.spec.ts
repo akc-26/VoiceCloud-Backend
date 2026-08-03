@@ -224,6 +224,7 @@ describe('Secure Host Verification Upload Foundation (B2A-2A)', () => {
         assetId: 'asset-1',
         category: PrivateDocumentCategory.GOVERNMENT_ID,
         validationStatus: PrivateAssetValidationStatus.VALIDATED,
+        linkedToApplication: false,
       });
     });
 

@@ -27,6 +27,13 @@ export class HostVerificationAssetResponseDto {
   @ApiProperty({ example: true })
   isActive: boolean;
 
+  @ApiProperty({
+    example: false,
+    description:
+      'Whether this private asset is currently linked to a Host application',
+  })
+  linkedToApplication: boolean;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt: Date;
 }

@@ -198,6 +198,7 @@ describe('Private Host verification access and replacement (B2A-2C)', () => {
       const result = await service.listOwnerAssets(OWNER_ID);
 
       expect(result).toHaveLength(2);
+      expect(result[0].linkedToApplication).toBe(true);
       expect(result[0]).not.toHaveProperty('storageKey');
       expect(result[0]).not.toHaveProperty('storageProvider');
       expect(result[0]).not.toHaveProperty('ownerUserId');
@@ -213,6 +214,7 @@ describe('Private Host verification access and replacement (B2A-2C)', () => {
         expect.objectContaining({
           assetId: CURRENT_ID,
           category: PrivateDocumentCategory.GOVERNMENT_ID,
+          linkedToApplication: true,
         }),
       ]);
       expect(result[0]).not.toHaveProperty('storageKey');
@@ -270,7 +272,11 @@ describe('Private Host verification access and replacement (B2A-2C)', () => {
         replacement,
         current,
       ]);
-      expect(result).toMatchObject({ assetId: REPLACEMENT_ID, isActive: true });
+      expect(result).toMatchObject({
+        assetId: REPLACEMENT_ID,
+        isActive: true,
+        linkedToApplication: true,
+      });
       expect(result).not.toHaveProperty('storageKey');
     });
 

@@ -522,6 +522,7 @@ export class HostVerificationAssetService {
       fileSize: asset.fileSize,
       validationStatus: asset.validationStatus,
       isActive: asset.isActive,
+      linkedToApplication: asset.hostProfileId !== null,
       createdAt: asset.createdAt,
     };
   }

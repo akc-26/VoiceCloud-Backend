@@ -38,13 +38,24 @@ import {
 } from 'lucide-react';
 import { creatorApi } from '../services/creator-api.service';
 import { useCreatorProfileStore } from '../store/creator-profile.store';
+import {
+  HostVerificationApplicationPayload,
+  HostVerificationAsset,
+  OwnerHostProfile,
+} from '../types/creator.types';
+import {
+  activeAssetsForCategory,
+  formatPrivateAssetSize,
+  preferredAssetForCategory,
+  validateHostVerificationFileSelection,
+} from '../utils/host-verification-assets';
 
 export const HostVerificationPage: React.FC = () => {
   const profile = useCreatorProfileStore((state) => state.profile);
 
   // Profile and Application State
   const [loading, setLoading] = useState(true);
-  const [hostProfile, setHostProfile] = useState<any | null>(null);
+  const [hostProfile, setHostProfile] = useState<OwnerHostProfile | null>(null);
   const [progression, setProgression] = useState<any | null>(null);
   const [publicConfig, setPublicConfig] = useState<any | null>(null);
 
@@ -58,13 +69,15 @@ export const HostVerificationPage: React.FC = () => {
   const [experience, setExperience] = useState('2+ years in live broadcasting');
 
   // Document Uploads State
-  const [idFile, setIdFile] = useState<File | null>(null);
-  const [selfieFile, setSelfieFile] = useState<File | null>(null);
-  const [idUploadedUrl, setIdUploadedUrl] = useState<string | null>(null);
-  const [selfieUploadedUrl, setSelfieUploadedUrl] = useState<string | null>(null);
+  const [verificationAssets, setVerificationAssets] = useState<
+    HostVerificationAsset[]
+  >([]);
 
   const [uploadingId, setUploadingId] = useState(false);
   const [uploadingSelfie, setUploadingSelfie] = useState(false);
+  const [uploadingSupporting, setUploadingSupporting] = useState(false);
+  const [replacingAssetId, setReplacingAssetId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -72,9 +85,10 @@ export const HostVerificationPage: React.FC = () => {
   const fetchHostStatus = async () => {
     setLoading(true);
     try {
-      const [pData, configData] = await Promise.all([
+      const [pData, configData, assetData] = await Promise.all([
         creatorApi.getHostProfile().catch(() => null),
         creatorApi.getPublicConfig().catch(() => null),
+        creatorApi.getHostVerificationAssets().catch(() => []),
       ]);
 
       if (pData) {
@@ -83,8 +97,18 @@ export const HostVerificationPage: React.FC = () => {
         setIdNumber(''); // Keep editable replacement field empty by default
         setCountry(pData.country || 'United States');
         setBio(pData.bio || '');
-        if (pData.languages) setLanguages(Array.isArray(pData.languages) ? pData.languages.join(', ') : pData.languages);
-        if (pData.categories) setCategories(Array.isArray(pData.categories) ? pData.categories.join(', ') : pData.categories);
+        if (pData.languages)
+          setLanguages(
+            Array.isArray(pData.languages)
+              ? pData.languages.join(', ')
+              : pData.languages,
+          );
+        if (pData.categories)
+          setCategories(
+            Array.isArray(pData.categories)
+              ? pData.categories.join(', ')
+              : pData.categories,
+          );
         if (pData.experience) setExperience(pData.experience);
 
         // Fetch progression stats if host profile exists
@@ -94,48 +118,164 @@ export const HostVerificationPage: React.FC = () => {
       if (configData) {
         setPublicConfig(configData);
       }
+      setVerificationAssets(assetData);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchHostStatus();
+    void fetchHostStatus();
   }, []);
 
   // Upload Handlers
+  const refreshVerificationAssets = async () => {
+    const assets = await creatorApi.getHostVerificationAssets();
+    setVerificationAssets(assets);
+    return assets;
+  };
+
+  const uploadOrReplaceSingleAsset = async (
+    file: File,
+    category: 'GOVERNMENT_ID' | 'SELFIE',
+  ) => {
+    const validationError = validateHostVerificationFileSelection(
+      file,
+      category,
+    );
+    if (validationError) throw new Error(validationError);
+
+    const currentLinkedAsset = activeAssetsForCategory(
+      verificationAssets,
+      category,
+    ).find((asset) => asset.linkedToApplication);
+    const uploaded =
+      category === 'GOVERNMENT_ID'
+        ? await creatorApi.uploadGovernmentId(file)
+        : await creatorApi.uploadProfilePhoto(file);
+
+    if (currentLinkedAsset) {
+      setReplacingAssetId(currentLinkedAsset.assetId);
+      await creatorApi.replaceHostVerificationAsset(
+        currentLinkedAsset.assetId,
+        uploaded.assetId,
+      );
+      await refreshVerificationAssets();
+      setReplacingAssetId(null);
+      return;
+    }
+
+    setVerificationAssets((current) => [uploaded, ...current]);
+  };
+
   const handleUploadGovernmentId = async (file: File) => {
-    setIdFile(file);
     setUploadingId(true);
+    setUploadError(null);
     try {
-      const res = await creatorApi.uploadGovernmentId(file);
-      if (res?.documentUrl) {
-        setIdUploadedUrl(res.documentUrl);
-      }
-    } catch (err: any) {
-      console.error('ID upload failed', err);
+      await uploadOrReplaceSingleAsset(file, 'GOVERNMENT_ID');
+    } catch (err: unknown) {
+      setReplacingAssetId(null);
+      setUploadError(
+        err instanceof Error
+          ? err.message
+          : 'Government ID upload failed securely.',
+      );
+      await refreshVerificationAssets().catch(() => undefined);
     } finally {
       setUploadingId(false);
     }
   };
 
   const handleUploadSelfie = async (file: File) => {
-    setSelfieFile(file);
     setUploadingSelfie(true);
+    setUploadError(null);
     try {
-      const res = await creatorApi.uploadProfilePhoto(file);
-      if (res?.selfieUrl) {
-        setSelfieUploadedUrl(res.selfieUrl);
-      }
-    } catch (err: any) {
-      console.error('Selfie upload failed', err);
+      await uploadOrReplaceSingleAsset(file, 'SELFIE');
+    } catch (err: unknown) {
+      setReplacingAssetId(null);
+      setUploadError(
+        err instanceof Error ? err.message : 'Selfie upload failed securely.',
+      );
+      await refreshVerificationAssets().catch(() => undefined);
     } finally {
       setUploadingSelfie(false);
     }
   };
 
-  const hasGovIdUploaded = !!hostProfile?.hasGovernmentIdUploaded || !!idUploadedUrl;
-  const hasSelfieUploaded = !!hostProfile?.hasProfilePhotoUploaded || !!selfieUploadedUrl;
+  const handleUploadSupportingDocument = async (file: File) => {
+    const validationError = validateHostVerificationFileSelection(
+      file,
+      'SUPPORTING_DOCUMENT',
+    );
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+
+    setUploadingSupporting(true);
+    setUploadError(null);
+    try {
+      const uploaded = await creatorApi.uploadVerificationDocument(file);
+      setVerificationAssets((current) => [uploaded, ...current]);
+    } catch (err: unknown) {
+      setUploadError(
+        err instanceof Error
+          ? err.message
+          : 'Supporting document upload failed securely.',
+      );
+    } finally {
+      setUploadingSupporting(false);
+    }
+  };
+
+  const handleReplaceSupportingDocument = async (
+    currentAsset: HostVerificationAsset,
+    file: File,
+  ) => {
+    const validationError = validateHostVerificationFileSelection(
+      file,
+      'SUPPORTING_DOCUMENT',
+    );
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+
+    setReplacingAssetId(currentAsset.assetId);
+    setUploadError(null);
+    try {
+      const uploaded = await creatorApi.uploadVerificationDocument(file);
+      await creatorApi.replaceHostVerificationAsset(
+        currentAsset.assetId,
+        uploaded.assetId,
+      );
+      await refreshVerificationAssets();
+    } catch (err: unknown) {
+      setUploadError(
+        err instanceof Error
+          ? err.message
+          : 'Supporting document replacement failed securely.',
+      );
+      await refreshVerificationAssets().catch(() => undefined);
+    } finally {
+      setReplacingAssetId(null);
+    }
+  };
+
+  const governmentIdAsset = preferredAssetForCategory(
+    verificationAssets,
+    'GOVERNMENT_ID',
+  );
+  const selfieAsset = preferredAssetForCategory(verificationAssets, 'SELFIE');
+  const supportingAssets = activeAssetsForCategory(
+    verificationAssets,
+    'SUPPORTING_DOCUMENT',
+  );
+  const hasGovIdUploaded = !!governmentIdAsset;
+  const hasSelfieUploaded = !!selfieAsset;
+  const hasLegacyDocumentsWithoutPrivateAssets =
+    (!!hostProfile?.hasGovernmentIdUploaded && !governmentIdAsset) ||
+    (!!hostProfile?.hasProfilePhotoUploaded && !selfieAsset);
 
   const handleSubmitApplication = async () => {
     if (!realName) {
@@ -147,7 +287,9 @@ export const HostVerificationPage: React.FC = () => {
       return;
     }
     if (!hasGovIdUploaded || !hasSelfieUploaded) {
-      setSubmitError('Government ID document and selfie photo uploads are required before submitting your application.');
+      setSubmitError(
+        'Government ID document and selfie photo uploads are required before submitting your application.',
+      );
       return;
     }
 
@@ -156,25 +298,37 @@ export const HostVerificationPage: React.FC = () => {
     setSubmitSuccess(null);
 
     try {
-      const dto: any = {
+      const dto: HostVerificationApplicationPayload = {
         realName,
         idNumber: idNumber.trim() ? idNumber.trim() : undefined,
+        governmentIdAssetId: governmentIdAsset.assetId,
+        selfieAssetId: selfieAsset.assetId,
+        supportingDocumentAssetIds: supportingAssets.map(
+          (asset) => asset.assetId,
+        ),
         country,
         bio,
-        languages: languages.split(',').map((s) => s.trim()).filter(Boolean),
-        categories: categories.split(',').map((s) => s.trim()).filter(Boolean),
+        languages: languages
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        categories: categories
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
         experience,
       };
 
-      if (idUploadedUrl) dto.documentUrl = idUploadedUrl;
-      if (selfieUploadedUrl) dto.selfieUrl = selfieUploadedUrl;
-
       const res = await creatorApi.applyForHostVerification(dto);
       setHostProfile(res);
-      setSubmitSuccess('Your Host Verification application has been submitted successfully for compliance review!');
-      fetchHostStatus();
+      setSubmitSuccess(
+        'Your Host Verification application has been submitted successfully for compliance review!',
+      );
+      void fetchHostStatus();
     } catch (err: any) {
-      setSubmitError(err?.message || 'Failed to submit host verification application.');
+      setSubmitError(
+        err?.message || 'Failed to submit host verification application.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -393,7 +547,7 @@ export const HostVerificationPage: React.FC = () => {
                         value={idNumber}
                         onChange={(e) => {
                           const val = e.target.value;
-                          if (!val.includes('*')) {
+                          if (!/[*•●]/.test(val)) {
                             setIdNumber(val);
                           }
                         }}
@@ -457,60 +611,288 @@ export const HostVerificationPage: React.FC = () => {
                     Verification Attachments
                   </Typography>
 
+                  {hasLegacyDocumentsWithoutPrivateAssets && (
+                    <Alert severity="warning">
+                      One or more legacy verification files are no longer
+                      available through secure private storage. Upload a new
+                      Government ID and selfie before resubmitting.
+                    </Alert>
+                  )}
+
+                  {uploadError && (
+                    <Alert
+                      severity="error"
+                      onClose={() => setUploadError(null)}
+                    >
+                      {uploadError}
+                    </Alert>
+                  )}
+
                   <Grid container spacing={2}>
                     {/* ID Document Uploader */}
                     <Grid xs={12} sm={6}>
-                      <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 1 }}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}
+                      >
+                        <Typography
+                          variant="caption"
+                          sx={{ fontWeight: 700, display: 'block', mb: 1 }}
+                        >
                           Government ID Document
                         </Typography>
-                        {hasGovIdUploaded ? (
-                          <Chip icon={<CheckCircle2 size={14} />} label="Uploaded" color="success" size="small" />
-                        ) : (
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            component="label"
-                            startIcon={uploadingId ? <CircularProgress size={16} /> : <Upload size={16} />}
-                            disabled={uploadingId || status === 'PENDING'}
-                          >
-                            {uploadingId ? 'Uploading...' : 'Upload ID File'}
-                            <input
-                              type="file"
-                              hidden
-                              accept="image/*,application/pdf"
-                              onChange={(e) => e.target.files?.[0] && handleUploadGovernmentId(e.target.files[0])}
+                        {governmentIdAsset && (
+                          <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+                            <Chip
+                              icon={<CheckCircle2 size={14} />}
+                              label={
+                                governmentIdAsset.linkedToApplication
+                                  ? 'Linked securely'
+                                  : 'Ready to submit'
+                              }
+                              color="success"
+                              size="small"
+                              sx={{ alignSelf: 'center' }}
                             />
-                          </Button>
+                            <Typography variant="caption" noWrap>
+                              {governmentIdAsset.originalFilename}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {governmentIdAsset.verifiedFormat} ·{' '}
+                              {formatPrivateAssetSize(
+                                governmentIdAsset.fileSize,
+                              )}
+                            </Typography>
+                          </Stack>
                         )}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          component="label"
+                          startIcon={
+                            uploadingId ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <Upload size={16} />
+                            )
+                          }
+                          disabled={uploadingId || status === 'PENDING'}
+                        >
+                          {uploadingId
+                            ? 'Uploading...'
+                            : governmentIdAsset
+                              ? 'Upload replacement'
+                              : 'Upload ID file'}
+                          <input
+                            type="file"
+                            hidden
+                            accept="image/jpeg,image/png,application/pdf"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) void handleUploadGovernmentId(file);
+                              event.target.value = '';
+                            }}
+                          />
+                        </Button>
                       </Paper>
                     </Grid>
 
                     {/* Verification Selfie Uploader */}
                     <Grid xs={12} sm={6}>
-                      <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 1 }}>
+                      <Paper
+                        variant="outlined"
+                        sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}
+                      >
+                        <Typography
+                          variant="caption"
+                          sx={{ fontWeight: 700, display: 'block', mb: 1 }}
+                        >
                           Verification Selfie Photo
                         </Typography>
-                        {hasSelfieUploaded ? (
-                          <Chip icon={<CheckCircle2 size={14} />} label="Uploaded" color="success" size="small" />
-                        ) : (
+                        {selfieAsset && (
+                          <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+                            <Chip
+                              icon={<CheckCircle2 size={14} />}
+                              label={
+                                selfieAsset.linkedToApplication
+                                  ? 'Linked securely'
+                                  : 'Ready to submit'
+                              }
+                              color="success"
+                              size="small"
+                              sx={{ alignSelf: 'center' }}
+                            />
+                            <Typography variant="caption" noWrap>
+                              {selfieAsset.originalFilename}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {selfieAsset.verifiedFormat} ·{' '}
+                              {formatPrivateAssetSize(selfieAsset.fileSize)}
+                            </Typography>
+                          </Stack>
+                        )}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          component="label"
+                          startIcon={
+                            uploadingSelfie ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <Upload size={16} />
+                            )
+                          }
+                          disabled={uploadingSelfie || status === 'PENDING'}
+                        >
+                          {uploadingSelfie
+                            ? 'Uploading...'
+                            : selfieAsset
+                              ? 'Upload replacement'
+                              : 'Upload selfie'}
+                          <input
+                            type="file"
+                            hidden
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) void handleUploadSelfie(file);
+                              event.target.value = '';
+                            }}
+                          />
+                        </Button>
+                      </Paper>
+                    </Grid>
+
+                    <Grid xs={12}>
+                      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 2,
+                            mb: supportingAssets.length ? 1.5 : 0,
+                          }}
+                        >
+                          <Box>
+                            <Typography
+                              variant="caption"
+                              sx={{ fontWeight: 700 }}
+                            >
+                              Supporting Documents
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: 'block' }}
+                            >
+                              Optional JPEG, PNG or PDF evidence; multiple files
+                              are supported.
+                            </Typography>
+                          </Box>
                           <Button
                             variant="outlined"
                             size="small"
                             component="label"
-                            startIcon={uploadingSelfie ? <CircularProgress size={16} /> : <Upload size={16} />}
-                            disabled={uploadingSelfie || status === 'PENDING'}
+                            startIcon={
+                              uploadingSupporting ? (
+                                <CircularProgress size={16} />
+                              ) : (
+                                <Upload size={16} />
+                              )
+                            }
+                            disabled={
+                              uploadingSupporting || status === 'PENDING'
+                            }
                           >
-                            {uploadingSelfie ? 'Uploading...' : 'Upload Selfie'}
+                            {uploadingSupporting
+                              ? 'Uploading...'
+                              : 'Add document'}
                             <input
                               type="file"
                               hidden
-                              accept="image/*"
-                              onChange={(e) => e.target.files?.[0] && handleUploadSelfie(e.target.files[0])}
+                              accept="image/jpeg,image/png,application/pdf"
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                if (file)
+                                  void handleUploadSupportingDocument(file);
+                                event.target.value = '';
+                              }}
                             />
                           </Button>
-                        )}
+                        </Box>
+
+                        <Stack spacing={1}>
+                          {supportingAssets.map((asset) => (
+                            <Box
+                              key={asset.assetId}
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 2,
+                                p: 1.25,
+                                bgcolor: 'action.hover',
+                                borderRadius: 1.5,
+                              }}
+                            >
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography
+                                  variant="body2"
+                                  noWrap
+                                  sx={{ fontWeight: 600 }}
+                                >
+                                  {asset.originalFilename}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {asset.verifiedFormat} ·{' '}
+                                  {formatPrivateAssetSize(asset.fileSize)} ·{' '}
+                                  {asset.linkedToApplication
+                                    ? 'Linked securely'
+                                    : 'Ready to submit'}
+                                </Typography>
+                              </Box>
+                              {asset.linkedToApplication && (
+                                <Button
+                                  component="label"
+                                  size="small"
+                                  disabled={
+                                    status === 'PENDING' ||
+                                    replacingAssetId === asset.assetId
+                                  }
+                                >
+                                  {replacingAssetId === asset.assetId
+                                    ? 'Replacing...'
+                                    : 'Replace'}
+                                  <input
+                                    type="file"
+                                    hidden
+                                    accept="image/jpeg,image/png,application/pdf"
+                                    onChange={(event) => {
+                                      const file = event.target.files?.[0];
+                                      if (file) {
+                                        void handleReplaceSupportingDocument(
+                                          asset,
+                                          file,
+                                        );
+                                      }
+                                      event.target.value = '';
+                                    }}
+                                  />
+                                </Button>
+                              )}
+                            </Box>
+                          ))}
+                        </Stack>
                       </Paper>
                     </Grid>
                   </Grid>
@@ -520,19 +902,23 @@ export const HostVerificationPage: React.FC = () => {
                       variant="contained"
                       color="primary"
                       size="large"
-                      startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <ShieldCheck size={20} />}
-                      onClick={handleSubmitApplication}
-                      disabled={submitting || status === 'PENDING' || status === 'APPROVED'}
+                      startIcon={
+                        submitting ? (
+                          <CircularProgress size={18} color="inherit" />
+                        ) : (
+                          <ShieldCheck size={20} />
+                        )
+                      }
+                      onClick={() => void handleSubmitApplication()}
+                      disabled={submitting || status === 'PENDING'}
                       fullWidth
                       sx={{ fontWeight: 700, py: 1.2 }}
                     >
-                      {status === 'APPROVED'
-                        ? 'Account Verified'
-                        : status === 'PENDING'
+                      {status === 'PENDING'
                         ? 'Application Pending Review'
                         : status === 'REJECTED'
-                        ? 'Resubmit Host Application'
-                        : 'Submit Verification Application'}
+                          ? 'Resubmit Host Application'
+                          : 'Submit Verification Application'}
                     </Button>
                   </Box>
                 </Stack>
@@ -642,3 +1028,4 @@ export const HostVerificationPage: React.FC = () => {
     </Box>
   );
 };
+

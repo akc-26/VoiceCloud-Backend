@@ -18,6 +18,9 @@ import {
   WalletSummaryResponse,
   NotificationsListResponse,
   RecentActivityItem,
+  HostVerificationAsset,
+  HostVerificationApplicationPayload,
+  OwnerHostProfile,
 } from '../types/creator.types';
 
 export class ApiError extends Error {
@@ -870,7 +873,12 @@ export class CreatorApiService {
   /**
    * Multipart Form File Upload Helper
    */
-  async uploadFile<T = any>(endpoint: string, file: File, fieldName = 'file'): Promise<T> {
+  async uploadFile<T>(
+    endpoint: string,
+    file: File,
+    fieldName = 'file',
+    isRetry = false,
+  ): Promise<T> {
     const formData = new FormData();
     formData.append(fieldName, file);
 
@@ -886,21 +894,46 @@ export class CreatorApiService {
     });
 
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(errText || `Upload failed with status ${res.status}`);
+      if (res.status === 401 && !isRetry) {
+        const refreshedToken = await this.triggerTokenRefresh();
+        if (refreshedToken) {
+          return this.uploadFile<T>(endpoint, file, fieldName, true);
+        }
+        this.handleUnauthorizedRedirect();
+        throw new ApiError('Session expired. Please log in again.', 401);
+      }
+
+      let message = `Upload failed with status ${res.status}`;
+      let details: unknown;
+      try {
+        details = await res.json();
+        const responseMessage = (details as { message?: string | string[] })
+          ?.message;
+        if (responseMessage) {
+          message = Array.isArray(responseMessage)
+            ? responseMessage.join(', ')
+            : responseMessage;
+        }
+      } catch {
+        // A non-JSON error response is intentionally reduced to a safe status.
+      }
+      throw new ApiError(message, res.status, details);
     }
-    return res.json();
+    return (await res.json()) as T;
   }
 
   /**
    * Host Verification & Creator Program API Endpoints
    */
-  async getHostProfile(signal?: AbortSignal): Promise<any> {
-    return this.request('/hosts/profile', { signal });
+  async getHostProfile(signal?: AbortSignal): Promise<OwnerHostProfile> {
+    return this.request<OwnerHostProfile>('/hosts/profile', { signal });
   }
 
-  async applyForHostVerification(dto: any, signal?: AbortSignal): Promise<any> {
-    return this.request('/hosts/apply', {
+  async applyForHostVerification(
+    dto: HostVerificationApplicationPayload,
+    signal?: AbortSignal,
+  ): Promise<OwnerHostProfile> {
+    return this.request<OwnerHostProfile>('/hosts/apply', {
       method: 'POST',
       body: JSON.stringify(dto),
       signal,
@@ -911,16 +944,48 @@ export class CreatorApiService {
     return this.request('/hosts/progression', { signal });
   }
 
-  async uploadGovernmentId(file: File): Promise<any> {
-    return this.uploadFile('/hosts/verification/government-id', file);
+  async uploadGovernmentId(file: File): Promise<HostVerificationAsset> {
+    return this.uploadFile<HostVerificationAsset>(
+      '/hosts/verification/government-id',
+      file,
+    );
   }
 
-  async uploadProfilePhoto(file: File): Promise<any> {
-    return this.uploadFile('/hosts/verification/profile-photo', file);
+  async uploadProfilePhoto(file: File): Promise<HostVerificationAsset> {
+    return this.uploadFile<HostVerificationAsset>(
+      '/hosts/verification/profile-photo',
+      file,
+    );
   }
 
-  async uploadVerificationDocument(file: File): Promise<any> {
-    return this.uploadFile('/hosts/verification/documents', file);
+  async uploadVerificationDocument(file: File): Promise<HostVerificationAsset> {
+    return this.uploadFile<HostVerificationAsset>(
+      '/hosts/verification/documents',
+      file,
+    );
+  }
+
+  async getHostVerificationAssets(
+    signal?: AbortSignal,
+  ): Promise<HostVerificationAsset[]> {
+    return this.request<HostVerificationAsset[]>('/hosts/verification/assets', {
+      signal,
+    });
+  }
+
+  async replaceHostVerificationAsset(
+    currentAssetId: string,
+    replacementAssetId: string,
+    signal?: AbortSignal,
+  ): Promise<HostVerificationAsset> {
+    return this.request<HostVerificationAsset>(
+      `/hosts/verification/assets/${encodeURIComponent(currentAssetId)}/replacement`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ replacementAssetId }),
+        signal,
+      },
+    );
   }
 
   async getPublicConfig(signal?: AbortSignal): Promise<any> {
@@ -929,4 +994,3 @@ export class CreatorApiService {
 }
 
 export const creatorApi = CreatorApiService.getInstance();
-

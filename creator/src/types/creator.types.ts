@@ -22,6 +22,64 @@ export interface CreatorProfile {
   category: string;
 }
 
+export type HostVerificationStatus =
+  'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+
+export type HostVerificationDocumentCategory =
+  'GOVERNMENT_ID' | 'SELFIE' | 'SUPPORTING_DOCUMENT';
+
+export interface HostVerificationAsset {
+  assetId: string;
+  category: HostVerificationDocumentCategory;
+  originalFilename: string;
+  verifiedMimeType: string;
+  verifiedFormat: string;
+  fileSize: number;
+  validationStatus: 'PENDING' | 'VALIDATED' | 'REJECTED';
+  isActive: boolean;
+  linkedToApplication: boolean;
+  createdAt: string;
+}
+
+export interface OwnerHostProfile {
+  id: string;
+  userId: string;
+  status: HostVerificationStatus;
+  hostLevel: number;
+  realName: string;
+  bio?: string;
+  country?: string;
+  languages?: string[];
+  categories?: string[];
+  experience?: string;
+  idNumber?: string;
+  rejectionReason?: string;
+  hasGovernmentIdUploaded: boolean;
+  hasProfilePhotoUploaded: boolean;
+  hasSupportingDocumentsUploaded: boolean;
+  hostRating: number;
+  totalRoomsHosted: number;
+  peakListeners: number;
+  xp: number;
+  performanceScore: number;
+  followersCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HostVerificationApplicationPayload {
+  realName: string;
+  idNumber?: string;
+  governmentIdAssetId: string;
+  selfieAssetId: string;
+  supportingDocumentAssetIds?: string[];
+  country?: string;
+  bio?: string;
+  languages?: string[];
+  categories?: string[];
+  experience?: string;
+}
+
 export interface LiveRoomSummary {
   id: string;
   title: string;
@@ -236,4 +294,3 @@ export interface RecentActivityItem {
   color?: string;
   timestamp?: string;
 }
-
