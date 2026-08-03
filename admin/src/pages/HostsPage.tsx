@@ -26,11 +26,13 @@ import LeaderboardIcon from '@mui/icons-material/Leaderboard';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import HistoryIcon from '@mui/icons-material/History';
 import StarsIcon from '@mui/icons-material/Stars';
+import DescriptionIcon from '@mui/icons-material/Description';
 
 import { DataTable, Column } from '../components/common/DataTable';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
+import { HostVerificationDocumentsDialog } from '../components/hosts/HostVerificationDocumentsDialog';
 import { useNotificationsStore } from '../store/notifications.store';
 import {
   hostsAdminService,
@@ -53,6 +55,8 @@ export const HostsPage: React.FC = () => {
   // Dialog States
   const [rejectDialogHost, setRejectDialogHost] = useState<HostProfileData | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [documentsDialogHost, setDocumentsDialogHost] =
+    useState<HostProfileData | null>(null);
 
   const [auditDialogHost, setAuditDialogHost] = useState<HostProfileData | null>(null);
   const [auditHistory, setAuditHistory] = useState<HostAuditNoteData[]>([]);
@@ -231,6 +235,14 @@ export const HostsPage: React.FC = () => {
       align: 'right',
       render: (row) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+          <IconButton
+            size="small"
+            color="primary"
+            onClick={() => setDocumentsDialogHost(row)}
+            title="Review private verification documents"
+          >
+            <DescriptionIcon />
+          </IconButton>
           <Button
             size="small"
             variant="contained"
@@ -314,6 +326,14 @@ export const HostsPage: React.FC = () => {
       align: 'right',
       render: (row) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+          <IconButton
+            size="small"
+            color="primary"
+            onClick={() => setDocumentsDialogHost(row)}
+            title="Review private verification documents"
+          >
+            <DescriptionIcon />
+          </IconButton>
           <Button
             size="small"
             variant="outlined"
@@ -573,6 +593,12 @@ export const HostsPage: React.FC = () => {
           )}
         </>
       )}
+
+      <HostVerificationDocumentsDialog
+        host={documentsDialogHost}
+        open={!!documentsDialogHost}
+        onClose={() => setDocumentsDialogHost(null)}
+      />
 
       {/* Reject Reason Dialog */}
       <Dialog open={!!rejectDialogHost} onClose={() => setRejectDialogHost(null)} maxWidth="xs" fullWidth>

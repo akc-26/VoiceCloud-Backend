@@ -5,8 +5,6 @@ export interface HostProfileData {
   userId: string;
   realName: string;
   idNumber: string;
-  documentUrl?: string;
-  selfieUrl?: string;
   bio?: string;
   languages?: string[];
   categories?: string[];
@@ -22,6 +20,24 @@ export interface HostProfileData {
   totalRoomsHosted: number;
   totalSpeakingTimeMinutes: number;
   rejectionReason?: string;
+  createdAt: string;
+}
+
+export type HostVerificationDocumentCategory =
+  | 'GOVERNMENT_ID'
+  | 'SELFIE'
+  | 'SUPPORTING_DOCUMENT';
+
+export interface HostVerificationAssetData {
+  assetId: string;
+  category: HostVerificationDocumentCategory;
+  originalFilename: string;
+  verifiedMimeType: string;
+  verifiedFormat: string;
+  fileSize: number;
+  validationStatus: 'PENDING' | 'VALIDATED' | 'REJECTED';
+  isActive: boolean;
+  linkedToApplication: boolean;
   createdAt: string;
 }
 
@@ -60,6 +76,26 @@ export const hostsAdminService = {
       params: status ? { status } : {},
     });
     return res.data as HostProfileData[];
+  },
+
+  async getVerificationAssets(hostId: string, signal?: AbortSignal) {
+    const res = await api.get(
+      `/hosts/admin/applications/${encodeURIComponent(hostId)}/verification-assets`,
+      { signal },
+    );
+    return res.data as HostVerificationAssetData[];
+  },
+
+  async getVerificationAssetContent(assetId: string, signal?: AbortSignal) {
+    const res = await api.get(
+      `/hosts/verification/assets/${encodeURIComponent(assetId)}/content`,
+      {
+        responseType: 'blob',
+        signal,
+        headers: { 'X-Silent-Error': 'true' },
+      },
+    );
+    return res.data as Blob;
   },
 
   async approveHost(id: string) {
