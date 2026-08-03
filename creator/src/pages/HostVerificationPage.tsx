@@ -50,6 +50,12 @@ import {
   validateHostVerificationFileSelection,
 } from '../utils/host-verification-assets';
 
+function getPrivateAssetLoadError(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Secure verification document status could not be loaded.';
+}
+
 export const HostVerificationPage: React.FC = () => {
   const profile = useCreatorProfileStore((state) => state.profile);
 
@@ -78,17 +84,25 @@ export const HostVerificationPage: React.FC = () => {
   const [uploadingSupporting, setUploadingSupporting] = useState(false);
   const [replacingAssetId, setReplacingAssetId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [assetLoadError, setAssetLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
   const fetchHostStatus = async () => {
     setLoading(true);
+    setAssetLoadError(null);
     try {
-      const [pData, configData, assetData] = await Promise.all([
+      const [pData, configData, assetResult] = await Promise.all([
         creatorApi.getHostProfile().catch(() => null),
         creatorApi.getPublicConfig().catch(() => null),
-        creatorApi.getHostVerificationAssets().catch(() => []),
+        creatorApi
+          .getHostVerificationAssets()
+          .then((assets) => ({ assets, error: null as string | null }))
+          .catch((error: unknown) => ({
+            assets: [] as HostVerificationAsset[],
+            error: getPrivateAssetLoadError(error),
+          })),
       ]);
 
       if (pData) {
@@ -118,7 +132,8 @@ export const HostVerificationPage: React.FC = () => {
       if (configData) {
         setPublicConfig(configData);
       }
-      setVerificationAssets(assetData);
+      setVerificationAssets(assetResult.assets);
+      setAssetLoadError(assetResult.error);
     } finally {
       setLoading(false);
     }
@@ -130,9 +145,15 @@ export const HostVerificationPage: React.FC = () => {
 
   // Upload Handlers
   const refreshVerificationAssets = async () => {
-    const assets = await creatorApi.getHostVerificationAssets();
-    setVerificationAssets(assets);
-    return assets;
+    try {
+      const assets = await creatorApi.getHostVerificationAssets();
+      setVerificationAssets(assets);
+      setAssetLoadError(null);
+      return assets;
+    } catch (error: unknown) {
+      setAssetLoadError(getPrivateAssetLoadError(error));
+      throw error;
+    }
   };
 
   const uploadOrReplaceSingleAsset = async (
@@ -278,6 +299,12 @@ export const HostVerificationPage: React.FC = () => {
     (!!hostProfile?.hasProfilePhotoUploaded && !selfieAsset);
 
   const handleSubmitApplication = async () => {
+    if (assetLoadError) {
+      setSubmitError(
+        'Secure verification document status is unavailable. Retry before submitting your application.',
+      );
+      return;
+    }
     if (!realName) {
       setSubmitError('Please complete all required fields (Real Name)');
       return;
@@ -611,6 +638,30 @@ export const HostVerificationPage: React.FC = () => {
                     Verification Attachments
                   </Typography>
 
+                  {assetLoadError && (
+                    <Alert
+                      severity="error"
+                      action={
+                        <Button
+                          color="inherit"
+                          size="small"
+                          startIcon={<RefreshCw size={14} />}
+                          onClick={() =>
+                            void refreshVerificationAssets().catch(
+                              () => undefined,
+                            )
+                          }
+                        >
+                          Retry
+                        </Button>
+                      }
+                    >
+                      Secure verification documents could not be loaded. Upload
+                      and submission are paused to protect the current document
+                      state.
+                    </Alert>
+                  )}
+
                   {hasLegacyDocumentsWithoutPrivateAssets && (
                     <Alert severity="warning">
                       One or more legacy verification files are no longer
@@ -679,7 +730,11 @@ export const HostVerificationPage: React.FC = () => {
                               <Upload size={16} />
                             )
                           }
-                          disabled={uploadingId || status === 'PENDING'}
+                          disabled={
+                            uploadingId ||
+                            status === 'PENDING' ||
+                            !!assetLoadError
+                          }
                         >
                           {uploadingId
                             ? 'Uploading...'
@@ -748,7 +803,11 @@ export const HostVerificationPage: React.FC = () => {
                               <Upload size={16} />
                             )
                           }
-                          disabled={uploadingSelfie || status === 'PENDING'}
+                          disabled={
+                            uploadingSelfie ||
+                            status === 'PENDING' ||
+                            !!assetLoadError
+                          }
                         >
                           {uploadingSelfie
                             ? 'Uploading...'
@@ -808,7 +867,9 @@ export const HostVerificationPage: React.FC = () => {
                               )
                             }
                             disabled={
-                              uploadingSupporting || status === 'PENDING'
+                              uploadingSupporting ||
+                              status === 'PENDING' ||
+                              !!assetLoadError
                             }
                           >
                             {uploadingSupporting
@@ -867,6 +928,7 @@ export const HostVerificationPage: React.FC = () => {
                                   size="small"
                                   disabled={
                                     status === 'PENDING' ||
+                                    !!assetLoadError ||
                                     replacingAssetId === asset.assetId
                                   }
                                 >
@@ -910,7 +972,9 @@ export const HostVerificationPage: React.FC = () => {
                         )
                       }
                       onClick={() => void handleSubmitApplication()}
-                      disabled={submitting || status === 'PENDING'}
+                      disabled={
+                        submitting || status === 'PENDING' || !!assetLoadError
+                      }
                       fullWidth
                       sx={{ fontWeight: 700, py: 1.2 }}
                     >
@@ -1028,4 +1092,3 @@ export const HostVerificationPage: React.FC = () => {
     </Box>
   );
 };
-

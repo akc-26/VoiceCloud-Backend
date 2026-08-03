@@ -29,6 +29,7 @@ import {
   getHostVerificationCategoryLabel,
   isHostVerificationAssetPreviewable,
   sortHostVerificationAssets,
+  validateHostVerificationPreviewBlob,
 } from '../../utils/host-verification-assets';
 
 interface HostVerificationDocumentsDialogProps {
@@ -50,9 +51,12 @@ export const HostVerificationDocumentsDialog: React.FC<
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const previewRequestRef = useRef(0);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
   const releasePreview = useCallback(() => {
     previewRequestRef.current += 1;
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = null;
@@ -113,21 +117,22 @@ export const HostVerificationDocumentsDialog: React.FC<
     }
 
     const requestId = ++previewRequestRef.current;
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
     setPreviewLoading(true);
     try {
       const blob = await hostsAdminService.getVerificationAssetContent(
         asset.assetId,
+        controller.signal,
       );
       if (requestId !== previewRequestRef.current) return;
-      if (!blob.size) {
-        throw new Error('The private document response was empty.');
-      }
+      const responseError = validateHostVerificationPreviewBlob(
+        blob,
+        asset.verifiedMimeType,
+      );
+      if (responseError) throw new Error(responseError);
 
-      const verifiedBlob =
-        blob.type === asset.verifiedMimeType
-          ? blob
-          : new Blob([blob], { type: asset.verifiedMimeType });
-      const objectUrl = URL.createObjectURL(verifiedBlob);
+      const objectUrl = URL.createObjectURL(blob);
       if (requestId !== previewRequestRef.current) {
         URL.revokeObjectURL(objectUrl);
         return;
@@ -135,7 +140,10 @@ export const HostVerificationDocumentsDialog: React.FC<
       previewUrlRef.current = objectUrl;
       setPreviewUrl(objectUrl);
     } catch (error: unknown) {
-      if (requestId === previewRequestRef.current) {
+      if (
+        !controller.signal.aborted &&
+        requestId === previewRequestRef.current
+      ) {
         setPreviewError(
           error instanceof Error
             ? error.message
@@ -143,7 +151,10 @@ export const HostVerificationDocumentsDialog: React.FC<
         );
       }
     } finally {
-      if (requestId === previewRequestRef.current) setPreviewLoading(false);
+      if (requestId === previewRequestRef.current) {
+        previewAbortRef.current = null;
+        setPreviewLoading(false);
+      }
     }
   };
 

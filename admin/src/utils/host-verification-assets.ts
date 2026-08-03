@@ -47,3 +47,21 @@ export function isHostVerificationAssetPreviewable(mimeType: string): boolean {
     normalized,
   );
 }
+
+export function validateHostVerificationPreviewBlob(
+  blob: Blob,
+  expectedMimeType: string,
+): string | null {
+  if (!blob.size) return 'The private document response was empty.';
+
+  const normalizedExpectedType = expectedMimeType.trim().toLowerCase();
+  const normalizedResponseType = blob.type.trim().toLowerCase();
+  if (
+    !isHostVerificationAssetPreviewable(normalizedExpectedType) ||
+    normalizedResponseType !== normalizedExpectedType
+  ) {
+    return 'The private document response did not match its verified format.';
+  }
+
+  return null;
+}

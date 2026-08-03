@@ -96,7 +96,7 @@ describe('Admin private Host document integration (B2B-2)', () => {
     });
 
     it('revokes every temporary object URL when review changes or closes', () => {
-      expect(dialog).toContain('URL.createObjectURL(verifiedBlob)');
+      expect(dialog).toContain('URL.createObjectURL(blob)');
       expect(dialog).toContain('URL.revokeObjectURL(previewUrlRef.current)');
       expect(dialog).toContain('URL.revokeObjectURL(objectUrl)');
       expect(dialog).toContain('releasePreview();');
