@@ -52,7 +52,7 @@ export class ApplyHostDto {
     example: 'https://cdn.voicecloud.app/documents/id-front.jpg',
     deprecated: true,
     description:
-      'Legacy compatibility field. New clients must use governmentIdAssetId.',
+      'Legacy compatibility field pending controlled migration. New clients must use governmentIdAssetId.',
   })
   @IsString()
   @IsOptional()
@@ -62,7 +62,7 @@ export class ApplyHostDto {
     example: 'https://cdn.voicecloud.app/documents/selfie.jpg',
     deprecated: true,
     description:
-      'Legacy compatibility field. New clients must use selfieAssetId.',
+      'Legacy compatibility field pending controlled migration. New clients must use selfieAssetId.',
   })
   @IsString()
   @IsOptional()

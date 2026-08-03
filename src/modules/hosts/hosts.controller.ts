@@ -287,6 +287,10 @@ export class HostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Asset access is forbidden' })
   @ApiResponse({ status: 404, description: 'Current asset was not found' })
+  @ApiResponse({
+    status: 503,
+    description: 'Private asset content is temporarily unavailable',
+  })
   async getVerificationAssetContent(
     @Param('assetId', new ParseUUIDPipe({ version: '4' })) assetId: string,
     @CurrentUser() actor: AuthenticatedUser,

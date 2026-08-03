@@ -26,7 +26,10 @@
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:status": "npm run typeorm -- migration:show -d src/database/data-source.ts",
     "migration:run": "npm run typeorm -- migration:run -d src/database/data-source.ts",
-    "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts"
+    "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
+    "host-verification:migration:preview": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts",
+    "host-verification:migration:run": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts --execute",
+    "host-verification:migration:report": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts --report"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   IStorageDriver,
+  LegacyPublicObject,
   StorageUploadResult,
   StorageMetadataResult,
 } from './storage-driver.interface';
@@ -109,6 +110,27 @@ export class S3StorageDriver implements IStorageDriver {
   async deletePrivate(_key: string): Promise<boolean> {
     throw new Error(
       'S3 private storage operations are unsupported in this subpart',
+    );
+  }
+
+  async readLegacyPublic(_reference: string): Promise<LegacyPublicObject> {
+    throw new Error(
+      'S3 legacy public migration is unsupported; manual re-upload is required',
+    );
+  }
+
+  async deleteLegacyPublic(_reference: string): Promise<boolean> {
+    throw new Error(
+      'S3 legacy public migration is unsupported; manual re-upload is required',
+    );
+  }
+
+  async quarantineLegacyPublic(
+    _reference: string,
+    _privateKey: string,
+  ): Promise<void> {
+    throw new Error(
+      'S3 legacy public migration is unsupported; manual re-upload is required',
     );
   }
 }

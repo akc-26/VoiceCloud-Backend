@@ -16,6 +16,13 @@ export interface StorageMetadataResult {
   lastModified?: Date;
 }
 
+export interface LegacyPublicObject {
+  buffer: Buffer;
+  originalFilename: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface IStorageDriver {
   readonly providerType: string;
 
@@ -39,4 +46,10 @@ export interface IStorageDriver {
   existsPrivate(key: string): Promise<boolean>;
 
   deletePrivate(key: string): Promise<boolean>;
+
+  readLegacyPublic(reference: string): Promise<LegacyPublicObject>;
+
+  deleteLegacyPublic(reference: string): Promise<boolean>;
+
+  quarantineLegacyPublic(reference: string, privateKey: string): Promise<void>;
 }

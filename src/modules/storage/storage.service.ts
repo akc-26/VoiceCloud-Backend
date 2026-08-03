@@ -14,6 +14,7 @@ import { UploadMediaDto } from './dto/upload-media.dto';
 import { QueryMediaDto } from './dto/query-media.dto';
 import { PrivateDocumentCategory } from './enums/private-document-category.enum';
 import { generateOpaquePrivateStorageKey } from './utils/private-storage-key.util';
+import { LegacyPublicObject } from './drivers/storage-driver.interface';
 
 @Injectable()
 export class StorageService {
@@ -353,6 +354,24 @@ export class StorageService {
   async deletePrivateObject(key: string): Promise<boolean> {
     const driver = await this.storageFactory.getActiveDriver();
     return driver.deletePrivate(key);
+  }
+
+  async readLegacyPublicObject(reference: string): Promise<LegacyPublicObject> {
+    const driver = await this.storageFactory.getActiveDriver();
+    return driver.readLegacyPublic(reference);
+  }
+
+  async deleteLegacyPublicObject(reference: string): Promise<boolean> {
+    const driver = await this.storageFactory.getActiveDriver();
+    return driver.deleteLegacyPublic(reference);
+  }
+
+  async quarantineLegacyPublicObject(
+    reference: string,
+    privateKey: string,
+  ): Promise<void> {
+    const driver = await this.storageFactory.getActiveDriver();
+    await driver.quarantineLegacyPublic(reference, privateKey);
   }
 
   generatePrivateStorageKey(

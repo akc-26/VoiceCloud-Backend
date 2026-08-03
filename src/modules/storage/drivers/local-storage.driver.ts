@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import {
   IStorageDriver,
+  LegacyPublicObject,
   StorageUploadResult,
   StorageMetadataResult,
 } from './storage-driver.interface';
@@ -17,14 +18,20 @@ import {
 export class LocalStorageDriver implements IStorageDriver {
   readonly providerType = 'local';
   private readonly logger = new Logger(LocalStorageDriver.name);
-  private readonly uploadDir = path.join(process.cwd(), 'uploads');
+  private readonly uploadDir: string;
   private readonly privateDir: string;
 
   constructor(
     @Optional()
     @Inject('CUSTOM_PRIVATE_DIR')
     customPrivateDir?: string,
+    @Optional()
+    @Inject('CUSTOM_PUBLIC_DIR')
+    customPublicDir?: string,
   ) {
+    this.uploadDir = path.resolve(
+      customPublicDir ?? path.join(process.cwd(), 'uploads'),
+    );
     this.privateDir = validatePrivateStoragePath(
       customPrivateDir ?? process.env.PRIVATE_STORAGE_PATH,
       this.uploadDir,
@@ -147,6 +154,146 @@ export class LocalStorageDriver implements IStorageDriver {
     this.verifySymlinkSafety(targetPath);
     await fs.promises.unlink(targetPath);
     return true;
+  }
+
+  async readLegacyPublic(reference: string): Promise<LegacyPublicObject> {
+    const targetPath = this.resolveLegacyPublicPath(reference);
+    this.verifyLegacyPublicSymlinkSafety(targetPath);
+
+    const stats = await fs.promises.stat(targetPath);
+    if (!stats.isFile()) {
+      throw new Error('Legacy public reference is not a regular file');
+    }
+
+    const originalFilename = path.basename(targetPath);
+    return {
+      buffer: await fs.promises.readFile(targetPath),
+      originalFilename,
+      mimeType: this.mimeTypeForLegacyFilename(originalFilename),
+      size: stats.size,
+    };
+  }
+
+  async deleteLegacyPublic(reference: string): Promise<boolean> {
+    const targetPath = this.resolveLegacyPublicPath(reference);
+    if (!fs.existsSync(targetPath)) {
+      return false;
+    }
+    this.verifyLegacyPublicSymlinkSafety(targetPath);
+    const stats = await fs.promises.stat(targetPath);
+    if (!stats.isFile()) {
+      throw new Error('Legacy public reference is not a regular file');
+    }
+    await fs.promises.unlink(targetPath);
+    return true;
+  }
+
+  async quarantineLegacyPublic(
+    reference: string,
+    privateKey: string,
+  ): Promise<void> {
+    const sourcePath = this.resolveLegacyPublicPath(reference);
+    this.verifyLegacyPublicSymlinkSafety(sourcePath);
+    const targetPath = this.resolvePrivatePath(privateKey);
+    this.verifySymlinkSafety(targetPath);
+    if (fs.existsSync(targetPath)) {
+      throw new Error('Legacy quarantine target already exists');
+    }
+    await fs.promises.mkdir(path.dirname(targetPath), {
+      recursive: true,
+      mode: 0o700,
+    });
+    await fs.promises.rename(sourcePath, targetPath);
+    await fs.promises.chmod(targetPath, 0o600);
+  }
+
+  private resolveLegacyPublicPath(reference: string): string {
+    const trimmed = (reference || '').trim();
+    if (!trimmed || trimmed.includes('\0') || trimmed.includes('\\')) {
+      throw new Error('Unsafe legacy public reference');
+    }
+
+    let pathname = trimmed;
+    if (/^https?:\/\//i.test(trimmed)) {
+      pathname = new URL(trimmed).pathname;
+    } else if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+      throw new Error('Unsupported legacy public reference scheme');
+    } else {
+      pathname = trimmed.split(/[?#]/, 1)[0];
+    }
+
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(pathname);
+    } catch {
+      throw new Error('Malformed legacy public reference encoding');
+    }
+    if (decoded.includes('\0') || decoded.includes('\\')) {
+      throw new Error('Unsafe legacy public reference');
+    }
+
+    const relativeReference = decoded.replace(/^\/+/, '');
+    const segments = relativeReference.split('/');
+    if (
+      segments[0] !== 'uploads' ||
+      segments.length < 2 ||
+      segments.some(
+        (segment) => !segment || segment === '.' || segment === '..',
+      )
+    ) {
+      throw new Error('Legacy public reference must be inside /uploads');
+    }
+
+    const targetPath = path.resolve(this.uploadDir, ...segments.slice(1));
+    const relative = path.relative(this.uploadDir, targetPath);
+    if (
+      relative === '' ||
+      relative.startsWith('..') ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error('Legacy public reference escapes the upload root');
+    }
+    if (!fs.existsSync(targetPath)) {
+      throw new Error('Legacy public source file was not found');
+    }
+    return targetPath;
+  }
+
+  private verifyLegacyPublicSymlinkSafety(targetPath: string): void {
+    const canonicalUploadRoot = fs.realpathSync(this.uploadDir);
+    const relativePath = path.relative(this.uploadDir, targetPath);
+    let current = this.uploadDir;
+
+    for (const part of relativePath.split(path.sep)) {
+      current = path.join(current, part);
+      if (!fs.existsSync(current)) {
+        throw new Error('Legacy public source file was not found');
+      }
+      if (fs.lstatSync(current).isSymbolicLink()) {
+        throw new Error('Symbolic link detected in legacy public path');
+      }
+      const canonicalCurrent = fs.realpathSync(current);
+      const relative = path.relative(canonicalUploadRoot, canonicalCurrent);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        throw new Error('Legacy public path escapes the upload root');
+      }
+    }
+  }
+
+  private mimeTypeForLegacyFilename(filename: string): string {
+    switch (path.extname(filename).toLowerCase()) {
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.webp':
+        return 'image/webp';
+      case '.pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   async upload(

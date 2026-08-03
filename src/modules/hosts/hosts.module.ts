@@ -13,6 +13,8 @@ import { HostsController } from './hosts.controller';
 import { StorageModule } from '../storage/storage.module';
 import { HostVerificationAssetService } from './host-verification-asset.service';
 import { HostVerificationUploadInterceptor } from './interceptors/host-verification-upload.interceptor';
+import { HostVerificationLegacyMigration } from './entities/host-verification-legacy-migration.entity';
+import { LegacyHostVerificationMigrationService } from './legacy-host-verification-migration.service';
 
 @Module({
   imports: [
@@ -25,6 +27,7 @@ import { HostVerificationUploadInterceptor } from './interceptors/host-verificat
       HostIncidentLog,
       HostReward,
       HostVerificationAsset,
+      HostVerificationLegacyMigration,
     ]),
     StorageModule,
   ],
@@ -33,7 +36,12 @@ import { HostVerificationUploadInterceptor } from './interceptors/host-verificat
     HostsService,
     HostVerificationAssetService,
     HostVerificationUploadInterceptor,
+    LegacyHostVerificationMigrationService,
   ],
-  exports: [HostsService, HostVerificationAssetService],
+  exports: [
+    HostsService,
+    HostVerificationAssetService,
+    LegacyHostVerificationMigrationService,
+  ],
 })
 export class HostsModule {}
