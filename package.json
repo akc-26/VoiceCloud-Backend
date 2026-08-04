@@ -12,8 +12,8 @@
     "build:creator": "vite build --config creator/vite.config.ts",
     "build:website": "vite build --config website/vite.config.ts",
     "build": "nest build && vite build --config website/vite.config.ts && vite build --config admin/vite.config.ts && vite build --config creator/vite.config.ts",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"scripts/**/*.mjs\"",
     "start": "nest start",
     "start:dev": "npx nest start --watch",
     "start:debug": "npx nest start --debug --watch",
@@ -30,7 +30,9 @@
     "migration:revert": "npm run typeorm -- migration:revert -d src/database/data-source.ts",
     "host-verification:migration:preview": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts",
     "host-verification:migration:run": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts --execute",
-    "host-verification:migration:report": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts --report"
+    "host-verification:migration:report": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts --report",
+    "test:wp08:01": "jest --runInBand --runTestsByPath src/config/infrastructure-mode.spec.ts src/config/env-validator.spec.ts src/modules/health/health.service.spec.ts src/redis/redis-response.util.spec.ts src/wp08/wp08-01-acceptance-contract.spec.ts src/modules/auth/authentication-security.spec.ts src/modules/hosts/hosts.security.spec.ts src/modules/hosts/hosts.spec.ts",
+    "wp08:01:acceptance": "node scripts/wp08/wp08-01-acceptance.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

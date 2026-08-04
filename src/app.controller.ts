@@ -12,7 +12,7 @@ export class AppController {
       version: '1.0.0',
       status: 'online',
       documentation: '/api/docs',
-      health: '/api/v1/health',
+      health: '/health',
       api: '/api',
     };
   }
@@ -27,7 +27,7 @@ export class AppController {
       version: '1.0.0',
       status: 'online',
       documentation: '/api/docs',
-      health: '/api/v1/health',
+      health: '/health',
       api: '/api',
     };
   }

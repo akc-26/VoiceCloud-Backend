@@ -132,7 +132,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter(filterLogger));
 
   // 5. Configure Swagger OpenAPI Documentation (Protected in production)
-  const port = 3000;
+  const port = Number(process.env.PORT ?? 3000);
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = process.env.ENABLE_SWAGGER === 'true' || !isProd;
 
@@ -254,7 +254,7 @@ async function bootstrap() {
   );
   await app.listen(port, '0.0.0.0');
   appLogger.log(
-    `VoiceCloud API is live! Access health checks at http://localhost:${port}/api/v1/health`,
+    `VoiceCloud API is live! Access health checks at http://localhost:${port}/health`,
   );
 }
 

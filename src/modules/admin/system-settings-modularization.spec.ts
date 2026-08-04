@@ -364,9 +364,7 @@ describe('WP07 Admin System Settings Modularization', () => {
     expect(page).toContain('StreamingInfrastructureSettingsCard');
     expect(operationalCard).not.toContain('.catch(() => {})');
     expect(streamingCard).not.toContain('.catch(() => {})');
-    expect(creatorService).toContain(
-      'getStreamingInfrastructureSettings()',
-    );
+    expect(creatorService).toContain('getStreamingInfrastructureSettings()');
     expect(environmentExample).not.toContain('STREAM_RTMP_URL');
     expect(environmentExample).not.toContain('STREAM_WEBRTC_URL');
     expect(environmentExample).not.toContain('STREAM_DEFAULT_BITRATE');

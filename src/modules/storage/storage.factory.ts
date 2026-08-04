@@ -16,6 +16,15 @@ export class StorageFactory {
   ) {}
 
   async getActiveDriver(): Promise<IStorageDriver> {
+    const configuredDriver = process.env.STORAGE_DRIVER?.trim().toLowerCase();
+
+    // An explicit local setting must take precedence over database provider
+    // profiles. This keeps local/private storage usable in isolated acceptance
+    // environments even when the default MinIO profile is active.
+    if (configuredDriver === 'local') {
+      return this.localDriver;
+    }
+
     const activeConfig =
       await this.dynamicConfigService.getActiveProviderConfig(
         ProviderCategory.STORAGE,

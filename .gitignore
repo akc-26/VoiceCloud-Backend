@@ -58,3 +58,10 @@ bun.lockb
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# WP08 local acceptance artifacts
+.wp08-private-*/
+.wp08-server-*.out.log
+.wp08-server-*.err.log
+.wp08-acceptance-*.out.log
+.wp08-acceptance-*.err.log

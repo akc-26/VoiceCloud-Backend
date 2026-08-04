@@ -817,9 +817,7 @@ export class AdminSettingsService implements OnModuleInit {
     return result;
   }
 
-  async getStreamingInfrastructureSettings(): Promise<
-    StreamingInfrastructureSettingsResponseDto
-  > {
+  async getStreamingInfrastructureSettings(): Promise<StreamingInfrastructureSettingsResponseDto> {
     const settings = await this.settingRepo.find({
       where: { key: In([...STREAMING_INFRASTRUCTURE_SETTING_KEYS]) },
     });

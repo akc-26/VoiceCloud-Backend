@@ -35,6 +35,18 @@ export function validateProductionEnvironment(): void {
 
   const missingVars: string[] = [];
 
+  if (process.env.DATABASE_SYNCHRONIZE === 'true') {
+    missingVars.push(
+      'DATABASE_SYNCHRONIZE (automatic schema synchronization is forbidden in production)',
+    );
+  }
+
+  if ((process.env.INFRASTRUCTURE_MODE ?? 'auto').toLowerCase() === 'memory') {
+    missingVars.push(
+      'INFRASTRUCTURE_MODE (memory infrastructure is forbidden in production)',
+    );
+  }
+
   for (const item of requiredProductionVars) {
     const val = process.env[item.name];
     if (

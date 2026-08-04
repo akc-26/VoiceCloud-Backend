@@ -20,6 +20,15 @@ export class HealthController {
         status: { type: 'string', example: 'ok' },
         database: { type: 'string', example: 'connected' },
         redis: { type: 'string', example: 'connected' },
+        infrastructure: {
+          type: 'object',
+          properties: {
+            mode: { type: 'string', example: 'real' },
+            databaseEngine: { type: 'string', example: 'postgres' },
+            redisEngine: { type: 'string', example: 'redis' },
+            realInfrastructure: { type: 'boolean', example: true },
+          },
+        },
       },
     },
   })

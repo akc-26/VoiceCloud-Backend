@@ -243,9 +243,7 @@ export class AdminController {
   @ApiOperation({
     summary: 'Get private streaming infrastructure settings',
   })
-  async getStreamingInfrastructureSettings(): Promise<
-    StreamingInfrastructureSettingsResponseDto
-  > {
+  async getStreamingInfrastructureSettings(): Promise<StreamingInfrastructureSettingsResponseDto> {
     return this.settingsService.getStreamingInfrastructureSettings();
   }
 

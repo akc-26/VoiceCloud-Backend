@@ -112,6 +112,7 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
     const res = await request(app.getHttpServer()).get('/api/info').expect(200);
     expect(res.body.name).toBe('VoiceCloud Monolith API');
     expect(res.body.api).toBe('/api');
+    expect(res.body.health).toBe('/health');
   });
 
   it('GET / should serve Landing Website HTML if built', async () => {

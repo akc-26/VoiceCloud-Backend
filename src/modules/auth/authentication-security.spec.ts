@@ -19,14 +19,12 @@ import { DevelopmentAccountSeederService } from './development-account-seeder.se
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
-
 jest.mock('./google-auth.service', () => ({
   GoogleAuthService: class GoogleAuthService {},
 }));
 
-const { AuthService } = jest.requireActual<typeof import('./auth.service')>(
-  './auth.service',
-);
+const { AuthService } =
+  jest.requireActual<typeof import('./auth.service')>('./auth.service');
 
 function createAuthService(userRepository: any) {
   return new AuthService(
@@ -332,9 +330,9 @@ describe('Authentication and portal authorization security', () => {
     expect(await bcrypt.compare('AdminPass123!', adminUser.passwordHash)).toBe(
       true,
     );
-    expect(await bcrypt.compare('CreatorPass123!', creatorUser.passwordHash)).toBe(
-      true,
-    );
+    expect(
+      await bcrypt.compare('CreatorPass123!', creatorUser.passwordHash),
+    ).toBe(true);
     expect(repository.save).toHaveBeenCalledTimes(2);
   });
 

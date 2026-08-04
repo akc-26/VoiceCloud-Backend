@@ -1,3 +1,10 @@
+# WP08-01 Revision 03
+
+- Reconciled AppController health metadata tests with the locked `/health` route.
+- Added API metadata and hosting-route tests to the focused WP08 preflight.
+- Replaced ambiguous npm Jest argument forwarding with deterministic direct serial Jest execution.
+- Added checker-contract regression coverage to prevent route and test-command drift.
+
 # WP07 Package 05
 
 - Corrected strict public-route metadata handling in RolesGuard and JwtAuthGuard.

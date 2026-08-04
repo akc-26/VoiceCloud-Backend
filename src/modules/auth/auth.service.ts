@@ -583,10 +583,9 @@ export class AuthService {
     if (!passwordMatches) {
       user.failedLoginAttempts += 1;
 
-      const lockoutThresholdSetting =
-        await this.adminSettingsService.findByKey(
-          'failed_login_lockout_attempts',
-        );
+      const lockoutThresholdSetting = await this.adminSettingsService.findByKey(
+        'failed_login_lockout_attempts',
+      );
       const maxAttempts = lockoutThresholdSetting?.value
         ? parseInt(lockoutThresholdSetting.value, 10)
         : 5;

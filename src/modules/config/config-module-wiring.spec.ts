@@ -39,10 +39,7 @@ describe('AppConfigModule provider wiring', () => {
     ) as unknown[];
 
     expect(adminProviders).toEqual(
-      expect.arrayContaining([
-        AdminFeatureFlagsService,
-        AdminVersionsService,
-      ]),
+      expect.arrayContaining([AdminFeatureFlagsService, AdminVersionsService]),
     );
     expect(adminExports).toEqual(
       expect.arrayContaining([

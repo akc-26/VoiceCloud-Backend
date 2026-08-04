@@ -21,7 +21,7 @@ describe('AppController', () => {
         version: '1.0.0',
         status: 'online',
         documentation: '/api/docs',
-        health: '/api/v1/health',
+        health: '/health',
         api: '/api',
       });
     });
@@ -32,7 +32,7 @@ describe('AppController', () => {
         version: '1.0.0',
         status: 'online',
         documentation: '/api/docs',
-        health: '/api/v1/health',
+        health: '/health',
         api: '/api',
       });
     });

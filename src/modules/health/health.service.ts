@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { RedisService } from '../../redis/redis.service';
 import { AppLogger } from '../../common/logger/app-logger.service';
+import { resolveInfrastructureMode } from '../../config/infrastructure-mode';
 
 @Injectable()
 export class HealthService {
@@ -16,6 +17,9 @@ export class HealthService {
   async checkHealth() {
     let dbStatus = 'disconnected';
     let redisStatus = 'disconnected';
+    const databaseEngine = this.getDatabaseEngine();
+    const redisEngine = this.getRedisEngine();
+    const infrastructureMode = resolveInfrastructureMode();
 
     // 1. Check PostgreSQL Connection
     try {
@@ -46,7 +50,36 @@ export class HealthService {
       status: overallStatus,
       database: dbStatus,
       redis: redisStatus,
+      infrastructure: {
+        mode: infrastructureMode,
+        databaseEngine,
+        redisEngine,
+        realInfrastructure:
+          databaseEngine === 'postgres' &&
+          redisEngine === 'redis' &&
+          dbStatus === 'connected' &&
+          redisStatus === 'connected',
+      },
     };
+  }
+
+  private getDatabaseEngine(): 'postgres' | 'pg-mem' | 'unknown' {
+    const taggedDataSource = this.dataSource as DataSource & {
+      __voiceCloudInfrastructure?: 'postgres' | 'pg-mem';
+    };
+    if (taggedDataSource.__voiceCloudInfrastructure) {
+      return taggedDataSource.__voiceCloudInfrastructure;
+    }
+    return this.dataSource?.options?.type === 'postgres'
+      ? 'postgres'
+      : 'unknown';
+  }
+
+  private getRedisEngine(): 'redis' | 'ioredis-mock' | 'unknown' {
+    const client = this.redisService.getClient() as unknown as {
+      __voiceCloudInfrastructure?: 'redis' | 'ioredis-mock';
+    };
+    return client.__voiceCloudInfrastructure ?? 'unknown';
   }
 
   async getOperationalMetrics() {
