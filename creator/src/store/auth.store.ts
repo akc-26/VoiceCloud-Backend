@@ -99,14 +99,14 @@ export const useAuthStore = create<AuthState>()(
           role: 'CREATOR',
         });
         try {
-          localStorage.removeItem('voicecloud-creator-auth');
+          localStorage.removeItem('voicecloud-creator-auth-v3');
         } catch {
           // Ignore localStorage issues
         }
       },
     }),
     {
-      name: 'voicecloud-creator-auth',
+      name: 'voicecloud-creator-auth-v3',
     }
   )
 );

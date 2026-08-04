@@ -29,6 +29,14 @@ import {
   UpdateHostBusinessSettingsDto,
 } from './dto/host-business-settings.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import {
+  OperationalSettingsResponseDto,
+  UpdateOperationalSettingsDto,
+} from './dto/operational-settings.dto';
+import {
+  StreamingInfrastructureSettingsResponseDto,
+  UpdateStreamingInfrastructureSettingsDto,
+} from './dto/streaming-infrastructure-settings.dto';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums';
@@ -190,15 +198,71 @@ export class AdminController {
 
   // System Settings
   @Get('settings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all system settings' })
   async getAllSettings() {
     return this.settingsService.findAll();
   }
 
   @Get('settings/group/:group')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get system settings by group' })
   async getSettingsByGroup(@Param('group') group: string) {
     return this.settingsService.findByGroup(group);
+  }
+
+  @Get('settings/operational')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get authoritative operational settings' })
+  async getOperationalSettings(): Promise<OperationalSettingsResponseDto> {
+    return this.settingsService.getOperationalSettings();
+  }
+
+  @Put('settings/operational')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Atomically update validated operational settings',
+  })
+  async updateOperationalSettings(
+    @Body() dto: UpdateOperationalSettingsDto,
+    @Req() req: RequestWithUser,
+  ): Promise<OperationalSettingsResponseDto> {
+    return this.settingsService.updateOperationalSettings(
+      dto,
+      req.user?.userId,
+    );
+  }
+
+  @Get('settings/streaming-infrastructure')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get private streaming infrastructure settings',
+  })
+  async getStreamingInfrastructureSettings(): Promise<
+    StreamingInfrastructureSettingsResponseDto
+  > {
+    return this.settingsService.getStreamingInfrastructureSettings();
+  }
+
+  @Put('settings/streaming-infrastructure')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Atomically update private streaming infrastructure settings',
+  })
+  async updateStreamingInfrastructureSettings(
+    @Body() dto: UpdateStreamingInfrastructureSettingsDto,
+    @Req() req: RequestWithUser,
+  ): Promise<StreamingInfrastructureSettingsResponseDto> {
+    return this.settingsService.updateStreamingInfrastructureSettings(
+      dto,
+      req.user?.userId,
+    );
   }
 
   @Get('settings/host-business')
@@ -226,6 +290,8 @@ export class AdminController {
   }
 
   @Post('settings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create new system setting' })
   async createSetting(
     @Body() dto: CreateSettingDto,
@@ -235,6 +301,8 @@ export class AdminController {
   }
 
   @Patch('settings/:key')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update system setting value by key' })
   async updateSetting(
     @Param('key') key: string,

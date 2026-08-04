@@ -16,12 +16,14 @@ import {
   TicketStatus,
 } from '../../common/enums';
 import { CreateScheduledRoomDto } from './dto/create-scheduled-room.dto';
+import { AdminSettingsService } from '../admin/admin-settings.service';
 
 describe('ScheduledRoomsService (Phase 2B)', () => {
   let service: ScheduledRoomsService;
   let roomRepo: jest.Mocked<Repository<ScheduledRoom>>;
   let ticketRepo: jest.Mocked<Repository<RoomTicket>>;
   let clubRepo: jest.Mocked<Repository<Club>>;
+  let adminSettingsService: { getOperationalSettings: jest.Mock };
 
   const mockFutureDate = new Date(Date.now() + 86400000).toISOString();
 
@@ -81,6 +83,18 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
             findOne: jest.fn(),
           },
         },
+        {
+          provide: AdminSettingsService,
+          useValue: {
+            getOperationalSettings: jest.fn().mockResolvedValue({
+              maintenanceMode: false,
+              maintenanceMessage: 'Available',
+              maxRoomCapacity: 500,
+              maxSpeakerSeats: 12,
+              updatedAt: new Date(0).toISOString(),
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -88,6 +102,7 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
     roomRepo = module.get(getRepositoryToken(ScheduledRoom));
     ticketRepo = module.get(getRepositoryToken(RoomTicket));
     clubRepo = module.get(getRepositoryToken(Club));
+    adminSettingsService = module.get(AdminSettingsService);
   });
 
   describe('createScheduledRoom', () => {
@@ -130,6 +145,48 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
       await expect(
         service.createScheduledRoom('user-host', dto),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('uses the configured room capacity when none is supplied', async () => {
+      const room = getMockRoom();
+      adminSettingsService.getOperationalSettings.mockResolvedValue({
+        maintenanceMode: false,
+        maintenanceMessage: 'Available',
+        maxRoomCapacity: 275,
+        maxSpeakerSeats: 12,
+        updatedAt: new Date(0).toISOString(),
+      });
+      roomRepo.create.mockImplementation((value) => value as ScheduledRoom);
+      roomRepo.save.mockImplementation(async (value) => value as ScheduledRoom);
+
+      const result = await service.createScheduledRoom('user-host', {
+        title: 'Configured Capacity Room',
+        scheduledStartTime: mockFutureDate,
+      });
+
+      expect(result.maxParticipants).toBe(275);
+      expect(roomRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ maxParticipants: 275 }),
+      );
+    });
+
+    it('rejects a requested capacity above the configured maximum', async () => {
+      adminSettingsService.getOperationalSettings.mockResolvedValue({
+        maintenanceMode: false,
+        maintenanceMessage: 'Available',
+        maxRoomCapacity: 200,
+        maxSpeakerSeats: 12,
+        updatedAt: new Date(0).toISOString(),
+      });
+
+      await expect(
+        service.createScheduledRoom('user-host', {
+          title: 'Oversized Room',
+          scheduledStartTime: mockFutureDate,
+          maxParticipants: 201,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(roomRepo.save).not.toHaveBeenCalled();
     });
   });
 
@@ -178,6 +235,25 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
           title: 'Unauthorized',
         }),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects capacity updates above the configured maximum', async () => {
+      const room = getMockRoom();
+      roomRepo.findOne.mockResolvedValue(room);
+      adminSettingsService.getOperationalSettings.mockResolvedValue({
+        maintenanceMode: false,
+        maintenanceMessage: 'Available',
+        maxRoomCapacity: 150,
+        maxSpeakerSeats: 12,
+        updatedAt: new Date(0).toISOString(),
+      });
+
+      await expect(
+        service.updateScheduledRoom('sroom-123', 'user-host', {
+          maxParticipants: 151,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(roomRepo.save).not.toHaveBeenCalled();
     });
   });
 

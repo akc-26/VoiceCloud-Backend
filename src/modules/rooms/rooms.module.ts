@@ -15,6 +15,7 @@ import { Club } from '../clubs/entities/club.entity';
 import { StorageModule } from '../storage/storage.module';
 import { EventsModule } from '../../common/events/events.module';
 import { RedisModule } from '../../redis/redis.module';
+import { SystemSettingsModule } from '../admin/system-settings/system-settings.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RedisModule } from '../../redis/redis.module';
     StorageModule,
     EventsModule,
     RedisModule,
+    SystemSettingsModule,
   ],
   controllers: [
     RoomTicketsController,

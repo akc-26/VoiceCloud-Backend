@@ -42,7 +42,7 @@ export default tseslint.config(
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       'no-empty': 'off',
-      "prettier/prettier": ["error", { endOfLine: "auto" }],
+      'prettier/prettier': ['error', { endOfLine: 'lf' }],
     },
   },
 );

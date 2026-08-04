@@ -23,6 +23,35 @@ export interface HostBusinessSettings {
 
 export type UpdateHostBusinessSettings = Omit<HostBusinessSettings, 'updatedAt'>;
 
+export interface OperationalSettings {
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+  maxRoomCapacity: number;
+  maxSpeakerSeats: number;
+  updatedAt: string;
+}
+
+export type UpdateOperationalSettings = Omit<OperationalSettings, 'updatedAt'>;
+
+export interface StreamingInfrastructureSettings {
+  provider: string;
+  rtmpUrl: string;
+  webrtcUrl: string;
+  turnStunServers: string[];
+  recordingEnabled: boolean;
+  lowLatencyMode: boolean;
+  defaultBitrate: number;
+  codec: string;
+  region: string;
+  streamKeyPolicy: string;
+  updatedAt: string;
+}
+
+export type UpdateStreamingInfrastructureSettings = Omit<
+  StreamingInfrastructureSettings,
+  'updatedAt'
+>;
+
 export interface ProviderConfigData {
   id: string;
   category: string;
@@ -75,6 +104,38 @@ export const adminService = {
 
   async updateSystemSetting(key: string, value: any) {
     const res = await api.patch(`/admin/settings/${key}`, { value });
+    return res.data;
+  },
+
+  async getOperationalSettings() {
+    const res = await api.get<OperationalSettings>(
+      '/admin/settings/operational',
+    );
+    return res.data;
+  },
+
+  async updateOperationalSettings(settings: UpdateOperationalSettings) {
+    const res = await api.put<OperationalSettings>(
+      '/admin/settings/operational',
+      settings,
+    );
+    return res.data;
+  },
+
+  async getStreamingInfrastructureSettings() {
+    const res = await api.get<StreamingInfrastructureSettings>(
+      '/admin/settings/streaming-infrastructure',
+    );
+    return res.data;
+  },
+
+  async updateStreamingInfrastructureSettings(
+    settings: UpdateStreamingInfrastructureSettings,
+  ) {
+    const res = await api.put<StreamingInfrastructureSettings>(
+      '/admin/settings/streaming-infrastructure',
+      settings,
+    );
     return res.data;
   },
 

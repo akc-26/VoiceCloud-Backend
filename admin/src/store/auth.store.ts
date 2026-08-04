@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'voicecloud_admin_auth',
+      name: 'voicecloud_admin_auth_v3',
     },
   ),
 );

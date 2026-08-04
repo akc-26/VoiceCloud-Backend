@@ -13,7 +13,7 @@ export class RaiseHandDto {
   @ApiPropertyOptional({ example: 1, description: 'Requested seat index' })
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(1)
   seatIndex?: number;
 }
 
@@ -28,7 +28,7 @@ export class SpeakerActionDto {
   @ApiPropertyOptional({ example: 1, description: 'Seat index' })
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(1)
   seatIndex?: number;
 }
 
@@ -45,7 +45,7 @@ export class RtcMuteUserDto {
 export class LockSeatDto {
   @ApiProperty({ example: 1, description: 'Seat index' })
   @IsInt()
-  @Min(0)
+  @Min(1)
   seatIndex: number;
 
   @ApiProperty({ example: true, description: 'Lock or unlock seat' })

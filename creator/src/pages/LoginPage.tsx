@@ -46,9 +46,16 @@ export const LoginPage: React.FC = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const identifier = email.trim();
-    if (!identifier || !password) {
-      setError('Please enter both email/username and password.');
+    const normalizedEmail = email.trim().toLowerCase();
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+
+    if (!normalizedEmail || !password) {
+      setError('Please enter both Creator email and password.');
+      return;
+    }
+
+    if (!isValidEmail) {
+      setError('Please enter a valid Creator email address.');
       return;
     }
 
@@ -56,19 +63,23 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const payload = identifier.includes('@')
-        ? { email: identifier, password }
-        : { username: identifier, password };
+      const authResponse = await CreatorApiService.getInstance().login({
+        email: normalizedEmail,
+        password,
+      });
 
-      const authResponse = await CreatorApiService.getInstance().login(payload);
+      if (authResponse.user?.role !== 'CREATOR') {
+        throw new Error('This account does not have Creator Studio access.');
+      }
+
       setAuthResponse(authResponse);
-      setLoading(false);
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      setLoading(false);
       setError(
         err.message || 'Authentication failed. Please check your credentials.'
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -174,12 +185,13 @@ export const LoginPage: React.FC = () => {
             <form onSubmit={handleSignIn}>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                 <TextField
-                  label="Creator Email / Username"
-                  type="text"
+                  label="Creator Email"
+                  type="email"
                   fullWidth
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="creator@voicecloud.app"
+                  placeholder="creator@voicecloud.com"
+                  required
                   slotProps={{
                     input: {
                       startAdornment: (
@@ -199,6 +211,7 @@ export const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  required
                   slotProps={{
                     input: {
                       startAdornment: (

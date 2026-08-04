@@ -14,6 +14,7 @@ import { UpdateScheduledRoomDto } from './dto/update-scheduled-room.dto';
 import { QueryScheduledRoomDto } from './dto/query-scheduled-room.dto';
 import { RegisterReminderDto } from './dto/register-reminder.dto';
 import { ScheduledRoomStatus, TicketStatus } from '../../common/enums';
+import { AdminSettingsService } from '../admin/admin-settings.service';
 
 @Injectable()
 export class ScheduledRoomsService {
@@ -24,6 +25,7 @@ export class ScheduledRoomsService {
     private readonly ticketRepository: Repository<RoomTicket>,
     @InjectRepository(Club)
     private readonly clubRepository: Repository<Club>,
+    private readonly adminSettingsService: AdminSettingsService,
   ) {}
 
   async createScheduledRoom(
@@ -48,8 +50,19 @@ export class ScheduledRoomsService {
       );
     }
 
+    const operationalSettings =
+      await this.adminSettingsService.getOperationalSettings();
+    const maxParticipants =
+      createDto.maxParticipants ?? operationalSettings.maxRoomCapacity;
+    if (maxParticipants > operationalSettings.maxRoomCapacity) {
+      throw new BadRequestException(
+        `Room capacity cannot exceed the configured maximum of ${operationalSettings.maxRoomCapacity}`,
+      );
+    }
+
     const scheduledRoom = this.scheduledRoomRepository.create({
       ...createDto,
+      maxParticipants,
       scheduledStartTime: startTime,
       hostId: userId,
       status: ScheduledRoomStatus.SCHEDULED,
@@ -161,6 +174,16 @@ export class ScheduledRoomsService {
       if (!club) {
         throw new NotFoundException(
           `Club with ID "${updateDto.clubId}" not found`,
+        );
+      }
+    }
+
+    if (updateDto.maxParticipants !== undefined) {
+      const operationalSettings =
+        await this.adminSettingsService.getOperationalSettings();
+      if (updateDto.maxParticipants > operationalSettings.maxRoomCapacity) {
+        throw new BadRequestException(
+          `Room capacity cannot exceed the configured maximum of ${operationalSettings.maxRoomCapacity}`,
         );
       }
     }

@@ -53,6 +53,7 @@ import {
   ResumeRecordingDto,
 } from './dto/recording-actions.dto';
 import { RtcQualityMetric } from './entities/rtc-quality-metric.entity';
+import { AdminSettingsService } from '../admin/admin-settings.service';
 
 @Injectable()
 export class RtcService {
@@ -76,7 +77,23 @@ export class RtcService {
     private readonly providerFactory: RtcProviderFactory,
     private readonly redisService: RedisService,
     private readonly eventsGateway: EventsGateway,
+    private readonly adminSettingsService: AdminSettingsService,
   ) {}
+
+  private async validateSpeakerSeatIndex(seatIndex?: number): Promise<void> {
+    if (seatIndex === undefined) return;
+    const { maxSpeakerSeats } =
+      await this.adminSettingsService.getOperationalSettings();
+    if (
+      !Number.isSafeInteger(seatIndex) ||
+      seatIndex < 1 ||
+      seatIndex > maxSpeakerSeats
+    ) {
+      throw new BadRequestException(
+        `Speaker seat index must be between 1 and ${maxSpeakerSeats}`,
+      );
+    }
+  }
 
   // 1. RTC Configuration
   async getRtcConfig(): Promise<RtcConfig> {
@@ -362,6 +379,7 @@ export class RtcService {
 
   // 4. Speaking Controls
   async raiseHand(userId: string, roomId: string, dto: RaiseHandDto) {
+    await this.validateSpeakerSeatIndex(dto.seatIndex);
     const redis = this.redisService.getClient();
     if (redis) {
       try {
@@ -403,6 +421,8 @@ export class RtcService {
   }
 
   async approveSpeaker(hostId: string, roomId: string, dto: SpeakerActionDto) {
+    const seatIndex = dto.seatIndex ?? 1;
+    await this.validateSpeakerSeatIndex(seatIndex);
     const room = await this.roomRepository.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException(`Room ${roomId} not found`);
 
@@ -423,7 +443,7 @@ export class RtcService {
         roomId,
         userId: dto.targetUserId,
         role: SpeakerRole.SPEAKER,
-        seatIndex: dto.seatIndex || 1,
+        seatIndex,
         joinedAt: new Date(),
       });
       await this.speakerHistoryRepository.save(history);
@@ -433,13 +453,13 @@ export class RtcService {
       roomId,
       targetUserId: dto.targetUserId,
       approvedBy: hostId,
-      seatIndex: dto.seatIndex || 1,
+      seatIndex,
     });
 
     this.eventsGateway.server?.emit('speaker_joined', {
       roomId,
       userId: dto.targetUserId,
-      seatIndex: dto.seatIndex || 1,
+      seatIndex,
       role: SpeakerRole.SPEAKER,
     });
 
@@ -527,6 +547,7 @@ export class RtcService {
   }
 
   async lockSeat(hostId: string, roomId: string, dto: LockSeatDto) {
+    await this.validateSpeakerSeatIndex(dto.seatIndex);
     const eventName = dto.lock ? 'seat_locked' : 'seat_unlocked';
     this.eventsGateway.server?.emit(eventName, {
       roomId,

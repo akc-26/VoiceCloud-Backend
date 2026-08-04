@@ -1,9 +1,27 @@
+# WP07 Package 05
+
+- Corrected strict public-route metadata handling in RolesGuard and JwtAuthGuard.
+- Isolated AuthService unit tests from Firebase Admin/Jose ESM loading.
+- Removed the Package 04 class-level Creator role regression affecting subscription routes.
+- Made development acceptance credentials deterministic for existing accounts.
+- Invalidated stale Admin and Creator browser sessions with v3 persistence keys.
+- Added focused authorization/authentication preflight tests to the acceptance script.
+
 # VoiceCloud Platform Changelog
 
 All notable changes to the VoiceCloud Enterprise Audio Platform are documented in this file.
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [1.0.0-WP07-07] - 2026-08-04 (ExecutionContext Test Contract Correction)
+
+### Fixed
+
+- Replaced incomplete NestJS `ExecutionContext` test doubles with one complete reusable factory.
+- Removed the unsafe direct TypeScript assertion that caused `TS2352` during the focused authentication regression suite.
+- Preserved strict production authorization behavior without weakening either guard.
+
 
 ## [1.0.0-WP05D] - 2026-07-31 (VC-PH08-WP05D Creator Studio Simplification & Streaming Infrastructure Relocation)
 
@@ -103,3 +121,18 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - **Token Refresh Interceptors**: Transparent single-attempt JWT access token refresh across Creator Studio and Admin Portal without session disruption or reconnect loops.
 - **Backend Logging**: Enhanced `[AuthDebug]` structured logging for token verification, socket room joining, and guard authorization in development mode.
 - **Automated Test Suite**: 300 passing test cases across 30 test suites covering room lifecycle, wallet ledgers, real-time event emitters, tasks & achievements, and moderation services.
+
+---
+
+## [1.0.0-WP07-04] - 2026-08-04 (Authentication and Portal Authorization Acceptance Correction)
+
+### Fixed
+
+- Removed Admin fake-token fallback and client-selected role override.
+- Restored server-authoritative Admin JWT roles and deterministic development Admin access.
+- Rejected unknown email/username login attempts instead of auto-creating accounts.
+- Required passwords for login and email registration.
+- Restricted Creator Studio login to valid Creator email accounts.
+- Protected Creator APIs with the backend `CREATOR` role while preserving public plan reads.
+- Invalidated Package 03 browser authentication persistence keys.
+- Added focused authentication and portal-authorization regression coverage.

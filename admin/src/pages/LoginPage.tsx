@@ -10,10 +10,6 @@ import {
   IconButton,
   Alert,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Divider,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
@@ -31,9 +27,8 @@ export const LoginPage: React.FC = () => {
   const setAuth = useAuthStore((state) => state.setAuth);
   const addToast = useNotificationsStore((state) => state.addToast);
 
-  const [email, setEmail] = useState('admin@voicecloud.com');
-  const [password, setPassword] = useState('AdminPass123!');
-  const [role, setRole] = useState<UserRole>('SUPER_ADMIN');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,28 +39,28 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Attempt backend login
-      const data = await authService.login(email, password);
+      const data = await authService.login(email.trim().toLowerCase(), password);
+      const allowedAdminRoles: UserRole[] = [
+        'SUPER_ADMIN',
+        'ADMIN',
+        'MODERATOR',
+        'SUPPORT',
+      ];
+
+      if (!allowedAdminRoles.includes(data.user.role)) {
+        throw new Error('This account does not have Admin Portal access.');
+      }
+
       setAuth(data.accessToken, data.refreshToken, {
         ...data.user,
-        role: role || data.user.role || 'SUPER_ADMIN',
+        isSuperAdmin: data.user.role === 'SUPER_ADMIN',
       });
       addToast('success', `Welcome back, ${data.user.displayName || 'Admin'}!`);
       navigate('/dashboard');
     } catch (err: any) {
-      // Fallback for demo login if backend authentication endpoint is mock-seeded
-      const fakeToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo_admin_${Date.now()}`;
-      setAuth(fakeToken, fakeToken, {
-        id: 'admin-001',
-        email: email || 'admin@voicecloud.com',
-        username: email.split('@')[0] || 'admin',
-        displayName: 'System Admin',
-        role: role,
-        isSuperAdmin: role === 'SUPER_ADMIN',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      });
-      addToast('success', `Logged in successfully as ${role}`);
-      navigate('/dashboard');
+      setError(
+        err?.message || 'Authentication failed. Please check your credentials.',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -161,20 +156,7 @@ export const LoginPage: React.FC = () => {
               }}
             />
 
-            <FormControl fullWidth margin="normal" size="medium">
-              <InputLabel>Admin Role Profile</InputLabel>
-              <Select
-                value={role}
-                label="Admin Role Profile"
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                sx={{ borderRadius: 2 }}
-              >
-                <MenuItem value="SUPER_ADMIN">Super Admin (Full Systems Control)</MenuItem>
-                <MenuItem value="ADMIN">Admin (Operations & Content)</MenuItem>
-                <MenuItem value="MODERATOR">Moderator (Safety & Compliance)</MenuItem>
-                <MenuItem value="SUPPORT">Support Specialist (User Services)</MenuItem>
-              </Select>
-            </FormControl>
+
 
             <Button
               type="submit"

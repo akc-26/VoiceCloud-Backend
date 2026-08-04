@@ -16,6 +16,7 @@ import { DefaultMockProvider } from './providers/default-mock.provider';
 import { RedisModule } from '../../redis/redis.module';
 import { EventsModule } from '../../common/events/events.module';
 import { AppConfigModule } from '../config/config.module';
+import { SystemSettingsModule } from '../admin/system-settings/system-settings.module';
 
 import { RtcQualityMetric } from './entities/rtc-quality-metric.entity';
 import { RtcQualityService } from './rtc-quality.service';
@@ -34,6 +35,7 @@ import { RtcQualityService } from './rtc-quality.service';
     RedisModule,
     EventsModule,
     AppConfigModule,
+    SystemSettingsModule,
   ],
   controllers: [RtcController],
   providers: [

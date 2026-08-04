@@ -111,6 +111,7 @@ export class PublicConfigController {
         ],
       },
       maxRoomCapacity: Number(publicSettings.max_room_capacity || 500),
+      maxSpeakerSeats: Number(publicSettings.max_speaker_seats || 12),
       supportedAudioProfiles: [
         'speech_standard',
         'music_standard',

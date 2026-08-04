@@ -81,7 +81,7 @@ export class JwtAuthGuard implements CanActivate {
             `[AuthDebug] REST Guard token rejection on ${request.method} ${request.url}: ${err.message}`,
           );
         }
-        if (!isPublic) {
+        if (isPublic !== true) {
           throw new UnauthorizedException(
             err.message || 'Invalid or expired access token',
           );
@@ -89,7 +89,7 @@ export class JwtAuthGuard implements CanActivate {
       }
     }
 
-    if (isPublic) {
+    if (isPublic === true) {
       return true;
     }
 

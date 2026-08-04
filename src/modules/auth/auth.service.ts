@@ -468,25 +468,25 @@ export class AuthService {
     clientIp?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
+    const email = registerDto.email.trim().toLowerCase();
+    const username = registerDto.username.trim();
+    const displayName = registerDto.displayName.trim();
+
     const existing = await this.userRepository.findOne({
-      where: [{ email: registerDto.email }, { username: registerDto.username }],
+      where: [{ email }, { username }],
     });
 
     if (existing) {
       throw new ConflictException('Username or email already exists');
     }
 
-    let passwordHash: string | undefined;
-    if (registerDto.password) {
-      passwordHash = await bcrypt.hash(registerDto.password, 10);
-    }
-
+    const passwordHash = await bcrypt.hash(registerDto.password, 10);
     const referralCode = await this.generateUniqueReferralCode();
 
     const user = this.userRepository.create({
-      username: registerDto.username,
-      displayName: registerDto.displayName,
-      email: registerDto.email,
+      username,
+      displayName,
+      email,
       passwordHash,
       isGuest: false,
       role: 'USER',
@@ -549,106 +549,81 @@ export class AuthService {
     clientIp?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
-    let user: User | null = null;
+    const email = loginDto.email?.trim().toLowerCase();
+    const username = loginDto.username?.trim();
 
-    if (loginDto.email) {
-      user = await this.userRepository.findOne({
-        where: { email: loginDto.email },
-      });
-    } else if (loginDto.username) {
-      user = await this.userRepository.findOne({
-        where: { username: loginDto.username },
-      });
+    if ((!email && !username) || (email && username)) {
+      throw new BadRequestException(
+        'Provide exactly one login identifier: email or username',
+      );
     }
 
-    if (!user) {
-      // Auto-provision demo account for developer testing or initial login
-      const username =
-        loginDto.username ||
-        `user_${Math.random().toString(36).substring(2, 8)}`;
-      const email = loginDto.email || `${username}@voicecloud.app`;
-      const referralCode = await this.generateUniqueReferralCode();
+    const user = email
+      ? await this.userRepository.findOne({ where: { email } })
+      : await this.userRepository.findOne({ where: { username } });
 
-      user = this.userRepository.create({
-        username,
-        displayName: username.charAt(0).toUpperCase() + username.slice(1),
-        email,
-        passwordHash: loginDto.password
-          ? await bcrypt.hash(loginDto.password, 10)
-          : undefined,
-        isGuest: false,
-        role: 'USER',
-        referralCode,
-        isOnline: true,
-        followersCount: 0,
-        followingCount: 0,
-        popularityScore: 100,
-        profileCompletion: 80,
-      });
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid email/username or password');
+    }
 
-      user = await this.userRepository.save(user);
-    } else {
-      // Account lockout check
-      if (user.lockoutUntil && user.lockoutUntil > new Date()) {
-        const remainingMinutes = Math.ceil(
-          (user.lockoutUntil.getTime() - Date.now()) / 60000,
+    // Account lockout check
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+      const remainingMinutes = Math.ceil(
+        (user.lockoutUntil.getTime() - Date.now()) / 60000,
+      );
+      throw new ForbiddenException(
+        `Account is locked due to multiple failed login attempts. Try again in ${remainingMinutes} minutes.`,
+      );
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      loginDto.password,
+      user.passwordHash,
+    );
+    if (!passwordMatches) {
+      user.failedLoginAttempts += 1;
+
+      const lockoutThresholdSetting =
+        await this.adminSettingsService.findByKey(
+          'failed_login_lockout_attempts',
         );
-        throw new ForbiddenException(
-          `Account is locked due to multiple failed login attempts. Try again in ${remainingMinutes} minutes.`,
+      const maxAttempts = lockoutThresholdSetting?.value
+        ? parseInt(lockoutThresholdSetting.value, 10)
+        : 5;
+
+      if (user.failedLoginAttempts >= maxAttempts) {
+        const lockoutDurationSetting =
+          await this.adminSettingsService.findByKey(
+            'failed_login_lockout_duration',
+          );
+        const lockoutMins = lockoutDurationSetting?.value
+          ? parseInt(lockoutDurationSetting.value, 10)
+          : 15;
+        user.lockoutUntil = new Date(Date.now() + lockoutMins * 60 * 1000);
+        this.logger.warn(
+          `Account '${user.id}' locked for ${lockoutMins} mins after ${user.failedLoginAttempts} failed attempts`,
         );
       }
 
-      if (user.passwordHash && loginDto.password) {
-        const passwordMatches = await bcrypt.compare(
-          loginDto.password,
-          user.passwordHash,
-        );
-        if (!passwordMatches) {
-          user.failedLoginAttempts += 1;
-
-          const lockoutThresholdSetting =
-            await this.adminSettingsService.findByKey(
-              'failed_login_lockout_attempts',
-            );
-          const maxAttempts = lockoutThresholdSetting?.value
-            ? parseInt(lockoutThresholdSetting.value, 10)
-            : 5;
-
-          if (user.failedLoginAttempts >= maxAttempts) {
-            const lockoutDurationSetting =
-              await this.adminSettingsService.findByKey(
-                'failed_login_lockout_duration',
-              );
-            const lockoutMins = lockoutDurationSetting?.value
-              ? parseInt(lockoutDurationSetting.value, 10)
-              : 15;
-            user.lockoutUntil = new Date(Date.now() + lockoutMins * 60 * 1000);
-            this.logger.warn(
-              `Account '${user.id}' locked for ${lockoutMins} mins after ${user.failedLoginAttempts} failed attempts`,
-            );
-          }
-
-          await this.userRepository.save(user);
-
-          await this.deviceSessionService.logConnectionHistory({
-            userId: user.id,
-            action: 'FAILED_LOGIN',
-            loginMethod: 'EMAIL_PASSWORD',
-            ipAddress: clientIp,
-            userAgent,
-          });
-
-          throw new UnauthorizedException('Invalid username or password');
-        }
-      }
-
-      // Reset failed attempts on success
-      user.failedLoginAttempts = 0;
-      user.lockoutUntil = undefined;
-      user.isOnline = true;
-      user.lastActiveAt = new Date();
       await this.userRepository.save(user);
+
+      await this.deviceSessionService.logConnectionHistory({
+        userId: user.id,
+        action: 'FAILED_LOGIN',
+        loginMethod: 'EMAIL_PASSWORD',
+        ipAddress: clientIp,
+        userAgent,
+      });
+
+      throw new UnauthorizedException('Invalid email/username or password');
     }
+
+    // Reset failed attempts on success
+    user.failedLoginAttempts = 0;
+    user.lockoutUntil = undefined;
+    user.isOnline = true;
+    user.lastActiveAt = new Date();
+    await this.userRepository.save(user);
 
     const device = await this.deviceSessionService.registerDevice(user.id, {
       ipAddress: clientIp,

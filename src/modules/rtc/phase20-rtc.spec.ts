@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RtcService } from './rtc.service';
 import { RtcQualityService } from './rtc-quality.service';
 import { RtcConfig, RtcProviderType } from './entities/rtc-config.entity';
@@ -24,11 +24,13 @@ import { LiveKitProvider } from './providers/livekit.provider';
 import { RedisService } from '../../redis/redis.service';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { DynamicConfigService } from '../config/dynamic-config.service';
+import { AdminSettingsService } from '../admin/admin-settings.service';
 
 describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
   let service: RtcService;
   let qualityService: RtcQualityService;
   let factory: RtcProviderFactory;
+  let adminSettingsService: { getOperationalSettings: jest.Mock };
 
   const mockConfig: RtcConfig = {
     id: '1',
@@ -85,6 +87,7 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
     sadd: jest.fn().mockResolvedValue(1),
     srem: jest.fn().mockResolvedValue(1),
     smembers: jest.fn().mockResolvedValue(['user-1', 'user-2']),
+    rpush: jest.fn().mockResolvedValue(1),
   };
 
   const mockRepository = {
@@ -173,12 +176,25 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
             getActiveProviderConfig: jest.fn().mockResolvedValue(null),
           },
         },
+        {
+          provide: AdminSettingsService,
+          useValue: {
+            getOperationalSettings: jest.fn().mockResolvedValue({
+              maintenanceMode: false,
+              maintenanceMessage: 'Available',
+              maxRoomCapacity: 500,
+              maxSpeakerSeats: 12,
+              updatedAt: new Date(0).toISOString(),
+            }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<RtcService>(RtcService);
     qualityService = module.get<RtcQualityService>(RtcQualityService);
     factory = module.get<RtcProviderFactory>(RtcProviderFactory);
+    adminSettingsService = module.get(AdminSettingsService);
 
     mockRepository.findOne.mockImplementation(({ where }) => {
       if (where?.id === 'room-101' || where?.roomId === 'room-101')
@@ -286,6 +302,49 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
       );
       expect(mockRedisClient.del).toHaveBeenCalledWith(
         'rtc:presence:room-101:bad-user',
+      );
+    });
+  });
+
+  describe('Backend-authoritative speaker-seat limits', () => {
+    it('accepts the configured maximum speaker seat', async () => {
+      adminSettingsService.getOperationalSettings.mockResolvedValue({
+        maintenanceMode: false,
+        maintenanceMessage: 'Available',
+        maxRoomCapacity: 500,
+        maxSpeakerSeats: 8,
+        updatedAt: new Date(0).toISOString(),
+      });
+
+      await expect(
+        service.raiseHand('user-1', 'room-101', { seatIndex: 8 }),
+      ).resolves.toMatchObject({ message: 'Hand raised successfully' });
+    });
+
+    it('rejects speaker seats above the configured maximum', async () => {
+      adminSettingsService.getOperationalSettings.mockResolvedValue({
+        maintenanceMode: false,
+        maintenanceMessage: 'Available',
+        maxRoomCapacity: 500,
+        maxSpeakerSeats: 8,
+        updatedAt: new Date(0).toISOString(),
+      });
+
+      await expect(
+        service.lockSeat('host-user-1', 'room-101', {
+          seatIndex: 9,
+          lock: true,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('defaults approved speakers to seat one', async () => {
+      await service.approveSpeaker('host-user-1', 'room-101', {
+        targetUserId: 'speaker-user-1',
+      });
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ seatIndex: 1 }),
       );
     });
   });

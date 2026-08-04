@@ -20,6 +20,29 @@ import { RedisService } from '../../redis/redis.service';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { AdminAuditLogsService } from './admin-audit-logs.service';
 import { validateHostLevelDefinitions } from '../hosts/host-level-config.validator';
+import {
+  OperationalSettingsResponseDto,
+  UpdateOperationalSettingsDto,
+} from './dto/operational-settings.dto';
+import {
+  StreamingInfrastructureSettingsResponseDto,
+  UpdateStreamingInfrastructureSettingsDto,
+} from './dto/streaming-infrastructure-settings.dto';
+import {
+  findManagedSettingDefinition,
+  MANAGED_SETTING_KEYS,
+  MAX_ROOM_CAPACITY_LIMIT,
+  MAX_SPEAKER_SEATS_LIMIT,
+  OPERATIONAL_SETTING_DEFINITIONS,
+  OPERATIONAL_SETTING_KEYS,
+  STREAMING_CODECS,
+  STREAMING_INFRASTRUCTURE_SETTING_DEFINITIONS,
+  STREAMING_PROVIDERS,
+  STREAMING_REGIONS,
+  STREAMING_INFRASTRUCTURE_SETTING_KEYS,
+  STREAM_KEY_POLICIES,
+  SystemSettingDefinition,
+} from './system-settings/system-settings.registry';
 
 const SETTINGS_ALL_CACHE = 'cache:system_settings:all';
 const SETTINGS_PUBLIC_CACHE = 'cache:system_settings:public';
@@ -32,11 +55,12 @@ export const HOST_BUSINESS_SETTING_KEYS = [
   'host_level_definitions',
 ] as const;
 
-const HOST_BUSINESS_SETTING_KEY_SET = new Set<string>(
-  HOST_BUSINESS_SETTING_KEYS,
-);
+const MANAGED_SETTING_KEY_SET = new Set<string>([
+  ...MANAGED_SETTING_KEYS,
+  ...HOST_BUSINESS_SETTING_KEYS,
+]);
 
-const DEFAULT_SYSTEM_SETTINGS = [
+const DEFAULT_SYSTEM_SETTINGS: SystemSettingDefinition[] = [
   // General
   {
     key: 'app_name',
@@ -402,17 +426,6 @@ const DEFAULT_SYSTEM_SETTINGS = [
     isPublic: true,
   },
   {
-    key: 'max_room_capacity',
-    group: 'rtc',
-    title: 'Max Room Capacity',
-    description: 'Max audience participants per room',
-    value: '500',
-    valueType: SettingValueType.NUMBER,
-    defaultValue: '500',
-    isEditable: true,
-    isPublic: true,
-  },
-  {
     key: 'default_audio_profile',
     group: 'rtc',
     title: 'Default Audio Profile',
@@ -424,30 +437,8 @@ const DEFAULT_SYSTEM_SETTINGS = [
     isPublic: true,
   },
 
-  // Maintenance
-  {
-    key: 'maintenance_mode',
-    group: 'maintenance',
-    title: 'Maintenance Mode',
-    description: 'Enable system maintenance lock',
-    value: 'false',
-    valueType: SettingValueType.BOOLEAN,
-    defaultValue: 'false',
-    isEditable: true,
-    isPublic: true,
-  },
-  {
-    key: 'maintenance_message',
-    group: 'maintenance',
-    title: 'Maintenance Message',
-    description: 'Message displayed during maintenance',
-    value:
-      'System is undergoing scheduled maintenance. Please try again shortly.',
-    valueType: SettingValueType.STRING,
-    defaultValue: 'System is undergoing scheduled maintenance.',
-    isEditable: true,
-    isPublic: true,
-  },
+  ...OPERATIONAL_SETTING_DEFINITIONS,
+  ...STREAMING_INFRASTRUCTURE_SETTING_DEFINITIONS,
 ];
 
 @Injectable()
@@ -478,12 +469,19 @@ export class AdminSettingsService implements OnModuleInit {
           existing.group !== item.group ||
           existing.description !== item.description ||
           existing.valueType !== item.valueType ||
-          existing.isPublic !== item.isPublic
+          existing.defaultValue !== item.defaultValue ||
+          existing.isEditable !== item.isEditable ||
+          existing.isPublic !== item.isPublic ||
+          JSON.stringify(existing.validationRules ?? null) !==
+            JSON.stringify(item.validationRules ?? null)
         ) {
           existing.title = item.title;
           existing.group = item.group;
           existing.description = item.description;
           existing.valueType = item.valueType;
+          existing.defaultValue = item.defaultValue;
+          existing.validationRules = item.validationRules;
+          existing.isEditable = item.isEditable;
           existing.isPublic = item.isPublic;
           updated = true;
         }
@@ -514,9 +512,11 @@ export class AdminSettingsService implements OnModuleInit {
     const cached = await this.redisService.get(SETTINGS_PUBLIC_CACHE);
     if (cached) {
       try {
-        return JSON.parse(cached) as Record<string, unknown>;
+        return this.excludePrivateSettings(
+          JSON.parse(cached) as Record<string, unknown>,
+        );
       } catch {
-        // Fallthrough
+        // Fall through to the database.
       }
     }
 
@@ -524,16 +524,30 @@ export class AdminSettingsService implements OnModuleInit {
       where: { isPublic: true },
     });
     const result: Record<string, unknown> = {};
-    for (const s of publicSettings) {
-      result[s.key] = this.parseSettingValue(s.value, s.valueType);
+    for (const setting of publicSettings) {
+      result[setting.key] = this.parseSettingValue(
+        setting.value,
+        setting.valueType,
+      );
     }
+    const safeResult = this.excludePrivateSettings(result);
 
     await this.redisService.set(
       SETTINGS_PUBLIC_CACHE,
-      JSON.stringify(result),
+      JSON.stringify(safeResult),
       3600,
     );
-    return result;
+    return safeResult;
+  }
+
+  private excludePrivateSettings(
+    settings: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const safeSettings = { ...settings };
+    for (const key of STREAMING_INFRASTRUCTURE_SETTING_KEYS) {
+      delete safeSettings[key];
+    }
+    return safeSettings;
   }
 
   private parseSettingValue(
@@ -678,7 +692,7 @@ export class AdminSettingsService implements OnModuleInit {
   private parseHostBusinessSettings(
     settings: SystemSetting[],
   ): HostBusinessSettingsResponseDto {
-    const settingsByKey = new Map(
+    const settingsByKey = new Map<string, SystemSetting>(
       settings.map((setting) => [setting.key, setting]),
     );
     const applicationsEnabled = this.strictBooleanValue(
@@ -761,7 +775,449 @@ export class AdminSettingsService implements OnModuleInit {
     return parsed;
   }
 
+  async getOperationalSettings(): Promise<OperationalSettingsResponseDto> {
+    const settings = await this.settingRepo.find({
+      where: { key: In([...OPERATIONAL_SETTING_KEYS]) },
+    });
+    return this.parseOperationalSettings(settings);
+  }
+
+  async updateOperationalSettings(
+    dto: UpdateOperationalSettingsDto,
+    userId?: string,
+  ): Promise<OperationalSettingsResponseDto> {
+    this.validateOperationalSettings(dto);
+    const settings = await this.persistManagedSettings(
+      [...OPERATIONAL_SETTING_KEYS],
+      {
+        maintenance_mode: String(dto.maintenanceMode),
+        maintenance_message: dto.maintenanceMessage.trim(),
+        max_room_capacity: String(dto.maxRoomCapacity),
+        max_speaker_seats: String(dto.maxSpeakerSeats),
+      },
+    );
+
+    await this.invalidateCache();
+    this.eventsGateway.broadcastMaintenanceModeToggled({
+      isMaintenance: dto.maintenanceMode,
+    });
+    this.eventsGateway.broadcastSystemConfigEvent(
+      'operational_settings_updated',
+      { keys: [...OPERATIONAL_SETTING_KEYS] },
+    );
+
+    const result = this.parseOperationalSettings(settings.updatedSettings);
+    await this.auditLogsService.log({
+      userId,
+      module: 'operational_settings',
+      action: 'update',
+      previousValue: settings.previousValue,
+      newValue: result,
+    });
+    return result;
+  }
+
+  async getStreamingInfrastructureSettings(): Promise<
+    StreamingInfrastructureSettingsResponseDto
+  > {
+    const settings = await this.settingRepo.find({
+      where: { key: In([...STREAMING_INFRASTRUCTURE_SETTING_KEYS]) },
+    });
+    return this.parseStreamingInfrastructureSettings(settings);
+  }
+
+  async updateStreamingInfrastructureSettings(
+    dto: UpdateStreamingInfrastructureSettingsDto,
+    userId?: string,
+  ): Promise<StreamingInfrastructureSettingsResponseDto> {
+    this.validateStreamingInfrastructureSettings(dto);
+    const settings = await this.persistManagedSettings(
+      [...STREAMING_INFRASTRUCTURE_SETTING_KEYS],
+      {
+        streaming_provider: dto.provider,
+        rtmp_server_url: dto.rtmpUrl.trim(),
+        webrtc_server_url: dto.webrtcUrl.trim(),
+        turn_stun_servers: JSON.stringify(
+          dto.turnStunServers.map((server) => server.trim()),
+        ),
+        recording_enabled: String(dto.recordingEnabled),
+        low_latency_mode: String(dto.lowLatencyMode),
+        default_bitrate: String(dto.defaultBitrate),
+        codec: dto.codec,
+        region: dto.region,
+        stream_key_policy: dto.streamKeyPolicy,
+      },
+    );
+
+    await this.invalidateCache();
+    this.eventsGateway.broadcastSystemConfigEvent(
+      'streaming_infrastructure_settings_updated',
+      { keys: [...STREAMING_INFRASTRUCTURE_SETTING_KEYS] },
+    );
+
+    const result = this.parseStreamingInfrastructureSettings(
+      settings.updatedSettings,
+    );
+    await this.auditLogsService.log({
+      userId,
+      module: 'streaming_infrastructure_settings',
+      action: 'update',
+      previousValue: settings.previousValue,
+      newValue: result,
+    });
+    return result;
+  }
+
+  private validateOperationalSettings(dto: UpdateOperationalSettingsDto) {
+    if (typeof dto.maintenanceMode !== 'boolean') {
+      throw new BadRequestException('Maintenance mode must be a boolean');
+    }
+    if (
+      typeof dto.maintenanceMessage !== 'string' ||
+      dto.maintenanceMessage.trim().length < 1 ||
+      dto.maintenanceMessage.trim().length > 500
+    ) {
+      throw new BadRequestException(
+        'Maintenance message must contain between 1 and 500 characters',
+      );
+    }
+    if (
+      !Number.isSafeInteger(dto.maxRoomCapacity) ||
+      dto.maxRoomCapacity < 2 ||
+      dto.maxRoomCapacity > MAX_ROOM_CAPACITY_LIMIT
+    ) {
+      throw new BadRequestException(
+        `Maximum room capacity must be an integer between 2 and ${MAX_ROOM_CAPACITY_LIMIT}`,
+      );
+    }
+    if (
+      !Number.isSafeInteger(dto.maxSpeakerSeats) ||
+      dto.maxSpeakerSeats < 1 ||
+      dto.maxSpeakerSeats > MAX_SPEAKER_SEATS_LIMIT ||
+      dto.maxSpeakerSeats >= dto.maxRoomCapacity
+    ) {
+      throw new BadRequestException(
+        'Maximum speaker seats must be between 1 and 100 and below room capacity',
+      );
+    }
+  }
+
+  private validateStreamingInfrastructureSettings(
+    dto: UpdateStreamingInfrastructureSettingsDto,
+  ) {
+    const providers = new Set<string>(STREAMING_PROVIDERS);
+    const codecs = new Set<string>(STREAMING_CODECS);
+    const regions = new Set<string>(STREAMING_REGIONS);
+    const policies = new Set<string>(STREAM_KEY_POLICIES);
+    if (!providers.has(dto.provider)) {
+      throw new BadRequestException('Unsupported streaming provider');
+    }
+    if (!/^rtmps?:\/\/[^\s]+$/i.test(dto.rtmpUrl)) {
+      throw new BadRequestException('Invalid RTMP server URL');
+    }
+    if (!/^(?:wss?|webrtc):\/\/[^\s]+$/i.test(dto.webrtcUrl)) {
+      throw new BadRequestException('Invalid WebRTC server URL');
+    }
+    if (
+      !Array.isArray(dto.turnStunServers) ||
+      dto.turnStunServers.length < 1 ||
+      dto.turnStunServers.length > 20 ||
+      dto.turnStunServers.some(
+        (server) =>
+          typeof server !== 'string' ||
+          !/^(?:turns?|stuns?):[^\s]+$/i.test(server.trim()),
+      )
+    ) {
+      throw new BadRequestException('Invalid TURN/STUN server configuration');
+    }
+    if (
+      new Set(dto.turnStunServers.map((server) => server.trim())).size !==
+      dto.turnStunServers.length
+    ) {
+      throw new BadRequestException('TURN/STUN servers must be unique');
+    }
+    if (
+      typeof dto.recordingEnabled !== 'boolean' ||
+      typeof dto.lowLatencyMode !== 'boolean'
+    ) {
+      throw new BadRequestException(
+        'Streaming feature switches must be boolean values',
+      );
+    }
+    if (
+      !Number.isSafeInteger(dto.defaultBitrate) ||
+      dto.defaultBitrate < 32 ||
+      dto.defaultBitrate > 512
+    ) {
+      throw new BadRequestException(
+        'Default bitrate must be an integer between 32 and 512',
+      );
+    }
+    if (!codecs.has(dto.codec)) {
+      throw new BadRequestException('Unsupported streaming codec');
+    }
+    if (!regions.has(dto.region)) {
+      throw new BadRequestException('Unsupported streaming region');
+    }
+    if (!policies.has(dto.streamKeyPolicy)) {
+      throw new BadRequestException('Unsupported stream-key policy');
+    }
+  }
+
+  private async persistManagedSettings(
+    keys: string[],
+    values: Record<string, string>,
+  ): Promise<{
+    previousValue: Record<string, string>;
+    updatedSettings: SystemSetting[];
+  }> {
+    return this.settingRepo.manager.transaction(async (manager) => {
+      const repository = manager.getRepository(SystemSetting);
+      const settings = await repository.find({ where: { key: In(keys) } });
+      const previousValue = Object.fromEntries(
+        settings.map((setting) => [setting.key, setting.value]),
+      );
+      const settingsByKey = new Map<string, SystemSetting>(
+        settings.map((setting) => [setting.key, setting]),
+      );
+
+      for (const key of keys) {
+        if (!settingsByKey.has(key)) {
+          const definition =
+            findManagedSettingDefinition(key) ||
+            DEFAULT_SYSTEM_SETTINGS.find((setting) => setting.key === key);
+          if (!definition) {
+            throw new ServiceUnavailableException(
+              `Required system setting '${key}' is unavailable`,
+            );
+          }
+          settingsByKey.set(key, repository.create(definition));
+        }
+      }
+
+      const toSave = keys.map((key) => {
+        const setting = settingsByKey.get(key);
+        if (!setting) {
+          throw new ServiceUnavailableException(
+            `Required system setting '${key}' is unavailable`,
+          );
+        }
+        setting.value = values[key];
+        return setting;
+      });
+
+      const updatedSettings = await repository.save(toSave);
+      return { previousValue, updatedSettings };
+    });
+  }
+
+  private parseOperationalSettings(
+    settings: SystemSetting[],
+  ): OperationalSettingsResponseDto {
+    const settingsByKey = new Map<string, SystemSetting>(
+      settings.map((setting) => [setting.key, setting]),
+    );
+    const result: OperationalSettingsResponseDto = {
+      maintenanceMode: this.strictBooleanSetting(
+        settingsByKey.get('maintenance_mode')?.value,
+        'maintenance_mode',
+        false,
+      ),
+      maintenanceMessage: this.strictStringSetting(
+        settingsByKey.get('maintenance_message')?.value,
+        'maintenance_message',
+        'System is undergoing scheduled maintenance. Please try again shortly.',
+      ),
+      maxRoomCapacity: this.strictIntegerSetting(
+        settingsByKey.get('max_room_capacity')?.value,
+        'max_room_capacity',
+        2,
+        MAX_ROOM_CAPACITY_LIMIT,
+        500,
+      ),
+      maxSpeakerSeats: this.strictIntegerSetting(
+        settingsByKey.get('max_speaker_seats')?.value,
+        'max_speaker_seats',
+        1,
+        MAX_SPEAKER_SEATS_LIMIT,
+        12,
+      ),
+      updatedAt: this.latestSettingsTimestamp(settings),
+    };
+    try {
+      this.validateOperationalSettings(result);
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        `Operational system settings are invalid: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    return result;
+  }
+
+  private parseStreamingInfrastructureSettings(
+    settings: SystemSetting[],
+  ): StreamingInfrastructureSettingsResponseDto {
+    const settingsByKey = new Map<string, SystemSetting>(
+      settings.map((setting) => [setting.key, setting]),
+    );
+    const turnStunServers = this.strictStringArraySetting(
+      settingsByKey.get('turn_stun_servers')?.value,
+      'turn_stun_servers',
+      ['turn:turn.voicecloud.app:3478', 'stun:stun.l.google.com:19302'],
+    );
+    const result: StreamingInfrastructureSettingsResponseDto = {
+      provider: this.strictStringSetting(
+        settingsByKey.get('streaming_provider')?.value,
+        'streaming_provider',
+        'mediamtx',
+      ),
+      rtmpUrl: this.strictStringSetting(
+        settingsByKey.get('rtmp_server_url')?.value,
+        'rtmp_server_url',
+        'rtmps://live.voicecloud.app:443/live',
+      ),
+      webrtcUrl: this.strictStringSetting(
+        settingsByKey.get('webrtc_server_url')?.value,
+        'webrtc_server_url',
+        'wss://webrtc.voicecloud.app:443/v1',
+      ),
+      turnStunServers,
+      recordingEnabled: this.strictBooleanSetting(
+        settingsByKey.get('recording_enabled')?.value,
+        'recording_enabled',
+        true,
+      ),
+      lowLatencyMode: this.strictBooleanSetting(
+        settingsByKey.get('low_latency_mode')?.value,
+        'low_latency_mode',
+        true,
+      ),
+      defaultBitrate: this.strictIntegerSetting(
+        settingsByKey.get('default_bitrate')?.value,
+        'default_bitrate',
+        32,
+        512,
+        324,
+      ),
+      codec: this.strictStringSetting(
+        settingsByKey.get('codec')?.value,
+        'codec',
+        'opus',
+      ),
+      region: this.strictStringSetting(
+        settingsByKey.get('region')?.value,
+        'region',
+        'us-east',
+      ),
+      streamKeyPolicy: this.strictStringSetting(
+        settingsByKey.get('stream_key_policy')?.value,
+        'stream_key_policy',
+        'auto_rotate_90d',
+      ),
+      updatedAt: this.latestSettingsTimestamp(settings),
+    };
+    try {
+      this.validateStreamingInfrastructureSettings(result);
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        `Streaming infrastructure settings are invalid: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    return result;
+  }
+
+  private strictBooleanSetting(
+    value: string | undefined,
+    key: string,
+    fallback: boolean,
+  ): boolean {
+    if (value === undefined) return fallback;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    throw new ServiceUnavailableException(
+      `System setting '${key}' contains an invalid boolean value`,
+    );
+  }
+
+  private strictStringSetting(
+    value: string | undefined,
+    key: string,
+    fallback: string,
+  ): string {
+    const parsed = value ?? fallback;
+    if (typeof parsed !== 'string' || parsed.trim().length === 0) {
+      throw new ServiceUnavailableException(
+        `System setting '${key}' contains an invalid string value`,
+      );
+    }
+    return parsed;
+  }
+
+  private strictIntegerSetting(
+    value: string | undefined,
+    key: string,
+    min: number,
+    max: number,
+    fallback: number,
+  ): number {
+    const parsed = value === undefined ? fallback : Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+      throw new ServiceUnavailableException(
+        `System setting '${key}' contains an invalid numeric value`,
+      );
+    }
+    return parsed;
+  }
+
+  private strictStringArraySetting(
+    value: string | undefined,
+    key: string,
+    fallback: string[],
+  ): string[] {
+    if (value === undefined) return fallback;
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (
+        !Array.isArray(parsed) ||
+        parsed.length < 1 ||
+        parsed.some((item) => typeof item !== 'string')
+      ) {
+        throw new Error('Expected a non-empty string array');
+      }
+      return (parsed as string[]).map((item) => item.trim());
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        `System setting '${key}' contains invalid JSON: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private latestSettingsTimestamp(settings: SystemSetting[]): string {
+    const latest = settings.reduce(
+      (current, setting) =>
+        setting.updatedAt && setting.updatedAt.getTime() > current.getTime()
+          ? setting.updatedAt
+          : current,
+      new Date(0),
+    );
+    return latest.getTime() > 0
+      ? latest.toISOString()
+      : new Date().toISOString();
+  }
+
   async create(dto: CreateSettingDto, userId?: string): Promise<SystemSetting> {
+    if (MANAGED_SETTING_KEY_SET.has(dto.key)) {
+      throw new BadRequestException(
+        'Managed system settings must be changed through their dedicated atomic endpoint',
+      );
+    }
+
     const setting = this.settingRepo.create(dto);
     const saved = await this.settingRepo.save(setting);
 
@@ -786,10 +1242,9 @@ export class AdminSettingsService implements OnModuleInit {
     dto: UpdateSettingDto,
     userId?: string,
   ): Promise<SystemSetting> {
-    if (HOST_BUSINESS_SETTING_KEY_SET.has(key)) {
+    if (MANAGED_SETTING_KEY_SET.has(key)) {
       throw new BadRequestException(
-        'Host business settings must be updated atomically through the ' +
-          'dedicated Host business settings endpoint',
+        'Managed system settings must be changed through their dedicated atomic endpoint',
       );
     }
 

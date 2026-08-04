@@ -11,10 +11,12 @@ import { StreamKeyAuditLog } from './entities/stream-key-audit-log.entity';
 import { CreatorService } from './creator.service';
 import { CreatorController } from './creator.controller';
 import { CreatorGateway } from '../../socket/creator.gateway';
+import { SystemSettingsModule } from '../admin/system-settings/system-settings.module';
 
 @Module({
   imports: [
     ConfigModule,
+    SystemSettingsModule,
     TypeOrmModule.forFeature([
       CreatorPlan,
       CreatorSubscription,

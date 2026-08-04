@@ -84,14 +84,14 @@ export class CreateScheduledRoomDto {
   isInviteOnly?: boolean = false;
 
   @ApiPropertyOptional({
-    description: 'Maximum allowed participants',
-    default: 500,
+    description:
+      'Maximum allowed participants. Defaults to the configured system maximum.',
   })
   @IsOptional()
   @IsInt()
   @Min(2)
   @Max(10000)
-  maxParticipants?: number = 500;
+  maxParticipants?: number;
 
   @ApiPropertyOptional({
     description: 'Is premium / paid room',

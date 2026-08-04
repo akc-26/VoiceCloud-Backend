@@ -96,3 +96,7 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## WP07 Package 07 local acceptance
+
+Run `WP07-07-CHECK.cmd` from the newly extracted Package 07 folder. Do not merge files into an earlier package or reuse an earlier package's `node_modules`.
+

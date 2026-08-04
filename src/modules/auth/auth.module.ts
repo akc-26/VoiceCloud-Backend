@@ -12,8 +12,9 @@ import { UserDevice } from '../users/entities/user-device.entity';
 import { UserSession } from '../users/entities/user-session.entity';
 import { UserConnectionHistory } from '../users/entities/user-connection-history.entity';
 import { OtpVerification } from './entities/otp-verification.entity';
-import { AdminModule } from '../admin/admin.module';
+import { SystemSettingsModule } from '../admin/system-settings/system-settings.module';
 import { AppConfigModule } from '../config/config.module';
+import { DevelopmentAccountSeederService } from './development-account-seeder.service';
 
 @Global()
 @Module({
@@ -26,7 +27,7 @@ import { AppConfigModule } from '../config/config.module';
       OtpVerification,
     ]),
     JwtModule.register({}),
-    forwardRef(() => AdminModule),
+    SystemSettingsModule,
     forwardRef(() => AppConfigModule),
   ],
   controllers: [AuthController],
@@ -36,6 +37,7 @@ import { AppConfigModule } from '../config/config.module';
     OtpService,
     GoogleAuthService,
     DeviceSessionService,
+    DevelopmentAccountSeederService,
   ],
   exports: [
     AuthService,

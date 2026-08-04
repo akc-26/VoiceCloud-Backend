@@ -9,6 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import { AdminSettingsService } from '../admin/admin-settings.service';
 import * as crypto from 'crypto';
 import { CreatorPlan } from '../users/entities/creator-plan.entity';
 import { CreatorSubscription } from '../users/entities/creator-subscription.entity';
@@ -33,6 +34,7 @@ import {
 export class CreatorService {
   constructor(
     private readonly configService: ConfigService,
+    private readonly adminSettingsService: AdminSettingsService,
     @InjectRepository(CreatorPlan)
     private readonly planRepository: Repository<CreatorPlan>,
     @InjectRepository(CreatorSubscription)
@@ -604,18 +606,11 @@ export class CreatorService {
   async getStreamCredentials(creatorId: string, ipAddress?: string) {
     await this.validateCreatorAuth(creatorId);
 
-    const rtmpUrl = this.configService.get<string>(
-      'STREAM_RTMP_URL',
-      'rtmps://live.voicecloud.app:443/live',
-    );
-    const webrtcUrl = this.configService.get<string>(
-      'STREAM_WEBRTC_URL',
-      'webrtc://live.voicecloud.app:443/live',
-    );
-    const audioBitrate = this.configService.get<string>(
-      'STREAM_DEFAULT_BITRATE',
-      '324',
-    );
+    const streamingSettings =
+      await this.adminSettingsService.getStreamingInfrastructureSettings();
+    const rtmpUrl = streamingSettings.rtmpUrl;
+    const webrtcUrl = streamingSettings.webrtcUrl;
+    const audioBitrate = String(streamingSettings.defaultBitrate);
     const keyLength = Number(
       this.configService.get<number>('STREAM_KEY_LENGTH', 32),
     );
@@ -660,10 +655,10 @@ export class CreatorService {
     }
 
     return {
-      rtmpUrl: creds.rtmpUrl || rtmpUrl,
-      webrtcUrl: creds.webrtcUrl || webrtcUrl,
+      rtmpUrl,
+      webrtcUrl,
       streamKey: creds.streamKey,
-      audioBitrate: creds.audioBitrate || audioBitrate,
+      audioBitrate,
       isActive: creds.isActive,
       lastRegeneratedAt: creds.lastRegeneratedAt,
     };
@@ -675,18 +670,11 @@ export class CreatorService {
   async regenerateStreamKey(creatorId: string, ipAddress?: string) {
     await this.validateCreatorAuth(creatorId);
 
-    const rtmpUrl = this.configService.get<string>(
-      'STREAM_RTMP_URL',
-      'rtmps://live.voicecloud.app:443/live',
-    );
-    const webrtcUrl = this.configService.get<string>(
-      'STREAM_WEBRTC_URL',
-      'webrtc://live.voicecloud.app:443/live',
-    );
-    const audioBitrate = this.configService.get<string>(
-      'STREAM_DEFAULT_BITRATE',
-      '324',
-    );
+    const streamingSettings =
+      await this.adminSettingsService.getStreamingInfrastructureSettings();
+    const rtmpUrl = streamingSettings.rtmpUrl;
+    const webrtcUrl = streamingSettings.webrtcUrl;
+    const audioBitrate = String(streamingSettings.defaultBitrate);
     const keyLength = Number(
       this.configService.get<number>('STREAM_KEY_LENGTH', 32),
     );

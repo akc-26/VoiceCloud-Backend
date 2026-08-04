@@ -40,6 +40,7 @@ export class RemoteConfigService {
       ],
       applicationParameters: {
         maxRoomCapacity: Number(publicSettings.max_room_capacity || 500),
+        maxSpeakerSeats: Number(publicSettings.max_speaker_seats || 12),
         coinExchangeRate: Number(publicSettings.coin_exchange_rate || 100),
         minRechargeAmount: Number(publicSettings.min_recharge_amount || 1),
         maxRechargeAmount: Number(publicSettings.max_recharge_amount || 10000),

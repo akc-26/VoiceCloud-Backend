@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { AdminSettingsService } from '../admin/admin-settings.service';
 import {
   NotFoundException,
   ForbiddenException,
@@ -81,6 +82,25 @@ describe('Phase 2D Creator Economy Business APIs', () => {
     get: jest.fn((key: string, defaultVal: any) => defaultVal),
   };
 
+  const mockAdminSettingsService = {
+    getStreamingInfrastructureSettings: jest.fn().mockResolvedValue({
+      provider: 'mediamtx',
+      rtmpUrl: 'rtmps://live.voicecloud.app:443/live',
+      webrtcUrl: 'wss://webrtc.voicecloud.app:443/v1',
+      turnStunServers: [
+        'turn:turn.voicecloud.app:3478',
+        'stun:stun.l.google.com:19302',
+      ],
+      recordingEnabled: true,
+      lowLatencyMode: true,
+      defaultBitrate: 324,
+      codec: 'opus',
+      region: 'us-east',
+      streamKeyPolicy: 'auto_rotate_90d',
+      updatedAt: new Date(0).toISOString(),
+    }),
+  };
+
   beforeAll(async () => {
     moduleRef = await Test.createTestingModule({
       controllers: [CreatorController],
@@ -89,6 +109,10 @@ describe('Phase 2D Creator Economy Business APIs', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: AdminSettingsService,
+          useValue: mockAdminSettingsService,
         },
         {
           provide: getRepositoryToken(CreatorPlan),
@@ -134,6 +158,25 @@ describe('Phase 2D Creator Economy Business APIs', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+
+    mockAdminSettingsService.getStreamingInfrastructureSettings.mockResolvedValue(
+      {
+        provider: 'mediamtx',
+        rtmpUrl: 'rtmps://live.voicecloud.app:443/live',
+        webrtcUrl: 'wss://webrtc.voicecloud.app:443/v1',
+        turnStunServers: [
+          'turn:turn.voicecloud.app:3478',
+          'stun:stun.l.google.com:19302',
+        ],
+        recordingEnabled: true,
+        lowLatencyMode: true,
+        defaultBitrate: 324,
+        codec: 'opus',
+        region: 'us-east',
+        streamKeyPolicy: 'auto_rotate_90d',
+        updatedAt: new Date(0).toISOString(),
+      },
+    );
 
     mockConfigService.get.mockImplementation(
       (_key: string, defaultVal: any) => defaultVal,
