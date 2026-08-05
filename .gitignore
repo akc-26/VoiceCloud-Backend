@@ -65,3 +65,22 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .wp08-server-*.err.log
 .wp08-acceptance-*.out.log
 .wp08-acceptance-*.err.log
+
+# Runtime-generated public media
+/uploads/
+
+# Build caches and local TypeScript state
+.cache/
+*.tsbuildinfo
+
+# Local diagnostic/export files
+*_tsc_errors.txt
+*.zip
+
+# Google AI Studio wrapper/scaffold files (not part of VoiceCloud)
+/index.html
+/metadata.json
+/vite.config.ts
+/src/App.tsx
+/src/main.tsx
+/src/index.css

@@ -45,7 +45,7 @@ import {
   LeaveRoomDto,
   RejoinRoomDto,
   ForceDisconnectDto,
-  RefreshTokenDto,
+  RefreshRtcTokenDto,
   SpeakingStateDto,
 } from './dto/join-leave-room.dto';
 import {
@@ -718,7 +718,7 @@ export class RtcService {
   }
 
   // 8. Refresh Token Pipeline
-  async refreshToken(userId: string, dto: RefreshTokenDto) {
+  async refreshToken(userId: string, dto: RefreshRtcTokenDto) {
     const config = await this.getRtcConfig();
     const provider = await this.providerFactory.getActiveProvider();
 

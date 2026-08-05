@@ -1,102 +1,88 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# VoiceCloud Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+VoiceCloud is a production-oriented NestJS monolith that serves the REST API, Socket.IO services, background queues, Landing Website, Admin Portal, and Creator Studio from one deployable application.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Application routes
 
-## Description
+- `/` — Landing Website
+- `/admin` — Admin Portal
+- `/creator` — Creator Studio
+- `/api` and `/api/v1` — REST API
+- `/socket.io` — Socket.IO
+- `/health` — Health checks
+- `/docs` and `/api/docs` — Swagger when enabled
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Requirements
 
-## Project setup
+- Node.js 22 LTS or the project-approved Node.js runtime
+- npm 10
+- PostgreSQL
+- Redis
+
+The application uses npm only. Do not add Bun lockfiles.
+
+## Setup
 
 ```bash
-$ npm install
+npm ci
+cp .env.example .env
 ```
 
-## Compile and run the project
+Replace every `CHANGE_ME` value in `.env` before production startup.
+
+## Build
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm run build
 ```
 
-## Run tests
+The build creates the backend and the three frontend bundles under `dist/`.
+
+## Database initialization and migrations
+
+For a **completely fresh, empty PostgreSQL database**, run the guarded one-time bootstrap after configuring `.env`:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run database:bootstrap
 ```
 
-## Deployment
+The bootstrap refuses to run when application tables already exist. It creates the current entity schema and records the migrations included in this release as applied. Keep `DATABASE_SYNCHRONIZE=false`.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+For an **existing VoiceCloud database**, never run the bootstrap. Run only pending migrations:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run migration:status
+npm run migration:run
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+After a production build, the equivalent compiled commands are:
 
-## Resources
+```bash
+npm run database:bootstrap:prod   # fresh empty database only
+npm run migration:status:prod
+npm run migration:run:prod       # existing database upgrades
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Never enable `DATABASE_SYNCHRONIZE` in production startup.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Production startup
 
-## Support
+```bash
+npm run start:prod
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+`npm run start:prod` forces `NODE_ENV=production`; configure `INFRASTRUCTURE_MODE=real` and all required production secrets in `.env`. Swagger is disabled unless `ENABLE_SWAGGER=true` is explicitly configured.
 
-## Stay in touch
+## Source layout
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- `src/` — NestJS backend, modules, queues, sockets, migrations, and scripts
+- `shared/` — shared contracts and types
+- `website/` — Landing Website
+- `admin/` — Admin Portal
+- `creator/` — Creator Studio
+- `scripts/wp08/` — pre-deployment acceptance tooling
+- `docs/` — architecture and migration documentation
 
-## License
+## Files intentionally excluded
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-## WP07 Package 07 local acceptance
-
-Run `WP07-07-CHECK.cmd` from the newly extracted Package 07 folder. Do not merge files into an earlier package or reuse an earlier package's `node_modules`.
-
+Google AI Studio wrapper/scaffold files, generated builds, dependencies, runtime uploads, private uploads, environment secrets, logs, caches, nested archives, and historical package verification reports are not part of the clean source package.

@@ -1,12 +1,12 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { RedisService } from '../../redis/redis.service';
-import { RegisterDeviceDto, DeviceBanDto } from './dto/auto-moderation.dto';
+import { RegisterModerationDeviceDto, DeviceBanDto } from './dto/auto-moderation.dto';
 
 @Injectable()
 export class DeviceSecurityService {
   constructor(private readonly redisService: RedisService) {}
 
-  async registerDevice(userId: string, dto: RegisterDeviceDto) {
+  async registerDevice(userId: string, dto: RegisterModerationDeviceDto) {
     const { deviceId, platform = 'Unknown', ipAddress = '0.0.0.0' } = dto;
 
     const isBanned = await this.isDeviceBanned(deviceId);

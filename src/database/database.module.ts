@@ -210,6 +210,22 @@ function createPgMemOptions(database: string): VoiceCloudTypeOrmOptions {
         const dataSource = new DataSource(options) as TaggedDataSource;
         dataSource.__voiceCloudInfrastructure = 'postgres';
         await dataSource.initialize();
+
+        if (!options.synchronize) {
+          const schemaRows = (await dataSource.query(
+            `SELECT to_regclass('public.users')::text AS "tableName"`,
+          )) as Array<{ tableName: string | null }>;
+
+          if (!schemaRows[0]?.tableName) {
+            await dataSource.destroy();
+            throw new Error(
+              'PostgreSQL is reachable, but the VoiceCloud schema is not initialized. ' +
+                'For a completely fresh database run `npm run database:bootstrap` before startup; ' +
+                'for an existing deployment run the normal pending migrations.',
+            );
+          }
+        }
+
         return dataSource;
       },
     }),

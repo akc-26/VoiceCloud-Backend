@@ -70,7 +70,7 @@ export class ForceDisconnectDto {
   reason?: string;
 }
 
-export class RefreshTokenDto {
+export class RefreshRtcTokenDto {
   @ApiProperty({ description: 'Room ID', example: 'room-123' })
   @IsString()
   roomId: string;
@@ -112,3 +112,6 @@ export class SpeakingStateDto {
   @Max(100)
   audioLevel?: number;
 }
+
+// Backward-compatible source export; the runtime class name stays unique for Swagger.
+export { RefreshRtcTokenDto as RefreshTokenDto };

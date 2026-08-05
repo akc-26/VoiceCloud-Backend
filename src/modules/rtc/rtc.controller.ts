@@ -42,7 +42,7 @@ import {
   LeaveRoomDto,
   RejoinRoomDto,
   ForceDisconnectDto,
-  RefreshTokenDto,
+  RefreshRtcTokenDto,
   SpeakingStateDto,
 } from './dto/join-leave-room.dto';
 import {
@@ -362,7 +362,7 @@ export class RtcController {
   @ApiResponse({ status: 200, description: 'Refreshed RTC token' })
   async refreshToken(
     @CurrentUser('userId') userId: string,
-    @Body() dto: RefreshTokenDto,
+    @Body() dto: RefreshRtcTokenDto,
   ) {
     return this.rtcService.refreshToken(userId, dto);
   }

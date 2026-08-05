@@ -143,3 +143,9 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Protected Creator APIs with the backend `CREATOR` role while preserving public plan reads.
 - Invalidated Package 03 browser authentication persistence keys.
 - Added focused authentication and portal-authorization regression coverage.
+
+## VC-PH08-WP08-01-R03 migration CLI correction
+
+- Added a dedicated TypeORM CLI data-source wrapper that exports exactly one `DataSource` instance.
+- Updated development and production migration scripts to use the CLI-only wrapper.
+- Preserved the existing `AppDataSource` named export used by repository tests and application tooling.

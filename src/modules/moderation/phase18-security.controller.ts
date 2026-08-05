@@ -19,7 +19,7 @@ import { AutoModerationService } from './auto-moderation.service';
 import { DeviceSecurityService } from './device-security.service';
 import {
   AnalyzeContentDto,
-  RegisterDeviceDto,
+  RegisterModerationDeviceDto,
   DeviceBanDto,
 } from './dto/auto-moderation.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -62,7 +62,7 @@ export class Phase18SecurityController {
   @ApiResponse({ status: 400, description: 'Device is banned' })
   async registerDevice(
     @CurrentUser('userId') userId: string,
-    @Body() dto: RegisterDeviceDto,
+    @Body() dto: RegisterModerationDeviceDto,
   ) {
     return this.deviceSecurityService.registerDevice(userId, dto);
   }
