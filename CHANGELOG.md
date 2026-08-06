@@ -1,3 +1,18 @@
+# VC-PH08-WP08-03-01 R02 — Acceptance Checker Correction
+
+- Corrected the WP08-03-01 checker so it does not fail on 17 formatting-drift files inherited byte-for-byte from the approved WP08-02 Git baseline.
+- Added controlled Prettier normalization plus package-scoped Prettier and ESLint verification for only the two WP08-03-01 files.
+- Recorded the inherited formatting debt explicitly in the contract manifest rather than silently rewriting unrelated production source.
+- Preserved the full WP08-01, WP08-02, complete Jest, and four-application build verification sequence.
+
+# VC-PH08-WP08-03-01 — Economy Audit and Contract Lock
+
+- Locked the approved `VoiceCloud-Backend-VC-PH08-WP08-02-R05` baseline at commit `5d73fac20e87630b70ca8bfe6711be93d94138f0`.
+- Audited gifts, wallet ledger, Creator and Host earnings, payouts, rewards, VIP, notifications, BullMQ, Redis events, and Admin/Creator economy integration.
+- Recorded 16 evidence-backed findings without modifying production business logic.
+- Locked PostgreSQL financial authority, atomic ledger mutations, idempotency, post-commit Socket.IO broadcasts, retry-safe queues, and Admin RBAC requirements.
+- Added a non-mutating manifest self-check, focused Jest contract test, and full audit/build checker.
+
 # WP08-01 Revision 03
 
 - Reconciled AppController health metadata tests with the locked `/health` route.

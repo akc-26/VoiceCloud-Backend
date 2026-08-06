@@ -38,7 +38,13 @@
     "wp08:01:acceptance": "node scripts/wp08/wp08-01-acceptance.mjs",
     "test:wp08:02": "jest --runInBand --runTestsByPath src/modules/rooms/room-lifecycle.service.spec.ts src/modules/rooms/rooms.service.wp08-02.spec.ts src/modules/rooms/scheduled-rooms.service.spec.ts src/common/events/realtime-room-access.wp08-02.spec.ts src/common/events/phase3a-realtime.spec.ts src/common/events/phase3b-redis.spec.ts src/wp08/wp08-02-realtime-security.spec.ts src/modules/moderation/moderation-rbac.wp08-02.spec.ts src/database/migrations/phase08-room-lifecycle-authority.spec.ts",
     "wp08:02:acceptance": "node scripts/wp08/wp08-02-acceptance.mjs",
-    "wp08:02:check": "powershell -ExecutionPolicy Bypass -File scripts/wp08/wp08-02-check.ps1"
+    "wp08:02:check": "powershell -ExecutionPolicy Bypass -File scripts/wp08/wp08-02-check.ps1",
+    "format:wp08:03:01": "prettier --write \"src/wp08/wp08-03-01-economy-contract.spec.ts\" \"scripts/wp08/wp08-03-01-self-check.mjs\"",
+    "format:check:wp08:03:01": "prettier --check \"src/wp08/wp08-03-01-economy-contract.spec.ts\" \"scripts/wp08/wp08-03-01-self-check.mjs\"",
+    "lint:wp08:03:01": "eslint \"src/wp08/wp08-03-01-economy-contract.spec.ts\" --no-cache",
+    "wp08:03:01:self-check": "node scripts/wp08/wp08-03-01-self-check.mjs",
+    "test:wp08:03:01": "jest --runInBand --runTestsByPath src/wp08/wp08-03-01-economy-contract.spec.ts",
+    "wp08:03:01:check": "powershell -ExecutionPolicy Bypass -File scripts/wp08/wp08-03-01-check.ps1"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
