@@ -15,6 +15,8 @@ import {
   TypingStatusDto,
 } from '../dto/socket-payloads.dto';
 import { RedisStateService } from '../../../redis/redis-state.service';
+import { RealtimeSocketAuthService } from '../services/realtime-socket-auth.service';
+import { SocketErrorCode } from '../constants/socket-error-codes.enum';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -29,6 +31,7 @@ export class PresenceGateway implements OnGatewayInit {
 
   constructor(
     private readonly roomStateService: RealtimeRoomStateService,
+    private readonly socketAuthService: RealtimeSocketAuthService,
     @Optional() private readonly redisStateService?: RedisStateService,
   ) {}
 
@@ -48,79 +51,80 @@ export class PresenceGateway implements OnGatewayInit {
     }
   }
 
-  private resolveUserId(client: Socket, payload?: any): string {
-    if (client.data?.user?.userId) return client.data.user.userId;
-    if (client.data?.userId) return client.data.userId;
-    if (payload?.userId) return payload.userId;
-    if (client.handshake?.auth?.userId) return client.handshake.auth.userId;
-    if (
-      client.handshake?.query?.userId &&
-      typeof client.handshake.query.userId === 'string'
-    ) {
-      return client.handshake.query.userId;
-    }
-    return '11111111-1111-1111-1111-111111111111';
-  }
-
   @SubscribeMessage('presence:join')
   @SubscribeMessage('join_room')
   async handleJoinPresence(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: PresenceJoinDto,
   ) {
-    const userId = this.resolveUserId(client, data);
-    if (!data?.roomId) {
-      return {
-        success: false,
-        error: 'ROOM_NOT_FOUND',
-        message: 'Room ID is required',
+    try {
+      const user = this.socketAuthService.getAuthenticatedUser(client);
+      if (!data?.roomId) {
+        return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
+      }
+
+      await this.roomStateService.assertRoomJoinable(
+        data.roomId,
+        user.userId,
+      );
+
+      const result = await this.roomStateService.addParticipant(
+        data.roomId,
+        user.userId,
+        client.id,
+        data.username || user.username,
+      );
+      try {
+        await client.join(data.roomId);
+        await client.join(`user:${user.userId}`);
+        this.trackJoinedRoom(client, data.roomId);
+      } catch (error) {
+        await this.roomStateService.removeParticipant(
+          data.roomId,
+          user.userId,
+          client.id,
+        );
+        throw error;
+      }
+
+      const userJoinedPayload = {
+        roomId: data.roomId,
+        userId: user.userId,
+        username: data.username || user.username,
+        socketId: client.id,
+        timestamp: new Date().toISOString(),
       };
+      const presenceUpdatedPayload = {
+        roomId: data.roomId,
+        participantCount: result.participantCount,
+      };
+
+      this.server.to(data.roomId).emit('user_joined', userJoinedPayload);
+      this.server
+        .to(data.roomId)
+        .emit('presence_updated', presenceUpdatedPayload);
+
+      void this.redisStateService?.publishEvent(
+        'user_joined',
+        userJoinedPayload,
+        data.roomId,
+        user.userId,
+      );
+      void this.redisStateService?.publishEvent(
+        'presence_updated',
+        presenceUpdatedPayload,
+        data.roomId,
+        user.userId,
+      );
+
+      return {
+        success: true,
+        roomId: data.roomId,
+        participantCount: result.participantCount,
+      };
+    } catch (error) {
+      return this.toFailure(error, 'JOIN_ROOM_FAILED');
     }
-
-    void client.join(data.roomId);
-    const res = await this.roomStateService.addParticipant(
-      data.roomId,
-      userId,
-      client.id,
-      data.username,
-    );
-
-    const userJoinedPayload = {
-      roomId: data.roomId,
-      userId,
-      username: data.username,
-      socketId: client.id,
-      timestamp: new Date().toISOString(),
-    };
-
-    const presenceUpdatedPayload = {
-      roomId: data.roomId,
-      participantCount: res.participantCount,
-    };
-
-    this.server.to(data.roomId).emit('user_joined', userJoinedPayload);
-    this.server
-      .to(data.roomId)
-      .emit('presence_updated', presenceUpdatedPayload);
-
-    void this.redisStateService?.publishEvent(
-      'user_joined',
-      userJoinedPayload,
-      data.roomId,
-      userId,
-    );
-    void this.redisStateService?.publishEvent(
-      'presence_updated',
-      presenceUpdatedPayload,
-      data.roomId,
-      userId,
-    );
-
-    return {
-      success: true,
-      roomId: data.roomId,
-      participantCount: res.participantCount,
-    };
   }
 
   @SubscribeMessage('presence:leave')
@@ -129,99 +133,116 @@ export class PresenceGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: PresenceLeaveDto,
   ) {
-    const userId = this.resolveUserId(client, data);
-    if (!data?.roomId) {
-      return {
-        success: false,
-        error: 'ROOM_NOT_FOUND',
-        message: 'Room ID is required',
+    try {
+      const user = this.socketAuthService.getAuthenticatedUser(client);
+      if (!data?.roomId) {
+        return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
+      }
+
+      this.socketAuthService.assertJoinedRoom(client, data.roomId);
+      await client.leave(data.roomId);
+      this.untrackJoinedRoom(client, data.roomId);
+      const result = await this.roomStateService.removeParticipant(
+        data.roomId,
+        user.userId,
+        client.id,
+      );
+
+      const userLeftPayload = {
+        roomId: data.roomId,
+        userId: user.userId,
+        timestamp: new Date().toISOString(),
       };
+      const presenceUpdatedPayload = {
+        roomId: data.roomId,
+        participantCount: result.participantCount,
+      };
+
+      this.server.to(data.roomId).emit('user_left', userLeftPayload);
+      this.server
+        .to(data.roomId)
+        .emit('presence_updated', presenceUpdatedPayload);
+
+      void this.redisStateService?.publishEvent(
+        'user_left',
+        userLeftPayload,
+        data.roomId,
+        user.userId,
+      );
+      void this.redisStateService?.publishEvent(
+        'presence_updated',
+        presenceUpdatedPayload,
+        data.roomId,
+        user.userId,
+      );
+
+      return {
+        success: true,
+        roomId: data.roomId,
+        participantCount: result.participantCount,
+      };
+    } catch (error) {
+      return this.toFailure(error, 'LEAVE_ROOM_FAILED');
     }
-
-    void client.leave(data.roomId);
-    const res = await this.roomStateService.removeParticipant(
-      data.roomId,
-      userId,
-    );
-
-    const userLeftPayload = {
-      roomId: data.roomId,
-      userId,
-      timestamp: new Date().toISOString(),
-    };
-
-    const presenceUpdatedPayload = {
-      roomId: data.roomId,
-      participantCount: res.participantCount,
-    };
-
-    this.server.to(data.roomId).emit('user_left', userLeftPayload);
-    this.server
-      .to(data.roomId)
-      .emit('presence_updated', presenceUpdatedPayload);
-
-    void this.redisStateService?.publishEvent(
-      'user_left',
-      userLeftPayload,
-      data.roomId,
-      userId,
-    );
-    void this.redisStateService?.publishEvent(
-      'presence_updated',
-      presenceUpdatedPayload,
-      data.roomId,
-      userId,
-    );
-
-    return {
-      success: true,
-      roomId: data.roomId,
-      participantCount: res.participantCount,
-    };
   }
 
   @SubscribeMessage('presence:reconnect')
   @SubscribeMessage('user_reconnect')
   async handleReconnect(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { roomId: string; userId?: string },
+    @MessageBody() data: { roomId: string },
   ) {
-    const userId = this.resolveUserId(client, data);
-    if (!data?.roomId) {
-      return {
-        success: false,
-        error: 'ROOM_NOT_FOUND',
-        message: 'Room ID is required',
+    try {
+      const user = this.socketAuthService.getAuthenticatedUser(client);
+      if (!data?.roomId) {
+        return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
+      }
+
+      await this.roomStateService.assertRoomJoinable(
+        data.roomId,
+        user.userId,
+      );
+      const result = await this.roomStateService.reconnectParticipant(
+        data.roomId,
+        user.userId,
+        client.id,
+      );
+      try {
+        await client.join(data.roomId);
+        await client.join(`user:${user.userId}`);
+        this.trackJoinedRoom(client, data.roomId);
+      } catch (error) {
+        await this.roomStateService.removeParticipant(
+          data.roomId,
+          user.userId,
+          client.id,
+        );
+        throw error;
+      }
+
+      const reconnectPayload = {
+        roomId: data.roomId,
+        userId: user.userId,
+        socketId: client.id,
+        timestamp: new Date().toISOString(),
       };
+
+      this.server.to(data.roomId).emit('user_reconnected', reconnectPayload);
+      void this.redisStateService?.publishEvent(
+        'user_reconnected',
+        reconnectPayload,
+        data.roomId,
+        user.userId,
+      );
+
+      return {
+        success: true,
+        roomId: data.roomId,
+        participantCount: result.participantCount,
+      };
+    } catch (error) {
+      return this.toFailure(error, 'RECONNECT_FAILED');
     }
-
-    void client.join(data.roomId);
-    const res = await this.roomStateService.reconnectParticipant(
-      data.roomId,
-      userId,
-      client.id,
-    );
-
-    const reconnectPayload = {
-      roomId: data.roomId,
-      userId,
-      socketId: client.id,
-      timestamp: new Date().toISOString(),
-    };
-
-    this.server.to(data.roomId).emit('user_reconnected', reconnectPayload);
-    void this.redisStateService?.publishEvent(
-      'user_reconnected',
-      reconnectPayload,
-      data.roomId,
-      userId,
-    );
-
-    return {
-      success: true,
-      roomId: data.roomId,
-      participantCount: res.participantCount,
-    };
   }
 
   @SubscribeMessage('chat:typing')
@@ -230,51 +251,65 @@ export class PresenceGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: TypingStatusDto,
   ) {
-    const userId = this.resolveUserId(client, data);
-    if (!data?.roomId) {
-      return {
-        success: false,
-        error: 'ROOM_NOT_FOUND',
-        message: 'Room ID is required',
+    try {
+      const user = this.socketAuthService.getAuthenticatedUser(client);
+      if (!data?.roomId) {
+        return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
+      }
+      await this.roomStateService.assertRoomJoinable(
+        data.roomId,
+        user.userId,
+      );
+      this.socketAuthService.assertJoinedRoom(client, data.roomId);
+      await this.roomStateService.assertParticipantOrHost(
+        data.roomId,
+        user.userId,
+      );
+      await this.roomStateService.setTypingStatus(
+        data.roomId,
+        user.userId,
+        !!data.isTyping,
+      );
+
+      const typingPayload = {
+        roomId: data.roomId,
+        userId: user.userId,
+        isTyping: !!data.isTyping,
+        timestamp: Date.now(),
       };
+
+      this.server.to(data.roomId).emit('user_typing', typingPayload);
+      void this.redisStateService?.publishEvent(
+        'user_typing',
+        typingPayload,
+        data.roomId,
+        user.userId,
+      );
+      return { success: true };
+    } catch (error) {
+      return this.toFailure(error, 'TYPING_STATUS_FAILED');
     }
-
-    await this.roomStateService.setTypingStatus(
-      data.roomId,
-      userId,
-      !!data.isTyping,
-    );
-
-    const typingPayload = {
-      roomId: data.roomId,
-      userId,
-      isTyping: !!data.isTyping,
-      timestamp: Date.now(),
-    };
-
-    this.server.to(data.roomId).emit('user_typing', typingPayload);
-    void this.redisStateService?.publishEvent(
-      'user_typing',
-      typingPayload,
-      data.roomId,
-      userId,
-    );
-
-    return { success: true };
   }
 
   @SubscribeMessage('presence:ping')
   @SubscribeMessage('heartbeat')
   @SubscribeMessage('ping')
   handlePing(@ConnectedSocket() client: Socket, @MessageBody() data?: any) {
-    const userId = this.resolveUserId(client, data);
-    void this.redisStateService?.updateHeartbeat(userId, data?.roomId);
-    return {
-      success: true,
-      timestamp: Date.now(),
-      clientTimestamp: data?.timestamp,
-      pong: true,
-    };
+    try {
+      const user = this.socketAuthService.getAuthenticatedUser(client);
+      if (data?.roomId) {
+        this.socketAuthService.assertJoinedRoom(client, data.roomId);
+      }
+      void this.redisStateService?.updateHeartbeat(user.userId, data?.roomId);
+      return {
+        success: true,
+        timestamp: Date.now(),
+        clientTimestamp: data?.timestamp,
+        pong: true,
+      };
+    } catch (error) {
+      return this.toFailure(error, SocketErrorCode.UNAUTHORIZED);
+    }
   }
 
   @SubscribeMessage('presence:count')
@@ -283,14 +318,45 @@ export class PresenceGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { roomId: string },
   ) {
-    if (!data?.roomId) {
-      return {
-        success: false,
-        error: 'ROOM_NOT_FOUND',
-        message: 'Room ID is required',
-      };
+    try {
+      const user = this.socketAuthService.getAuthenticatedUser(client);
+      if (!data?.roomId) {
+        return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
+      }
+      await this.roomStateService.assertRoomJoinable(data.roomId, user.userId);
+      this.socketAuthService.assertJoinedRoom(client, data.roomId);
+      await this.roomStateService.assertParticipantOrHost(
+        data.roomId,
+        user.userId,
+      );
+      const count = await this.roomStateService.getParticipantCount(data.roomId);
+      return { success: true, roomId: data.roomId, participantCount: count };
+    } catch (error) {
+      return this.toFailure(error, 'PARTICIPANT_COUNT_FAILED');
     }
-    const count = await this.roomStateService.getParticipantCount(data.roomId);
-    return { success: true, roomId: data.roomId, participantCount: count };
+  }
+
+  private trackJoinedRoom(client: Socket, roomId: string): void {
+    const rooms =
+      (client.data.joinedRoomIds as Set<string> | undefined) ?? new Set<string>();
+    rooms.add(roomId);
+    client.data.joinedRoomIds = rooms;
+  }
+
+  private untrackJoinedRoom(client: Socket, roomId: string): void {
+    const rooms = client.data.joinedRoomIds as Set<string> | undefined;
+    rooms?.delete(roomId);
+  }
+
+  private failure(error: string, message: string) {
+    return { success: false, error, message };
+  }
+
+  private toFailure(error: unknown, fallbackCode: string) {
+    const candidate = error as { code?: string; message?: string };
+    return this.failure(
+      candidate?.code || fallbackCode,
+      candidate?.message || 'Realtime room operation failed',
+    );
   }
 }

@@ -15,6 +15,8 @@ import { QueryScheduledRoomDto } from './dto/query-scheduled-room.dto';
 import { RegisterReminderDto } from './dto/register-reminder.dto';
 import { ScheduledRoomStatus, TicketStatus } from '../../common/enums';
 import { AdminSettingsService } from '../admin/admin-settings.service';
+import { HostsService } from '../hosts/hosts.service';
+import { HostVerificationStatus } from '../hosts/entities/host-profile.entity';
 
 @Injectable()
 export class ScheduledRoomsService {
@@ -26,12 +28,15 @@ export class ScheduledRoomsService {
     @InjectRepository(Club)
     private readonly clubRepository: Repository<Club>,
     private readonly adminSettingsService: AdminSettingsService,
+    private readonly hostsService: HostsService,
   ) {}
 
   async createScheduledRoom(
     userId: string,
     createDto: CreateScheduledRoomDto,
   ): Promise<ScheduledRoom> {
+    await this.assertApprovedHost(userId);
+
     if (createDto.clubId) {
       const club = await this.clubRepository.findOne({
         where: { id: createDto.clubId },
@@ -70,6 +75,25 @@ export class ScheduledRoomsService {
     });
 
     return this.scheduledRoomRepository.save(scheduledRoom);
+  }
+
+  private async assertApprovedHost(userId: string): Promise<void> {
+    let host;
+    try {
+      host = await this.hostsService.getHostProfile(userId);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new ForbiddenException(
+          'Only an approved Host can schedule live rooms',
+        );
+      }
+      throw error;
+    }
+    if (host.status !== HostVerificationStatus.APPROVED) {
+      throw new ForbiddenException(
+        'Only an approved Host can schedule live rooms',
+      );
+    }
   }
 
   async findAll(queryDto: QueryScheduledRoomDto) {
@@ -159,11 +183,11 @@ export class ScheduledRoomsService {
     }
 
     if (
-      room.status === ScheduledRoomStatus.CANCELLED ||
-      room.status === ScheduledRoomStatus.COMPLETED
+      room.status !== ScheduledRoomStatus.SCHEDULED &&
+      room.status !== ScheduledRoomStatus.POSTPONED
     ) {
       throw new BadRequestException(
-        'Cannot update a cancelled or completed room',
+        `Cannot update a scheduled room while it is ${room.status}`,
       );
     }
 
@@ -213,6 +237,15 @@ export class ScheduledRoomsService {
     if (room.hostId !== userId) {
       throw new ForbiddenException(
         'Only the host can cancel this scheduled room',
+      );
+    }
+
+    if (
+      room.status !== ScheduledRoomStatus.SCHEDULED &&
+      room.status !== ScheduledRoomStatus.POSTPONED
+    ) {
+      throw new BadRequestException(
+        `Cannot cancel a scheduled room while it is ${room.status}`,
       );
     }
 

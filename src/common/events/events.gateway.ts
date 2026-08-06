@@ -3,12 +3,11 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  SubscribeMessage,
-  MessageBody,
-  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
+import { RealtimeSocketAuthService } from './services/realtime-socket-auth.service';
+import { RealtimeRoomStateService } from './services/realtime-room-state.service';
 
 @WebSocketGateway({
   cors: {
@@ -23,41 +22,67 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(EventsGateway.name);
 
-  handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
-  }
+  constructor(
+    private readonly socketAuthService: RealtimeSocketAuthService,
+    private readonly roomStateService: RealtimeRoomStateService,
+  ) {}
 
-  handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
-  }
-
-  @SubscribeMessage('join_room')
-  handleJoinRoom(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { roomId: string },
-  ) {
-    if (data?.roomId) {
-      void client.join(data.roomId);
-      this.logger.log(`Client ${client.id} joined room ${data.roomId}`);
+  async handleConnection(client: Socket) {
+    try {
+      const user = await this.socketAuthService.authenticate(client);
+      await client.join(`user:${user.userId}`);
+      this.logger.log(
+        `Authenticated realtime client connected: ${client.id} (userId=${user.userId})`,
+      );
+      client.emit('connection_established', {
+        status: 'connected',
+        socketId: client.id,
+        user: {
+          userId: user.userId,
+          username: user.username,
+          role: user.role,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      this.socketAuthService.logAuthenticationFailure(client, error);
+      client.emit('auth_error', {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Invalid or expired access token',
+      });
+      client.disconnect(true);
     }
   }
 
-  @SubscribeMessage('leave_room')
-  handleLeaveRoom(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { roomId: string },
-  ) {
-    if (data?.roomId) {
-      void client.leave(data.roomId);
-      this.logger.log(`Client ${client.id} left room ${data.roomId}`);
+  async handleDisconnect(client: Socket) {
+    const user = client.data?.user as { userId?: string } | undefined;
+    const joinedRoomIds = client.data?.joinedRoomIds as
+      | Set<string>
+      | undefined;
+
+    if (user?.userId && joinedRoomIds) {
+      await Promise.all(
+        Array.from(joinedRoomIds).map((roomId) =>
+          this.roomStateService
+            .removeParticipant(roomId, user.userId, client.id)
+            .catch(() => undefined),
+        ),
+      );
     }
+
+    this.logger.log(
+      `Realtime client disconnected: ${client.id}${
+        user?.userId ? ` (userId=${user.userId})` : ''
+      }`,
+    );
   }
 
   broadcastToRoom(roomId: string, event: string, payload: unknown) {
     this.logger.log(`Broadcasting event '${event}' to room ${roomId}`);
     if (this.server) {
       this.server.to(roomId).emit(event, payload);
-      this.server.emit(event, payload);
     }
   }
 

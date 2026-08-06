@@ -7,6 +7,7 @@ import { RoomGateway } from './gateways/room.gateway';
 import { PresenceGateway } from './gateways/presence.gateway';
 import { ReactionsGateway } from './gateways/reactions.gateway';
 import { SocketErrorCode } from './constants/socket-error-codes.enum';
+import { RealtimeSocketAuthService } from './services/realtime-socket-auth.service';
 
 describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
   let roomStateService: RealtimeRoomStateService;
@@ -24,10 +25,33 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
     emit: jest.fn(),
   } as unknown as Server;
 
+  const mockSocketAuthService = {
+    getAuthenticatedUser: (client: Socket) => client.data.user,
+    assertJoinedRoom: (client: Socket, roomId: string) => {
+      const joined = client.data.joinedRoomIds as Set<string>;
+      if (!joined?.has(roomId)) {
+        throw { code: SocketErrorCode.NOT_IN_ROOM, message: 'Not in room' };
+      }
+    },
+  };
+
   const createMockSocket = (userId: string, socketId = 'sock-123') =>
     ({
       id: socketId,
-      data: { user: { userId } },
+      data: {
+        user: { userId },
+        joinedRoomIds: new Set([
+          'room-queue-101',
+          'room-stage-202',
+          'room-reactions-303',
+          'room-gifts-404',
+          'room-topic-505',
+          'room-presence-606',
+          'room-101',
+          'room-202',
+          'room-303',
+        ]),
+      },
       handshake: { auth: { userId }, query: {}, headers: {} },
       join: jest.fn().mockReturnValue(Promise.resolve()),
       leave: jest.fn().mockReturnValue(Promise.resolve()),
@@ -36,6 +60,17 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockRoomRepository.findOne.mockResolvedValue({
+      id: 'generic-live-room',
+      hostId: 'generic-host',
+      title: 'Generic Live Room',
+      description: '',
+      category: 'General',
+      status: 'live',
+    });
+    mockRoomRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +78,10 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
         RoomGateway,
         PresenceGateway,
         ReactionsGateway,
+        {
+          provide: RealtimeSocketAuthService,
+          useValue: mockSocketAuthService,
+        },
         {
           provide: getRepositoryToken(Room),
           useValue: mockRoomRepository,
@@ -73,8 +112,11 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
         id: roomId,
         hostId,
         title: 'Tech Talk',
+        status: 'live',
       });
       await roomStateService.getOrCreateRoomState(roomId, hostId);
+      await roomStateService.addParticipant(roomId, listener1, 'sock-l1');
+      await roomStateService.addParticipant(roomId, listener2, 'sock-l2');
     });
 
     it('should allow listeners to join queue and receive position', async () => {
@@ -173,8 +215,13 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
     const listenerId = 'listener-user-3';
 
     beforeEach(async () => {
-      mockRoomRepository.findOne.mockResolvedValue({ id: roomId, hostId });
+      mockRoomRepository.findOne.mockResolvedValue({
+        id: roomId,
+        hostId,
+        status: 'live',
+      });
       await roomStateService.getOrCreateRoomState(roomId, hostId);
+      await roomStateService.addParticipant(roomId, listenerId, 'sock-stage');
     });
 
     it('should allow host to invite listener to stage', async () => {
@@ -301,16 +348,28 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
 
   describe('3. Live Emoji Reactions', () => {
     const roomId = 'room-reactions-303';
+    const userId = 'user-emoji-1';
+
+    beforeEach(async () => {
+      mockRoomRepository.findOne.mockResolvedValue({
+        id: roomId,
+        hostId: 'host-reactions-303',
+        status: 'live',
+      });
+      await roomStateService.getOrCreateRoomState(roomId, 'host-reactions-303');
+      await roomStateService.addParticipant(roomId, userId, 'sock-emoji');
+      mockRoomRepository.save.mockClear();
+    });
 
     it('should broadcast valid emoji reaction without database persistence', async () => {
-      const socket = createMockSocket('user-emoji-1');
-      const res = reactionsGateway.handleSendEmojiReaction(socket, {
+      const socket = createMockSocket(userId);
+      const res = await reactionsGateway.handleSendEmojiReaction(socket, {
         roomId,
         emoji: '🔥',
       });
 
       expect(res.success).toBe(true);
-      expect(res.emoji).toBe('🔥');
+      expect('emoji' in res ? res.emoji : undefined).toBe('🔥');
       expect(mockServer.emit).toHaveBeenCalledWith(
         'emoji_reaction_received',
         expect.objectContaining({ roomId, emoji: '🔥' }),
@@ -319,23 +378,36 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
     });
 
     it('should reject invalid emoji string with INVALID_EMOJI error code', async () => {
-      const socket = createMockSocket('user-emoji-1');
-      const res = reactionsGateway.handleSendEmojiReaction(socket, {
+      const socket = createMockSocket(userId);
+      const res = await reactionsGateway.handleSendEmojiReaction(socket, {
         roomId,
         emoji: 'not_a_valid_emoji_text',
       });
 
       expect(res.success).toBe(false);
-      expect(res.error).toBe(SocketErrorCode.INVALID_EMOJI);
+      expect('error' in res ? res.error : undefined).toBe(
+        SocketErrorCode.INVALID_EMOJI,
+      );
     });
   });
 
   describe('4. Gift Broadcast Events', () => {
     const roomId = 'room-gifts-404';
+    const senderId = 'sender-1';
+
+    beforeEach(async () => {
+      mockRoomRepository.findOne.mockResolvedValue({
+        id: roomId,
+        hostId: 'host-gifts-404',
+        status: 'live',
+      });
+      await roomStateService.getOrCreateRoomState(roomId, 'host-gifts-404');
+      await roomStateService.addParticipant(roomId, senderId, 'sock-gift');
+    });
 
     it('should broadcast gift events without altering wallet or balance', async () => {
-      const socket = createMockSocket('sender-1');
-      const res = reactionsGateway.handleSendGiftEvent(socket, {
+      const socket = createMockSocket(senderId);
+      const res = await reactionsGateway.handleSendGiftEvent(socket, {
         roomId,
         recipientId: 'creator-1',
         giftId: 'gift-dragon-01',
@@ -344,7 +416,7 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(res.status).toBe('broadcasted');
+      expect('status' in res ? res.status : undefined).toBe('broadcasted');
       expect(mockServer.emit).toHaveBeenCalledWith(
         'gift.sent',
         expect.anything(),
@@ -368,11 +440,17 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
       mockRoomRepository.findOne.mockResolvedValue({
         id: roomId,
         hostId,
+        status: 'live',
         title: 'Old Title',
         description: 'Old Description',
         category: 'General',
       });
       await roomStateService.getOrCreateRoomState(roomId, hostId);
+      await roomStateService.addParticipant(
+        roomId,
+        'random-user-99',
+        'sock-random',
+      );
     });
 
     it('should allow host to update title, description, category and persist to Room entity', async () => {
@@ -421,7 +499,9 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
       });
 
       expect(res.success).toBe(true);
-      expect(res.participantCount).toBe(1);
+      expect(
+        'participantCount' in res ? res.participantCount : undefined,
+      ).toBe(1);
       expect(socket.join).toHaveBeenCalledWith(roomId);
       expect(mockServer.emit).toHaveBeenCalledWith(
         'user_joined',
@@ -437,7 +517,11 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
         roomId,
       });
       expect(leaveRes.success).toBe(true);
-      expect(leaveRes.participantCount).toBe(0);
+      expect(
+        'participantCount' in leaveRes
+          ? leaveRes.participantCount
+          : undefined,
+      ).toBe(0);
       expect(mockServer.emit).toHaveBeenCalledWith(
         'user_left',
         expect.anything(),
@@ -457,6 +541,7 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
 
     it('should handle chat typing status', async () => {
       const socket = createMockSocket('user-pres-1');
+      await presenceGateway.handleJoinPresence(socket, { roomId });
       const res = await presenceGateway.handleTypingStatus(socket, {
         roomId,
         isTyping: true,
@@ -474,7 +559,7 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
       const res = presenceGateway.handlePing(socket, { timestamp: 123456 });
 
       expect(res.success).toBe(true);
-      expect(res.pong).toBe(true);
+      expect('pong' in res ? res.pong : undefined).toBe(true);
     });
 
     it('should return online participant count', async () => {
@@ -485,7 +570,9 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
         roomId,
       });
       expect(res.success).toBe(true);
-      expect(res.participantCount).toBe(1);
+      expect(
+        'participantCount' in res ? res.participantCount : undefined,
+      ).toBe(1);
     });
   });
 });

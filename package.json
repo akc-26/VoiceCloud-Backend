@@ -35,7 +35,10 @@
     "host-verification:migration:run": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts --execute",
     "host-verification:migration:report": "ts-node -r tsconfig-paths/register src/scripts/migrate-legacy-host-verification.ts --report",
     "test:wp08:01": "jest --runInBand --runTestsByPath src/config/infrastructure-mode.spec.ts src/config/env-validator.spec.ts src/modules/health/health.service.spec.ts src/redis/redis-response.util.spec.ts src/wp08/wp08-01-acceptance-contract.spec.ts src/modules/auth/authentication-security.spec.ts src/modules/hosts/hosts.security.spec.ts src/modules/hosts/hosts.spec.ts",
-    "wp08:01:acceptance": "node scripts/wp08/wp08-01-acceptance.mjs"
+    "wp08:01:acceptance": "node scripts/wp08/wp08-01-acceptance.mjs",
+    "test:wp08:02": "jest --runInBand --runTestsByPath src/modules/rooms/room-lifecycle.service.spec.ts src/modules/rooms/rooms.service.wp08-02.spec.ts src/modules/rooms/scheduled-rooms.service.spec.ts src/common/events/realtime-room-access.wp08-02.spec.ts src/common/events/phase3a-realtime.spec.ts src/common/events/phase3b-redis.spec.ts src/wp08/wp08-02-realtime-security.spec.ts src/modules/moderation/moderation-rbac.wp08-02.spec.ts src/database/migrations/phase08-room-lifecycle-authority.spec.ts",
+    "wp08:02:acceptance": "node scripts/wp08/wp08-02-acceptance.mjs",
+    "wp08:02:check": "powershell -ExecutionPolicy Bypass -File scripts/wp08/wp08-02-check.ps1"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

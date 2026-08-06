@@ -212,9 +212,10 @@ function createPgMemOptions(database: string): VoiceCloudTypeOrmOptions {
         await dataSource.initialize();
 
         if (!options.synchronize) {
-          const schemaRows = (await dataSource.query(
+          const schemaRows: Array<{ tableName: string | null }> =
+            await dataSource.query(
             `SELECT to_regclass('public.users')::text AS "tableName"`,
-          )) as Array<{ tableName: string | null }>;
+            );
 
           if (!schemaRows[0]?.tableName) {
             await dataSource.destroy();

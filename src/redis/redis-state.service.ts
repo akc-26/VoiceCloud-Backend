@@ -339,6 +339,85 @@ export class RedisStateService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // --- Room-level audience moderation ---
+  async isRoomBanned(roomId: string, userId: string): Promise<boolean> {
+    try {
+      return (
+        (await this.redisClient.sismember(
+          REDIS_KEYS.ROOM_BANNED_USERS(roomId),
+          userId,
+        )) === 1
+      );
+    } catch (err: any) {
+      this.logger.warn(`Redis isRoomBanned error: ${err.message}`);
+      throw err;
+    }
+  }
+
+  async banUserFromRoom(roomId: string, userId: string): Promise<void> {
+    try {
+      const key = REDIS_KEYS.ROOM_BANNED_USERS(roomId);
+      await this.redisClient.sadd(key, userId);
+      await this.redisClient.expire(key, DEFAULT_TTLS.ROOM_STATE_SECONDS);
+    } catch (err: any) {
+      this.logger.warn(`Redis banUserFromRoom error: ${err.message}`);
+      throw err;
+    }
+  }
+
+  async unbanUserFromRoom(roomId: string, userId: string): Promise<void> {
+    try {
+      await this.redisClient.srem(
+        REDIS_KEYS.ROOM_BANNED_USERS(roomId),
+        userId,
+      );
+    } catch (err: any) {
+      this.logger.warn(`Redis unbanUserFromRoom error: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // --- Room audience invitations ---
+  async isAudienceInvited(roomId: string, userId: string): Promise<boolean> {
+    try {
+      return (
+        (await this.redisClient.sismember(
+          REDIS_KEYS.ROOM_AUDIENCE_INVITES(roomId),
+          userId,
+        )) === 1
+      );
+    } catch (err: any) {
+      this.logger.warn(`Redis isAudienceInvited error: ${err.message}`);
+      return false;
+    }
+  }
+
+  async inviteAudienceUser(roomId: string, userId: string): Promise<void> {
+    try {
+      const key = REDIS_KEYS.ROOM_AUDIENCE_INVITES(roomId);
+      await this.redisClient.sadd(key, userId);
+      await this.redisClient.expire(key, DEFAULT_TTLS.ROOM_STATE_SECONDS);
+    } catch (err: any) {
+      this.logger.warn(`Redis inviteAudienceUser error: ${err.message}`);
+      throw err;
+    }
+  }
+
+  async revokeAudienceInvitation(
+    roomId: string,
+    userId: string,
+  ): Promise<void> {
+    try {
+      await this.redisClient.srem(
+        REDIS_KEYS.ROOM_AUDIENCE_INVITES(roomId),
+        userId,
+      );
+    } catch (err: any) {
+      this.logger.warn(`Redis revokeAudienceInvitation error: ${err.message}`);
+      throw err;
+    }
+  }
+
   // --- Participants ---
   async addRoomParticipant(
     roomId: string,
@@ -370,6 +449,40 @@ export class RedisStateService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async addRoomParticipantStrict(
+    roomId: string,
+    participant: RedisRoomParticipant,
+  ): Promise<number> {
+    const key = REDIS_KEYS.ROOM_PARTICIPANTS(roomId);
+    await this.redisClient.hset(
+      key,
+      participant.userId,
+      JSON.stringify(participant),
+    );
+    await this.redisClient.expire(key, DEFAULT_TTLS.ROOM_STATE_SECONDS);
+    return this.redisClient.hlen(key);
+  }
+
+  async getRoomParticipantStrict(
+    roomId: string,
+    userId: string,
+  ): Promise<RedisRoomParticipant | null> {
+    const raw = await this.redisClient.hget(
+      REDIS_KEYS.ROOM_PARTICIPANTS(roomId),
+      userId,
+    );
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  async removeRoomParticipantStrict(
+    roomId: string,
+    userId: string,
+  ): Promise<number> {
+    const key = REDIS_KEYS.ROOM_PARTICIPANTS(roomId);
+    await this.redisClient.hdel(key, userId);
+    return this.redisClient.hlen(key);
+  }
+
   async getRoomParticipants(roomId: string): Promise<RedisRoomParticipant[]> {
     try {
       const key = REDIS_KEYS.ROOM_PARTICIPANTS(roomId);
@@ -380,6 +493,19 @@ export class RedisStateService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Redis getRoomParticipants error: ${err.message}`);
       return [];
     }
+  }
+
+  async getRoomParticipantsStrict(
+    roomId: string,
+  ): Promise<RedisRoomParticipant[]> {
+    const key = REDIS_KEYS.ROOM_PARTICIPANTS(roomId);
+    const data = await this.redisClient.hgetall(key);
+    if (!data) return [];
+    return Object.values(data).map((value) => JSON.parse(value));
+  }
+
+  async getParticipantCountStrict(roomId: string): Promise<number> {
+    return this.redisClient.hlen(REDIS_KEYS.ROOM_PARTICIPANTS(roomId));
   }
 
   async getParticipantCount(roomId: string): Promise<number> {
@@ -626,6 +752,8 @@ export class RedisStateService implements OnModuleInit, OnModuleDestroy {
       const pipeline = this.redisClient.pipeline();
       pipeline.del(REDIS_KEYS.ROOM_META(roomId));
       pipeline.del(REDIS_KEYS.ROOM_MODERATORS(roomId));
+      pipeline.del(REDIS_KEYS.ROOM_BANNED_USERS(roomId));
+      pipeline.del(REDIS_KEYS.ROOM_AUDIENCE_INVITES(roomId));
       pipeline.del(REDIS_KEYS.ROOM_SPEAKERS(roomId));
       pipeline.del(REDIS_KEYS.ROOM_PARTICIPANTS(roomId));
       pipeline.del(REDIS_KEYS.ROOM_QUEUE(roomId));

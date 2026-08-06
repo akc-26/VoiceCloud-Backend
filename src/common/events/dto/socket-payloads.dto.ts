@@ -129,3 +129,13 @@ export class TypingStatusDto extends RoomEventBaseDto {
   @IsBoolean()
   isTyping: boolean;
 }
+
+export class RoomAudienceModerationDto extends RoomEventBaseDto {
+  @IsString()
+  @IsNotEmpty()
+  targetUserId: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}

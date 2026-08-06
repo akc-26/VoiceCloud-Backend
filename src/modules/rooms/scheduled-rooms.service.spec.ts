@@ -17,6 +17,8 @@ import {
 } from '../../common/enums';
 import { CreateScheduledRoomDto } from './dto/create-scheduled-room.dto';
 import { AdminSettingsService } from '../admin/admin-settings.service';
+import { HostsService } from '../hosts/hosts.service';
+import { HostVerificationStatus } from '../hosts/entities/host-profile.entity';
 
 describe('ScheduledRoomsService (Phase 2B)', () => {
   let service: ScheduledRoomsService;
@@ -24,6 +26,7 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
   let ticketRepo: jest.Mocked<Repository<RoomTicket>>;
   let clubRepo: jest.Mocked<Repository<Club>>;
   let adminSettingsService: { getOperationalSettings: jest.Mock };
+  let hostsService: { getHostProfile: jest.Mock };
 
   const mockFutureDate = new Date(Date.now() + 86400000).toISOString();
 
@@ -84,6 +87,16 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
           },
         },
         {
+          provide: HostsService,
+          useValue: {
+            getHostProfile: jest.fn().mockResolvedValue({
+              id: 'host-profile-1',
+              userId: 'user-host',
+              status: HostVerificationStatus.APPROVED,
+            }),
+          },
+        },
+        {
           provide: AdminSettingsService,
           useValue: {
             getOperationalSettings: jest.fn().mockResolvedValue({
@@ -103,6 +116,7 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
     ticketRepo = module.get(getRepositoryToken(RoomTicket));
     clubRepo = module.get(getRepositoryToken(Club));
     adminSettingsService = module.get(AdminSettingsService);
+    hostsService = module.get(HostsService);
   });
 
   describe('createScheduledRoom', () => {
@@ -120,6 +134,22 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
 
       expect(roomRepo.create).toHaveBeenCalled();
       expect(result).toBe(room);
+    });
+
+    it('rejects scheduling by a non-approved Host', async () => {
+      hostsService.getHostProfile.mockResolvedValue({
+        id: 'host-profile-1',
+        userId: 'user-host',
+        status: HostVerificationStatus.SUSPENDED,
+      });
+
+      await expect(
+        service.createScheduledRoom('user-host', {
+          title: 'Blocked Scheduled Room',
+          scheduledStartTime: mockFutureDate,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(roomRepo.create).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException for past start time', async () => {
@@ -237,6 +267,19 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('rejects edits after the linked room has gone live', async () => {
+      const room = getMockRoom();
+      room.status = ScheduledRoomStatus.LIVE;
+      roomRepo.findOne.mockResolvedValue(room);
+
+      await expect(
+        service.updateScheduledRoom('sroom-123', 'user-host', {
+          title: 'Late edit',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(roomRepo.save).not.toHaveBeenCalled();
+    });
+
     it('rejects capacity updates above the configured maximum', async () => {
       const room = getMockRoom();
       roomRepo.findOne.mockResolvedValue(room);
@@ -258,6 +301,17 @@ describe('ScheduledRoomsService (Phase 2B)', () => {
   });
 
   describe('deleteScheduledRoom', () => {
+    it('rejects cancellation after the linked room has gone live', async () => {
+      const room = getMockRoom();
+      room.status = ScheduledRoomStatus.LIVE;
+      roomRepo.findOne.mockResolvedValue(room);
+
+      await expect(
+        service.deleteScheduledRoom('sroom-123', 'user-host'),
+      ).rejects.toThrow(BadRequestException);
+      expect(roomRepo.save).not.toHaveBeenCalled();
+    });
+
     it('should cancel room when caller is host', async () => {
       const room = getMockRoom();
       roomRepo.findOne.mockResolvedValue(room);

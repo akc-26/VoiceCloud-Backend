@@ -16,6 +16,8 @@ import { StorageModule } from '../storage/storage.module';
 import { EventsModule } from '../../common/events/events.module';
 import { RedisModule } from '../../redis/redis.module';
 import { SystemSettingsModule } from '../admin/system-settings/system-settings.module';
+import { RoomLifecycleService } from './room-lifecycle.service';
+import { HostsModule } from '../hosts/hosts.module';
 
 @Module({
   imports: [
@@ -24,6 +26,7 @@ import { SystemSettingsModule } from '../admin/system-settings/system-settings.m
     EventsModule,
     RedisModule,
     SystemSettingsModule,
+    HostsModule,
   ],
   controllers: [
     RoomTicketsController,
@@ -36,12 +39,14 @@ import { SystemSettingsModule } from '../admin/system-settings/system-settings.m
     ScheduledRoomsService,
     RoomTicketsService,
     SoundboardService,
+    RoomLifecycleService,
   ],
   exports: [
     RoomsService,
     ScheduledRoomsService,
     RoomTicketsService,
     SoundboardService,
+    RoomLifecycleService,
     TypeOrmModule,
   ],
 })

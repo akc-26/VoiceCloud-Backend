@@ -20,8 +20,14 @@ import {
 } from 'class-validator';
 import { Club } from '../../clubs/entities/club.entity';
 import { ScheduledRoom } from './scheduled-room.entity';
+import { RoomLifecycleStatus } from '../enums/room-lifecycle-status.enum';
 
 @Entity('rooms')
+@Index('UQ_rooms_scheduledRoomId', ['scheduledRoomId'], {
+  unique: true,
+  where: '"scheduledRoomId" IS NOT NULL',
+})
+@Index('IDX_rooms_status_isLive', ['status', 'isLive'])
 export class Room {
   @ApiProperty({ description: 'Unique room ID' })
   @PrimaryGeneratedColumn('uuid')
@@ -56,14 +62,14 @@ export class Room {
   isLocked: boolean;
 
   @ApiProperty({ description: 'Room live state' })
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: false })
   @IsBoolean()
   isLive: boolean;
 
   @ApiProperty({
     description: 'Room Lifecycle Status (offline, live, paused, ended)',
   })
-  @Column({ type: 'varchar', default: 'offline' })
+  @Column({ type: 'varchar', default: RoomLifecycleStatus.OFFLINE })
   @IsString()
   status: string;
 
@@ -75,12 +81,12 @@ export class Room {
   @ApiPropertyOptional({ description: 'Broadcast start timestamp' })
   @Column({ type: 'timestamp', nullable: true })
   @IsOptional()
-  startedAt: Date;
+  startedAt: Date | null;
 
   @ApiPropertyOptional({ description: 'Broadcast end timestamp' })
   @Column({ type: 'timestamp', nullable: true })
   @IsOptional()
-  endedAt: Date;
+  endedAt: Date | null;
 
   @ApiProperty({ description: 'Language' })
   @Column({ type: 'varchar', default: 'en' })

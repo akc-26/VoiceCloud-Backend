@@ -3,12 +3,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import RedisMock from 'ioredis-mock';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
 import { RedisStateService } from '../../redis/redis-state.service';
+import { RealtimeSocketAuthService } from './services/realtime-socket-auth.service';
 import { REDIS_KEYS, DEFAULT_TTLS } from '../../redis/redis-keys.constant';
 import { RealtimeRoomStateService } from './services/realtime-room-state.service';
 import { Room } from '../../modules/rooms/entities/room.entity';
 import { RoomGateway } from './gateways/room.gateway';
 import { PresenceGateway } from './gateways/presence.gateway';
 import { ReactionsGateway } from './gateways/reactions.gateway';
+import { SocketErrorCode } from './constants/socket-error-codes.enum';
 
 describe('Phase 3B - Redis Integration & Distributed State', () => {
   let testingModule: TestingModule;
@@ -26,17 +28,31 @@ describe('Phase 3B - Redis Integration & Distributed State', () => {
       title: 'Voice Room 101',
       description: 'Test Room Description',
       category: 'Music',
+      status: 'live',
     }),
     save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+  };
+
+  const mockSocketAuthService = {
+    getAuthenticatedUser: (client: any) => client.data.user,
+    assertJoinedRoom: (client: any, roomId: string) => {
+      const joined = client.data.joinedRoomIds as Set<string>;
+      if (!joined?.has(roomId)) {
+        throw { code: SocketErrorCode.NOT_IN_ROOM, message: 'Not in room' };
+      }
+    },
   };
 
   const createMockSocket = (userId: string, socketId: string) =>
     ({
       id: socketId,
-      data: { user: { userId } },
+      data: {
+        user: { userId },
+        joinedRoomIds: new Set(['room-101', 'room-202', 'room-303']),
+      },
       handshake: { auth: { userId }, query: {} },
-      join: jest.fn(),
-      leave: jest.fn(),
+      join: jest.fn().mockResolvedValue(undefined),
+      leave: jest.fn().mockResolvedValue(undefined),
     }) as any;
 
   const createMockServer = () => {
@@ -59,6 +75,10 @@ describe('Phase 3B - Redis Integration & Distributed State', () => {
         RoomGateway,
         PresenceGateway,
         ReactionsGateway,
+        {
+          provide: RealtimeSocketAuthService,
+          useValue: mockSocketAuthService,
+        },
         {
           provide: getRepositoryToken(Room),
           useValue: mockRoomRepo,
@@ -106,6 +126,10 @@ describe('Phase 3B - Redis Integration & Distributed State', () => {
       expect(REDIS_KEYS.USER_PRESENCE('u1')).toBe('vc:user:u1:presence');
       expect(REDIS_KEYS.USER_SOCKETS('u1')).toBe('vc:user:u1:sockets');
       expect(REDIS_KEYS.ROOM_META('r1')).toBe('vc:room:r1:meta');
+      expect(REDIS_KEYS.ROOM_BANNED_USERS('r1')).toBe('vc:room:r1:banned');
+      expect(REDIS_KEYS.ROOM_AUDIENCE_INVITES('r1')).toBe(
+        'vc:room:r1:audience-invites',
+      );
       expect(REDIS_KEYS.ROOM_QUEUE('r1')).toBe('vc:room:r1:queue');
       expect(REDIS_KEYS.ROOM_SPEAKERS('r1')).toBe('vc:room:r1:speakers');
       expect(REDIS_KEYS.ROOM_PARTICIPANTS('r1')).toBe(
@@ -229,6 +253,57 @@ describe('Phase 3B - Redis Integration & Distributed State', () => {
       const newCount = await redisStateService.getParticipantCount('room-101');
       expect(newCount).toBe(0);
     });
+
+    it('should use strict participant operations without masking Redis errors', async () => {
+      const participant = {
+        userId: 'strict-user',
+        username: 'Strict User',
+        socketId: 'strict-socket',
+        joinedAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+      };
+
+      await expect(
+        redisStateService.addRoomParticipantStrict('room-101', participant),
+      ).resolves.toBe(1);
+      await expect(
+        redisStateService.getRoomParticipantStrict('room-101', 'strict-user'),
+      ).resolves.toEqual(participant);
+      await expect(
+        redisStateService.getParticipantCountStrict('room-101'),
+      ).resolves.toBe(1);
+      await expect(
+        redisStateService.removeRoomParticipantStrict(
+          'room-101',
+          'strict-user',
+        ),
+      ).resolves.toBe(0);
+    });
+
+    it('should persist room bans and audience invitations in Redis', async () => {
+      await redisStateService.banUserFromRoom('room-101', 'banned-user');
+      await expect(
+        redisStateService.isRoomBanned('room-101', 'banned-user'),
+      ).resolves.toBe(true);
+
+      await redisStateService.unbanUserFromRoom('room-101', 'banned-user');
+      await expect(
+        redisStateService.isRoomBanned('room-101', 'banned-user'),
+      ).resolves.toBe(false);
+
+      await redisStateService.inviteAudienceUser('room-101', 'invited-user');
+      await expect(
+        redisStateService.isAudienceInvited('room-101', 'invited-user'),
+      ).resolves.toBe(true);
+
+      await redisStateService.revokeAudienceInvitation(
+        'room-101',
+        'invited-user',
+      );
+      await expect(
+        redisStateService.isAudienceInvited('room-101', 'invited-user'),
+      ).resolves.toBe(false);
+    });
   });
 
   describe('4. Speaker Queue Synchronization & Atomic Operations', () => {
@@ -336,6 +411,7 @@ describe('Phase 3B - Redis Integration & Distributed State', () => {
 
     it('should propagate gift events via Pub/Sub through ReactionsGateway', async () => {
       const socket = createMockSocket('user-sender', 's1');
+      await roomStateService.addParticipant('room-101', 'user-sender', 's1');
       const res = await reactionsGateway.handleSendGiftEvent(socket, {
         roomId: 'room-101',
         recipientId: 'user-receiver',

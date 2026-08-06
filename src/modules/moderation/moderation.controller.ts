@@ -24,11 +24,15 @@ import { BanUserDto } from './dto/ban-user.dto';
 import { MuteUserDto } from './dto/mute-user.dto';
 import { WarnUserDto, CreateNoteDto } from './dto/warn-user.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Admin Moderation')
 @Controller('moderation')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
 @ApiBearerAuth()
 export class ModerationController {
   constructor(private readonly moderationService: ModerationService) {}

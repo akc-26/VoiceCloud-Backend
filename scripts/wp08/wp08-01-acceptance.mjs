@@ -16,6 +16,10 @@ const adminEmail = process.env.DEV_ADMIN_EMAIL ?? 'admin@voicecloud.com';
 const adminPassword = process.env.DEV_ADMIN_PASSWORD ?? 'AdminPass123!';
 const creatorEmail = process.env.DEV_CREATOR_EMAIL ?? 'creator@voicecloud.com';
 const creatorPassword = process.env.DEV_CREATOR_PASSWORD ?? 'CreatorPass123!';
+const acceptanceHostEmail = process.env.WP08_ACCEPTANCE_HOST_EMAIL;
+const acceptanceHostUsername = process.env.WP08_ACCEPTANCE_HOST_USERNAME;
+const acceptanceHostPassword =
+  process.env.WP08_ACCEPTANCE_HOST_PASSWORD ?? 'Wp08Acceptance123!';
 
 let completedChecks = 0;
 let adminAccessToken;
@@ -366,9 +370,9 @@ async function run() {
 
   beginCheck('Register a real acceptance user');
   const stamp = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const email = `wp08_${stamp}@voicecloud.test`;
-  const username = `wp08_${stamp}`.slice(0, 48);
-  const password = 'Wp08Acceptance123!';
+  const email = acceptanceHostEmail ?? `wp08_${stamp}@voicecloud.test`;
+  const username = (acceptanceHostUsername ?? `wp08_${stamp}`).slice(0, 48);
+  const password = acceptanceHostPassword;
   const registration = await request('/api/v1/auth/register', {
     method: 'POST',
     expected: 201,
@@ -630,6 +634,7 @@ async function run() {
     `WP08-01 REAL HTTP ACCEPTANCE PASSED (${completedChecks} checks)`,
   );
   console.log(`Acceptance user created successfully: ${email}`);
+  console.log(`WP08_ACCEPTANCE_HOST_READY=${email}`);
   console.log('============================================================');
 }
 

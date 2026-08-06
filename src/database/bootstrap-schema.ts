@@ -38,14 +38,14 @@ function migrationTimestamp(name: string): number {
 async function listExistingApplicationTables(
   dataSource: DataSource,
 ): Promise<string[]> {
-  const rows = (await dataSource.query(`
+  const rows: ExistingTableRow[] = await dataSource.query(`
     SELECT table_name
     FROM information_schema.tables
     WHERE table_schema = 'public'
       AND table_type = 'BASE TABLE'
       AND table_name <> 'migrations'
     ORDER BY table_name
-  `)) as ExistingTableRow[];
+  `);
 
   return rows.map((row) => row.table_name);
 }
@@ -69,10 +69,10 @@ async function markCurrentMigrationsAsApplied(
 
   for (const migration of migrations) {
     const timestamp = migrationTimestamp(migration.name);
-    const existing = (await dataSource.query(
+    const existing: unknown[] = await dataSource.query(
       `SELECT 1 FROM "migrations" WHERE "timestamp" = $1 AND "name" = $2 LIMIT 1`,
       [timestamp, migration.name],
-    )) as unknown[];
+    );
 
     if (existing.length === 0) {
       await dataSource.query(

@@ -1,8 +1,22 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Room } from '../../../modules/rooms/entities/room.entity';
 import { SocketErrorCode } from '../constants/socket-error-codes.enum';
+import { RoomLifecycleStatus } from '../../../modules/rooms/enums/room-lifecycle-status.enum';
+import { ScheduledRoom } from '../../../modules/rooms/entities/scheduled-room.entity';
+import { RoomTicket } from '../../../modules/rooms/entities/room-ticket.entity';
+import { User } from '../../../modules/users/entities/user.entity';
+import { CreatorSubscription } from '../../../modules/users/entities/creator-subscription.entity';
+import { ClubMember } from '../../../modules/clubs/entities/club-member.entity';
+import { AdminSettingsService } from '../../../modules/admin/admin-settings.service';
+import {
+  SubscriptionStatus,
+  TicketStatus,
+  VerificationStatus,
+  VisibilityType,
+} from '../../enums';
 import {
   RedisStateService,
   RedisQueueUser,
@@ -47,6 +61,8 @@ export interface RoomState {
   category?: string;
   isClosed: boolean;
   moderators: Set<string>;
+  bannedUsers: Set<string>;
+  audienceInvitations: Set<string>;
   participants: Map<string, RoomParticipant>;
   queue: QueueUser[];
   speakers: Map<string, StageSpeaker>;
@@ -64,6 +80,22 @@ export class RealtimeRoomStateService {
     private readonly roomRepository: Repository<Room>,
     @Optional()
     private readonly redisStateService?: RedisStateService,
+    @Optional()
+    @InjectRepository(ScheduledRoom)
+    private readonly scheduledRoomRepository?: Repository<ScheduledRoom>,
+    @Optional()
+    @InjectRepository(RoomTicket)
+    private readonly roomTicketRepository?: Repository<RoomTicket>,
+    @Optional()
+    @InjectRepository(User)
+    private readonly userRepository?: Repository<User>,
+    @Optional()
+    @InjectRepository(CreatorSubscription)
+    private readonly subscriptionRepository?: Repository<CreatorSubscription>,
+    @Optional() private readonly moduleRef?: ModuleRef,
+    @Optional()
+    @InjectRepository(ClubMember)
+    private readonly clubMemberRepository?: Repository<ClubMember>,
   ) {}
 
   /**
@@ -148,6 +180,8 @@ export class RealtimeRoomStateService {
         category,
         isClosed,
         moderators: new Set<string>([hostId]),
+        bannedUsers: new Set<string>(),
+        audienceInvitations: new Set<string>(),
         participants: new Map<string, RoomParticipant>(),
         queue: [],
         speakers: new Map<string, StageSpeaker>(),
@@ -203,7 +237,7 @@ export class RealtimeRoomStateService {
 
       // Synchronize participants
       const redisParticipants =
-        await this.redisStateService.getRoomParticipants(roomId);
+        await this.redisStateService.getRoomParticipantsStrict(roomId);
       state.participants.clear();
       for (const p of redisParticipants) {
         state.participants.set(p.userId, {
@@ -226,6 +260,338 @@ export class RealtimeRoomStateService {
     }
 
     return state;
+  }
+
+  async assertRoomJoinable(
+    roomId: string,
+    userId?: string,
+  ): Promise<Room> {
+    const room = await this.roomRepository.findOne({ where: { id: roomId } });
+    if (!room) {
+      throw {
+        code: SocketErrorCode.ROOM_NOT_FOUND,
+        message: 'Room not found',
+      };
+    }
+
+    if (
+      room.status !== RoomLifecycleStatus.LIVE &&
+      room.status !== RoomLifecycleStatus.PAUSED
+    ) {
+      throw {
+        code: SocketErrorCode.INVALID_ROOM_STATE,
+        message: `Room is not joinable while it is ${room.status}`,
+      };
+    }
+
+    const state = await this.getOrCreateRoomState(roomId, room.hostId);
+    const isBanned = userId
+      ? this.redisStateService
+        ? await this.redisStateService.isRoomBanned(roomId, userId)
+        : state.bannedUsers.has(userId)
+      : false;
+    if (isBanned) {
+      throw {
+        code: SocketErrorCode.ROOM_BANNED,
+        message: 'User is banned from this room',
+      };
+    }
+    if (state.isClosed) {
+      throw {
+        code: SocketErrorCode.ROOM_CLOSED,
+        message: 'Room is closed',
+      };
+    }
+
+    if (userId) {
+      await this.assertAudienceAccess(room, state, userId);
+    }
+
+    return room;
+  }
+
+  async inviteAudienceParticipant(
+    roomId: string,
+    requesterId: string,
+    targetUserId: string,
+  ): Promise<{ targetUserId: string }> {
+    const state = await this.getOrCreateRoomState(roomId);
+    if (!this.canManageStage(state, requesterId)) {
+      throw {
+        code: SocketErrorCode.NOT_MODERATOR,
+        message: 'Only the host or a moderator can invite participants',
+      };
+    }
+    if (targetUserId === state.hostId) {
+      return { targetUserId };
+    }
+    state.audienceInvitations.add(targetUserId);
+    await this.redisStateService?.inviteAudienceUser(roomId, targetUserId);
+    return { targetUserId };
+  }
+
+  async revokeAudienceInvitation(
+    roomId: string,
+    requesterId: string,
+    targetUserId: string,
+  ): Promise<{ targetUserId: string }> {
+    const state = await this.getOrCreateRoomState(roomId);
+    if (!this.canManageStage(state, requesterId)) {
+      throw {
+        code: SocketErrorCode.NOT_MODERATOR,
+        message: 'Only the host or a moderator can revoke invitations',
+      };
+    }
+    state.audienceInvitations.delete(targetUserId);
+    await this.redisStateService?.revokeAudienceInvitation(
+      roomId,
+      targetUserId,
+    );
+    return { targetUserId };
+  }
+
+  private async assertAudienceAccess(
+    room: Room,
+    state: RoomState,
+    userId: string,
+  ): Promise<void> {
+    if (room.hostId === userId) return;
+
+    const alreadyPresent = this.redisStateService
+      ? (await this.redisStateService.getRoomParticipantsStrict(room.id)).some(
+          (participant) => participant.userId === userId,
+        )
+      : state.participants.has(userId);
+
+    const isInvited = this.redisStateService
+      ? await this.redisStateService.isAudienceInvited(room.id, userId)
+      : state.audienceInvitations.has(userId);
+    const scheduledRoom = await this.getLinkedScheduledRoom(room);
+    const isClubOnly =
+      scheduledRoom?.visibility === VisibilityType.CLUB_ONLY &&
+      !!scheduledRoom.clubId;
+    const isClubMember = isClubOnly
+      ? await this.isClubMember(scheduledRoom.clubId, userId)
+      : false;
+
+    if (!alreadyPresent && room.isLocked && !isInvited) {
+      throw {
+        code: SocketErrorCode.ROOM_LOCKED,
+        message: 'Room is locked',
+      };
+    }
+    if (isClubOnly && !isClubMember) {
+      throw {
+        code: SocketErrorCode.CLUB_MEMBERSHIP_REQUIRED,
+        message: 'Active club membership is required to join this room',
+      };
+    }
+    if (
+      !alreadyPresent &&
+      room.isInviteOnly &&
+      !isInvited &&
+      !isClubMember
+    ) {
+      throw {
+        code: SocketErrorCode.INVITATION_REQUIRED,
+        message: 'An invitation is required to join this room',
+      };
+    }
+
+    if (room.isTicketRequired || room.isPremium) {
+      const hasTicket = await this.hasValidTicket(room, userId);
+      if (!hasTicket) {
+        throw {
+          code: SocketErrorCode.TICKET_REQUIRED,
+          message: 'A valid room ticket is required',
+        };
+      }
+    }
+
+    if (room.isSubscriberOnly) {
+      const hasSubscription = await this.hasActiveSubscription(
+        userId,
+        room.hostId,
+      );
+      if (!hasSubscription) {
+        throw {
+          code: SocketErrorCode.SUBSCRIPTION_REQUIRED,
+          message: 'An active Host subscription is required',
+        };
+      }
+    }
+
+    if (room.isVerifiedOnly) {
+      const isVerified = await this.isVerifiedUser(userId);
+      if (!isVerified) {
+        throw {
+          code: SocketErrorCode.VERIFICATION_REQUIRED,
+          message: 'A verified account is required',
+        };
+      }
+    }
+
+    if (!alreadyPresent) {
+      const capacity = await this.resolveRoomCapacity(room);
+      const participantCount = this.redisStateService
+        ? await this.redisStateService.getParticipantCountStrict(room.id)
+        : state.participants.size;
+      if (participantCount >= capacity) {
+        throw {
+          code: SocketErrorCode.ROOM_FULL,
+          message: 'Room capacity has been reached',
+        };
+      }
+    }
+  }
+
+  private async hasValidTicket(room: Room, userId: string): Promise<boolean> {
+    if (!this.roomTicketRepository) return false;
+    const directTicket = await this.roomTicketRepository.findOne({
+      where: {
+        roomId: room.id,
+        userId,
+        isValid: true,
+        status: TicketStatus.ACTIVE,
+      },
+    });
+    if (directTicket) return true;
+    if (!room.scheduledRoomId) return false;
+
+    const scheduledTicket = await this.roomTicketRepository.findOne({
+      where: {
+        scheduledRoomId: room.scheduledRoomId,
+        userId,
+        isValid: true,
+        status: TicketStatus.ACTIVE,
+      },
+    });
+    return !!scheduledTicket;
+  }
+
+  private async hasActiveSubscription(
+    subscriberId: string,
+    creatorId: string,
+  ): Promise<boolean> {
+    if (!this.subscriptionRepository) return false;
+    const subscription = await this.subscriptionRepository.findOne({
+      where: {
+        subscriberId,
+        creatorId,
+        status: SubscriptionStatus.ACTIVE,
+      },
+      order: { startedAt: 'DESC' },
+    });
+    if (!subscription) return false;
+    return !subscription.expiresAt || subscription.expiresAt > new Date();
+  }
+
+  private async isVerifiedUser(userId: string): Promise<boolean> {
+    if (!this.userRepository) return false;
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    return !!(
+      user &&
+      (user.isVerified || user.verificationStatus === VerificationStatus.VERIFIED)
+    );
+  }
+
+  private async getLinkedScheduledRoom(
+    room: Room,
+  ): Promise<ScheduledRoom | null> {
+    if (!room.scheduledRoomId || !this.scheduledRoomRepository) return null;
+    return this.scheduledRoomRepository.findOne({
+      where: { id: room.scheduledRoomId },
+    });
+  }
+
+  private async isClubMember(clubId: string, userId: string): Promise<boolean> {
+    if (!this.clubMemberRepository) return false;
+    const membership = await this.clubMemberRepository.findOne({
+      where: { clubId, userId },
+    });
+    return !!membership;
+  }
+
+  private async resolveRoomCapacity(room: Room): Promise<number> {
+    const scheduled = await this.getLinkedScheduledRoom(room);
+    if (scheduled?.maxParticipants) return scheduled.maxParticipants;
+
+    try {
+      const settingsService = this.moduleRef?.get(AdminSettingsService, {
+        strict: false,
+      });
+      const settings = await settingsService?.getOperationalSettings();
+      if (settings?.maxRoomCapacity) return settings.maxRoomCapacity;
+    } catch (error) {
+      this.logger.warn(
+        `Could not resolve configured room capacity: ${String(error)}`,
+      );
+    }
+    return 500;
+  }
+
+  async openRoom(room: Room): Promise<void> {
+    const state = await this.getOrCreateRoomState(room.id, room.hostId);
+    state.hostId = room.hostId;
+    state.title = room.title;
+    state.description = room.description;
+    state.category = room.category;
+    state.isClosed = false;
+
+    await this.redisStateService?.setRoomMeta(room.id, {
+      roomId: room.id,
+      hostId: room.hostId,
+      title: room.title,
+      description: room.description || '',
+      category: room.category,
+      isClosed: false,
+    });
+  }
+
+  async setRoomPaused(room: Room): Promise<void> {
+    await this.openRoom(room);
+  }
+
+  async closeRoom(roomId: string): Promise<void> {
+    const state = this.roomStates.get(roomId);
+    if (state) state.isClosed = true;
+
+    if (this.redisStateService) {
+      const meta = await this.redisStateService.getRoomMeta(roomId);
+      if (meta) {
+        await this.redisStateService.setRoomMeta(roomId, {
+          ...meta,
+          isClosed: true,
+        });
+      }
+    }
+
+    await this.cleanupRoomState(roomId);
+  }
+
+  async cleanupRoomState(roomId: string): Promise<void> {
+    this.roomStates.delete(roomId);
+    await this.redisStateService?.cleanupRoomState(roomId);
+  }
+
+  async isParticipantOrHost(roomId: string, userId: string): Promise<boolean> {
+    const state = await this.getOrCreateRoomState(roomId);
+    if (state.hostId === userId) return true;
+    if (this.redisStateService) {
+      const participants =
+        await this.redisStateService.getRoomParticipantsStrict(roomId);
+      return participants.some((participant) => participant.userId === userId);
+    }
+    return state.participants.has(userId);
+  }
+
+  async assertParticipantOrHost(roomId: string, userId: string): Promise<void> {
+    if (!(await this.isParticipantOrHost(roomId, userId))) {
+      throw {
+        code: SocketErrorCode.NOT_IN_ROOM,
+        message: 'Join the room before performing this action',
+      };
+    }
   }
 
   isOwner(state: RoomState, userId: string): boolean {
@@ -479,6 +845,7 @@ export class RealtimeRoomStateService {
       });
     }
 
+    await this.persistCurrentRoomCounts(roomId, state);
     return {
       speaker: stageSpeaker,
       speakers: Array.from(state.speakers.values()),
@@ -559,6 +926,7 @@ export class RealtimeRoomStateService {
       });
     }
 
+    await this.persistCurrentRoomCounts(roomId, state);
     return {
       speaker: stageSpeaker,
       speakers: Array.from(state.speakers.values()),
@@ -575,6 +943,12 @@ export class RealtimeRoomStateService {
       throw {
         code: SocketErrorCode.NOT_MODERATOR,
         message: 'Only host or moderator can demote speakers',
+      };
+    }
+    if (targetUserId === state.hostId) {
+      throw {
+        code: SocketErrorCode.NOT_ROOM_OWNER,
+        message: 'The room host cannot be removed from their own stage',
       };
     }
 
@@ -595,6 +969,7 @@ export class RealtimeRoomStateService {
       await this.redisStateService.removeSpeaker(roomId, targetUserId);
     }
 
+    await this.persistCurrentRoomCounts(roomId, state);
     return { targetUserId, speakers: Array.from(state.speakers.values()) };
   }
 
@@ -619,6 +994,12 @@ export class RealtimeRoomStateService {
       throw {
         code: SocketErrorCode.NOT_MODERATOR,
         message: 'Only host or moderator can mute/unmute other speakers',
+      };
+    }
+    if (target === state.hostId && requesterId !== state.hostId) {
+      throw {
+        code: SocketErrorCode.NOT_ROOM_OWNER,
+        message: 'Only the room host can change their own mute state',
       };
     }
 
@@ -662,6 +1043,94 @@ export class RealtimeRoomStateService {
       isMuted,
       speakers: Array.from(state.speakers.values()),
     };
+  }
+
+  // --- Room-level Audience Moderation ---
+
+  async kickParticipant(
+    roomId: string,
+    requesterId: string,
+    targetUserId: string,
+  ) {
+    const state = await this.getOrCreateRoomState(roomId);
+    if (!this.isModerator(state, requesterId)) {
+      throw {
+        code: SocketErrorCode.NOT_MODERATOR,
+        message: 'Only host or moderator can remove participants',
+      };
+    }
+    if (targetUserId === state.hostId) {
+      throw {
+        code: SocketErrorCode.NOT_ROOM_OWNER,
+        message: 'The room host cannot be removed from their own room',
+      };
+    }
+
+    state.queue = state.queue.filter((item) => item.userId !== targetUserId);
+    state.pendingInvitations.delete(targetUserId);
+    state.speakers.delete(targetUserId);
+
+    if (this.redisStateService) {
+      await this.redisStateService
+        .dequeueUser(roomId, targetUserId)
+        .catch(() => undefined);
+      await this.redisStateService.removeInvitation(roomId, targetUserId);
+      await this.redisStateService.removeSpeaker(roomId, targetUserId);
+    }
+
+    const result = await this.removeParticipant(roomId, targetUserId);
+    return {
+      targetUserId,
+      participantCount: result.participantCount,
+      speakers: Array.from(state.speakers.values()),
+    };
+  }
+
+  async banParticipant(
+    roomId: string,
+    requesterId: string,
+    targetUserId: string,
+  ) {
+    const state = await this.getOrCreateRoomState(roomId);
+    if (!this.isModerator(state, requesterId)) {
+      throw {
+        code: SocketErrorCode.NOT_MODERATOR,
+        message: 'Only host or moderator can ban participants',
+      };
+    }
+    if (targetUserId === state.hostId) {
+      throw {
+        code: SocketErrorCode.NOT_ROOM_OWNER,
+        message: 'The room host cannot be banned from their own room',
+      };
+    }
+
+    state.bannedUsers.add(targetUserId);
+    await this.redisStateService?.banUserFromRoom(roomId, targetUserId);
+    const result = await this.kickParticipant(
+      roomId,
+      requesterId,
+      targetUserId,
+    );
+    return { ...result, banned: true };
+  }
+
+  async unbanParticipant(
+    roomId: string,
+    requesterId: string,
+    targetUserId: string,
+  ) {
+    const state = await this.getOrCreateRoomState(roomId);
+    if (!this.isModerator(state, requesterId)) {
+      throw {
+        code: SocketErrorCode.NOT_MODERATOR,
+        message: 'Only host or moderator can unban participants',
+      };
+    }
+
+    state.bannedUsers.delete(targetUserId);
+    await this.redisStateService?.unbanUserFromRoom(roomId, targetUserId);
+    return { targetUserId, banned: false };
   }
 
   // --- Room Topic Updates ---
@@ -748,7 +1217,7 @@ export class RealtimeRoomStateService {
         roomId,
         username,
       );
-      count = await this.redisStateService.addRoomParticipant(roomId, {
+      count = await this.redisStateService.addRoomParticipantStrict(roomId, {
         userId,
         username,
         socketId,
@@ -757,47 +1226,80 @@ export class RealtimeRoomStateService {
       });
     }
 
+    await this.persistRoomCounts(roomId, state, count);
     return { participantCount: count, participant };
   }
 
-  async removeParticipant(roomId: string, userId: string) {
-    const state = await this.getOrCreateRoomState(roomId);
-    state.participants.delete(userId);
-    state.typingUsers.delete(userId);
+  async removeParticipant(
+    roomId: string,
+    userId: string,
+    socketId = '',
+  ) {
+    const state = this.roomStates.get(roomId);
+    const inMemoryParticipant = state?.participants.get(userId);
+    const redisParticipant = this.redisStateService
+      ? await this.redisStateService.getRoomParticipantStrict(roomId, userId)
+      : null;
+    const existingSocketId =
+      redisParticipant?.socketId ?? inMemoryParticipant?.socketId;
+    const shouldRemove =
+      !socketId || !existingSocketId || existingSocketId === socketId;
 
-    let count = state.participants.size;
-    if (this.redisStateService) {
-      await this.redisStateService.removeUserPresence(userId, '', roomId);
-      count = await this.redisStateService.removeRoomParticipant(
-        roomId,
-        userId,
-      );
+    if (state && shouldRemove) {
+      state.participants.delete(userId);
+      state.typingUsers.delete(userId);
     }
 
+    let count = state?.participants.size ?? 0;
+    if (this.redisStateService) {
+      await this.redisStateService.removeUserPresence(userId, socketId, roomId);
+      if (shouldRemove) {
+        count = await this.redisStateService.removeRoomParticipantStrict(
+          roomId,
+          userId,
+        );
+      } else {
+        count = await this.redisStateService.getParticipantCountStrict(roomId);
+      }
+    }
+
+    if (state) {
+      await this.persistRoomCounts(roomId, state, count);
+    }
     return { participantCount: count };
   }
 
   async reconnectParticipant(roomId: string, userId: string, socketId: string) {
     const state = await this.getOrCreateRoomState(roomId);
+    const now = new Date();
     const existing = state.participants.get(userId);
-    if (existing) {
-      existing.socketId = socketId;
-      existing.lastSeenAt = new Date();
-    } else {
-      state.participants.set(userId, {
-        userId,
-        socketId,
-        joinedAt: new Date(),
-        lastSeenAt: new Date(),
-      });
-    }
+    const participant: RoomParticipant = existing
+      ? {
+          ...existing,
+          socketId,
+          lastSeenAt: now,
+        }
+      : {
+          userId,
+          socketId,
+          joinedAt: now,
+          lastSeenAt: now,
+        };
+    state.participants.set(userId, participant);
 
     let count = state.participants.size;
     if (this.redisStateService) {
       await this.redisStateService.setUserPresence(userId, socketId, roomId);
-      count = await this.redisStateService.getParticipantCount(roomId);
+      count = await this.redisStateService.addRoomParticipantStrict(roomId, {
+        userId,
+        username: participant.username,
+        socketId,
+        joinedAt: participant.joinedAt.toISOString(),
+        lastSeenAt: participant.lastSeenAt.toISOString(),
+      });
     }
 
+    await this.persistRoomCounts(roomId, state, count);
     return { participantCount: count };
   }
 
@@ -814,6 +1316,39 @@ export class RealtimeRoomStateService {
     }
 
     return { isTyping };
+  }
+
+  private async persistCurrentRoomCounts(
+    roomId: string,
+    state: RoomState,
+  ): Promise<void> {
+    const participantCount = this.redisStateService
+      ? await this.redisStateService.getParticipantCount(roomId)
+      : state.participants.size;
+    await this.persistRoomCounts(roomId, state, participantCount);
+  }
+
+  private async persistRoomCounts(
+    roomId: string,
+    state: RoomState,
+    participantCount: number,
+  ): Promise<void> {
+    try {
+      const room = await this.roomRepository.findOne({ where: { id: roomId } });
+      if (!room) return;
+
+      const speakerCount = this.redisStateService
+        ? (await this.redisStateService.getSpeakers(roomId)).length
+        : state.speakers.size;
+
+      room.speakerCount = speakerCount;
+      room.listenerCount = Math.max(participantCount - speakerCount, 0);
+      await this.roomRepository.save(room);
+    } catch (error) {
+      this.logger.warn(
+        `Could not persist participant counts for room ${roomId}: ${error}`,
+      );
+    }
   }
 
   async getParticipantCount(roomId: string) {

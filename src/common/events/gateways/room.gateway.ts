@@ -22,8 +22,10 @@ import {
   StageMuteDto,
   StageUnmuteDto,
   UpdateRoomTopicDto,
+  RoomAudienceModerationDto,
 } from '../dto/socket-payloads.dto';
 import { RedisStateService } from '../../../redis/redis-state.service';
+import { RealtimeSocketAuthService } from '../services/realtime-socket-auth.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -38,6 +40,7 @@ export class RoomGateway implements OnGatewayInit {
 
   constructor(
     private readonly roomStateService: RealtimeRoomStateService,
+    private readonly socketAuthService: RealtimeSocketAuthService,
     @Optional() private readonly redisStateService?: RedisStateService,
   ) {}
 
@@ -57,18 +60,18 @@ export class RoomGateway implements OnGatewayInit {
     }
   }
 
-  private resolveUserId(client: Socket, payload?: any): string {
-    if (client.data?.user?.userId) return client.data.user.userId;
-    if (client.data?.userId) return client.data.userId;
-    if (payload?.userId) return payload.userId;
-    if (client.handshake?.auth?.userId) return client.handshake.auth.userId;
-    if (
-      client.handshake?.query?.userId &&
-      typeof client.handshake.query.userId === 'string'
-    ) {
-      return client.handshake.query.userId;
-    }
-    return '11111111-1111-1111-1111-111111111111';
+  private resolveUserId(client: Socket): string {
+    return this.socketAuthService.getAuthenticatedUser(client).userId;
+  }
+
+  private async assertRoomAccess(
+    client: Socket,
+    roomId: string,
+  ): Promise<void> {
+    const userId = this.resolveUserId(client);
+    await this.roomStateService.assertRoomJoinable(roomId, userId);
+    this.socketAuthService.assertJoinedRoom(client, roomId);
+    await this.roomStateService.assertParticipantOrHost(roomId, userId);
   }
 
   // --- Speaker Queue ---
@@ -79,8 +82,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SpeakerQueueJoinDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.joinQueue(
         data.roomId,
         userId,
@@ -115,8 +119,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SpeakerQueueLeaveDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.leaveQueue(data.roomId, userId);
       const payload = {
         roomId: data.roomId,
@@ -148,6 +153,8 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: { roomId: string },
   ) {
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.getQueue(data.roomId);
       return { success: true, queue: res.queue, count: res.count };
     } catch (err: any) {
@@ -165,8 +172,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SpeakerQueueReorderDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.reorderQueue(
         data.roomId,
         userId,
@@ -203,8 +211,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: StageInviteDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.inviteSpeaker(
         data.roomId,
         userId,
@@ -243,8 +252,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: StageAcceptInvitationDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.acceptInvitation(
         data.roomId,
         userId,
@@ -291,8 +301,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: StageRejectInvitationDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       await this.roomStateService.rejectInvitation(data.roomId, userId);
       const payload = {
         roomId: data.roomId,
@@ -322,8 +333,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: StagePromoteDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.promoteListener(
         data.roomId,
         userId,
@@ -371,8 +383,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: StageDemoteDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.demoteSpeaker(
         data.roomId,
         userId,
@@ -420,8 +433,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: StageRemoveDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.removeSpeaker(
         data.roomId,
         userId,
@@ -468,8 +482,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: StageMuteDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.setMuteSpeaker(
         data.roomId,
         userId,
@@ -518,8 +533,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: StageUnmuteDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.setMuteSpeaker(
         data.roomId,
         userId,
@@ -573,8 +589,9 @@ export class RoomGateway implements OnGatewayInit {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: UpdateRoomTopicDto,
   ) {
-    const userId = this.resolveUserId(client, data);
     try {
+      const userId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.updateTopic(
         data.roomId,
         userId,
@@ -598,5 +615,204 @@ export class RoomGateway implements OnGatewayInit {
         message: err.message,
       };
     }
+  }
+
+  // --- Room-level Audience Invitations ---
+
+  @SubscribeMessage('room:invite_participant')
+  @SubscribeMessage('invite_participant')
+  async handleInviteParticipant(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: RoomAudienceModerationDto,
+  ) {
+    try {
+      const requesterId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
+      const result = await this.roomStateService.inviteAudienceParticipant(
+        data.roomId,
+        requesterId,
+        data.targetUserId,
+      );
+      const payload = {
+        roomId: data.roomId,
+        targetUserId: result.targetUserId,
+        invitedBy: requesterId,
+      };
+      this.server
+        .to(`user:${data.targetUserId}`)
+        .emit('room_invitation_received', payload);
+      this.server.to(data.roomId).emit('participant_invited', payload);
+      void this.redisStateService?.publishEvent(
+        'participant_invited',
+        payload,
+        data.roomId,
+        requesterId,
+      );
+      return { success: true, ...payload };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.code || 'INVITE_PARTICIPANT_FAILED',
+        message: err.message,
+      };
+    }
+  }
+
+  @SubscribeMessage('room:revoke_invitation')
+  async handleRevokeParticipantInvitation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: RoomAudienceModerationDto,
+  ) {
+    try {
+      const requesterId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
+      const result = await this.roomStateService.revokeAudienceInvitation(
+        data.roomId,
+        requesterId,
+        data.targetUserId,
+      );
+      const payload = {
+        roomId: data.roomId,
+        targetUserId: result.targetUserId,
+        revokedBy: requesterId,
+      };
+      this.server
+        .to(`user:${data.targetUserId}`)
+        .emit('room_invitation_revoked', payload);
+      return { success: true, ...payload };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.code || 'REVOKE_INVITATION_FAILED',
+        message: err.message,
+      };
+    }
+  }
+
+  // --- Room-level Audience Moderation ---
+
+  @SubscribeMessage('room:kick_participant')
+  @SubscribeMessage('kick_participant')
+  async handleKickParticipant(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: RoomAudienceModerationDto,
+  ) {
+    try {
+      const requesterId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
+      const result = await this.roomStateService.kickParticipant(
+        data.roomId,
+        requesterId,
+        data.targetUserId,
+      );
+      const payload = {
+        roomId: data.roomId,
+        targetUserId: data.targetUserId,
+        moderatedBy: requesterId,
+        reason: data.reason,
+        participantCount: result.participantCount,
+      };
+
+      this.server.to(`user:${data.targetUserId}`).emit('room_kicked', payload);
+      this.leaveTargetSocketRoom(data.targetUserId, data.roomId);
+      this.server.to(data.roomId).emit('participant_kicked', payload);
+      void this.redisStateService?.publishEvent(
+        'participant_kicked',
+        payload,
+        data.roomId,
+        requesterId,
+      );
+      return { success: true, ...payload };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.code || 'KICK_PARTICIPANT_FAILED',
+        message: err.message,
+      };
+    }
+  }
+
+  @SubscribeMessage('room:ban_participant')
+  @SubscribeMessage('ban_participant')
+  async handleBanParticipant(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: RoomAudienceModerationDto,
+  ) {
+    try {
+      const requesterId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
+      const result = await this.roomStateService.banParticipant(
+        data.roomId,
+        requesterId,
+        data.targetUserId,
+      );
+      const payload = {
+        roomId: data.roomId,
+        targetUserId: data.targetUserId,
+        moderatedBy: requesterId,
+        reason: data.reason,
+        participantCount: result.participantCount,
+      };
+
+      this.server.to(`user:${data.targetUserId}`).emit('room_banned', payload);
+      this.leaveTargetSocketRoom(data.targetUserId, data.roomId);
+      this.server.to(data.roomId).emit('participant_banned', payload);
+      void this.redisStateService?.publishEvent(
+        'participant_banned',
+        payload,
+        data.roomId,
+        requesterId,
+      );
+      return { success: true, ...payload };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.code || 'BAN_PARTICIPANT_FAILED',
+        message: err.message,
+      };
+    }
+  }
+
+  @SubscribeMessage('room:unban_participant')
+  @SubscribeMessage('unban_participant')
+  async handleUnbanParticipant(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: RoomAudienceModerationDto,
+  ) {
+    try {
+      const requesterId = this.resolveUserId(client);
+      await this.assertRoomAccess(client, data.roomId);
+      const result = await this.roomStateService.unbanParticipant(
+        data.roomId,
+        requesterId,
+        data.targetUserId,
+      );
+      const payload = {
+        roomId: data.roomId,
+        targetUserId: result.targetUserId,
+        moderatedBy: requesterId,
+      };
+      this.server.to(data.roomId).emit('participant_unbanned', payload);
+      void this.redisStateService?.publishEvent(
+        'participant_unbanned',
+        payload,
+        data.roomId,
+        requesterId,
+      );
+      return { success: true, ...payload };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.code || 'UNBAN_PARTICIPANT_FAILED',
+        message: err.message,
+      };
+    }
+  }
+
+  private leaveTargetSocketRoom(userId: string, roomId: string): void {
+    const scopedServer = this.server as unknown as {
+      in?: (room: string) => { socketsLeave?: (targetRoom: string) => void };
+    };
+    scopedServer.in?.(`user:${userId}`).socketsLeave?.(roomId);
   }
 }

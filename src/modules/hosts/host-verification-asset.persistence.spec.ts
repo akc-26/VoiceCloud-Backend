@@ -192,7 +192,7 @@ describe('Private Host Verification Asset Persistence Foundation (B2A-1B)', () =
       'migration:revert',
     );
     expect(packageJson.scripts['migration:run']).toContain(
-      'src/database/data-source.ts',
+      'src/database/typeorm-cli.data-source.ts',
     );
   });
 

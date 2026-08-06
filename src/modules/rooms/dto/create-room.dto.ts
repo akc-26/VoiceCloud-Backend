@@ -83,6 +83,14 @@ export class CreateRoomDto {
   @IsBoolean()
   isSubscriberOnly?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Restrict room entry to verified users',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isVerifiedOnly?: boolean;
+
   @ApiPropertyOptional({ description: 'Is invite only', default: false })
   @IsOptional()
   @IsBoolean()

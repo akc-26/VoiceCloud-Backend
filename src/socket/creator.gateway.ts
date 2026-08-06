@@ -247,26 +247,57 @@ export class CreatorGateway
   }
 
   @SubscribeMessage('join_room')
-  handleJoinRoom(
+  async handleJoinRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { room: string },
   ) {
-    if (data?.room) {
-      void client.join(data.room);
-      return { success: true, room: data.room };
+    const user = client.data?.user as CreatorSocketUser | undefined;
+    if (!user?.userId) {
+      return { success: false, error: 'Authenticated creator required' };
     }
-    return { success: false, error: 'Room name required' };
+    if (!data?.room) {
+      return { success: false, error: 'Room name required' };
+    }
+    if (!this.isAuthorizedLogicalRoom(data.room, user)) {
+      return {
+        success: false,
+        error: 'ROOM_SUBSCRIPTION_FORBIDDEN',
+        message: 'Creator sockets may only join their own logical rooms',
+      };
+    }
+
+    await client.join(data.room);
+    return { success: true, room: data.room };
   }
 
   @SubscribeMessage('leave_room')
-  handleLeaveRoom(
+  async handleLeaveRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { room: string },
   ) {
-    if (data?.room) {
-      void client.leave(data.room);
-      return { success: true, room: data.room };
+    const user = client.data?.user as CreatorSocketUser | undefined;
+    if (!user?.userId) {
+      return { success: false, error: 'Authenticated creator required' };
     }
-    return { success: false, error: 'Room name required' };
+    if (!data?.room) {
+      return { success: false, error: 'Room name required' };
+    }
+    if (!this.isAuthorizedLogicalRoom(data.room, user)) {
+      return {
+        success: false,
+        error: 'ROOM_SUBSCRIPTION_FORBIDDEN',
+        message: 'Creator sockets may only leave their own logical rooms',
+      };
+    }
+
+    await client.leave(data.room);
+    return { success: true, room: data.room };
+  }
+
+  private isAuthorizedLogicalRoom(
+    room: string,
+    user: CreatorSocketUser,
+  ): boolean {
+    return room === `user:${user.userId}` || room === `creator:${user.creatorId}`;
   }
 }

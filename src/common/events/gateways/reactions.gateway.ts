@@ -11,6 +11,8 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EmojiReactionDto, SendGiftEventDto } from '../dto/socket-payloads.dto';
 import { SocketErrorCode } from '../constants/socket-error-codes.enum';
 import { RedisStateService } from '../../../redis/redis-state.service';
+import { RealtimeSocketAuthService } from '../services/realtime-socket-auth.service';
+import { RealtimeRoomStateService } from '../services/realtime-room-state.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -27,6 +29,8 @@ export class ReactionsGateway implements OnGatewayInit {
     /^(\p{Extended_Pictographic}|\p{Emoji_Presentation})+$/u;
 
   constructor(
+    private readonly socketAuthService: RealtimeSocketAuthService,
+    private readonly roomStateService: RealtimeRoomStateService,
     @Optional() private readonly redisStateService?: RedisStateService,
   ) {}
 
@@ -46,30 +50,21 @@ export class ReactionsGateway implements OnGatewayInit {
     }
   }
 
-  private resolveUserId(client: Socket, payload?: any): string {
-    if (client.data?.user?.userId) return client.data.user.userId;
-    if (client.data?.userId) return client.data.userId;
-    if (payload?.userId) return payload.userId;
-    if (client.handshake?.auth?.userId) return client.handshake.auth.userId;
-    if (
-      client.handshake?.query?.userId &&
-      typeof client.handshake.query.userId === 'string'
-    ) {
-      return client.handshake.query.userId;
-    }
-    return '11111111-1111-1111-1111-111111111111';
-  }
-
   // --- Live Emoji Reactions ---
 
   @SubscribeMessage('reaction:send')
   @SubscribeMessage('send_emoji_reaction')
   @SubscribeMessage('emoji_reaction')
-  handleSendEmojiReaction(
+  async handleSendEmojiReaction(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: EmojiReactionDto,
   ) {
-    const userId = this.resolveUserId(client, data);
+    let userId: string;
+    try {
+      userId = this.socketAuthService.getAuthenticatedUser(client).userId;
+    } catch (error) {
+      return this.toFailure(error, SocketErrorCode.UNAUTHORIZED);
+    }
 
     if (!data?.roomId) {
       return {
@@ -77,6 +72,14 @@ export class ReactionsGateway implements OnGatewayInit {
         error: SocketErrorCode.ROOM_NOT_FOUND,
         message: 'Room ID is required',
       };
+    }
+
+    try {
+      await this.roomStateService.assertRoomJoinable(data.roomId, userId);
+      this.socketAuthService.assertJoinedRoom(client, data.roomId);
+      await this.roomStateService.assertParticipantOrHost(data.roomId, userId);
+    } catch (error) {
+      return this.toFailure(error, SocketErrorCode.NOT_IN_ROOM);
     }
 
     if (!data.emoji || !this.EMOJI_REGEX.test(data.emoji.trim())) {
@@ -119,11 +122,16 @@ export class ReactionsGateway implements OnGatewayInit {
 
   @SubscribeMessage('gift:send')
   @SubscribeMessage('send_gift')
-  handleSendGiftEvent(
+  async handleSendGiftEvent(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: SendGiftEventDto,
   ) {
-    const senderId = this.resolveUserId(client, data);
+    let senderId: string;
+    try {
+      senderId = this.socketAuthService.getAuthenticatedUser(client).userId;
+    } catch (error) {
+      return this.toFailure(error, SocketErrorCode.UNAUTHORIZED);
+    }
 
     if (!data?.roomId) {
       return {
@@ -131,6 +139,17 @@ export class ReactionsGateway implements OnGatewayInit {
         error: SocketErrorCode.ROOM_NOT_FOUND,
         message: 'Room ID is required',
       };
+    }
+
+    try {
+      await this.roomStateService.assertRoomJoinable(data.roomId, senderId);
+      this.socketAuthService.assertJoinedRoom(client, data.roomId);
+      await this.roomStateService.assertParticipantOrHost(
+        data.roomId,
+        senderId,
+      );
+    } catch (error) {
+      return this.toFailure(error, SocketErrorCode.NOT_IN_ROOM);
     }
 
     const timestamp = new Date().toISOString();
@@ -192,5 +211,14 @@ export class ReactionsGateway implements OnGatewayInit {
     );
 
     return { success: true, giftId: data.giftId, status: 'broadcasted' };
+  }
+
+  private toFailure(error: unknown, fallbackCode: string) {
+    const candidate = error as { code?: string; message?: string };
+    return {
+      success: false,
+      error: candidate?.code || fallbackCode,
+      message: candidate?.message || 'Realtime reaction failed',
+    };
   }
 }
