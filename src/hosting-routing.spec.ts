@@ -1,24 +1,56 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, RequestMethod } from '@nestjs/common';
-import * as request from 'supertest';
-import * as express from 'express';
-import * as path from 'path';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import * as request from 'supertest';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import {
+  FrontendHostingPaths,
+  registerFrontendHosting,
+} from './hosting/frontend-hosting';
 
 describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
   let app: INestApplication;
+  let temporaryDistRoot: string;
 
   beforeAll(async () => {
+    temporaryDistRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'voicecloud-hosting-'),
+    );
+
+    const websiteDist = path.join(temporaryDistRoot, 'website');
+    const adminDist = path.join(temporaryDistRoot, 'admin');
+    const creatorDist = path.join(temporaryDistRoot, 'creator');
+
+    for (const directory of [websiteDist, adminDist, creatorDist]) {
+      fs.mkdirSync(path.join(directory, 'assets'), { recursive: true });
+      fs.writeFileSync(
+        path.join(directory, 'assets', 'app.js'),
+        'window.__VOICECLOUD_HOSTING_TEST__ = true;',
+      );
+    }
+
+    fs.writeFileSync(
+      path.join(websiteDist, 'index.html'),
+      '<!doctype html><html><body>Landing<script src="/assets/app.js"></script></body></html>',
+    );
+    fs.writeFileSync(
+      path.join(adminDist, 'index.html'),
+      '<!doctype html><html><body>Admin<script src="/admin/assets/app.js"></script></body></html>',
+    );
+    fs.writeFileSync(
+      path.join(creatorDist, 'index.html'),
+      '<!doctype html><html><body>Creator<script src="/creator/assets/app.js"></script></body></html>',
+    );
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [AppService],
     }).compile();
 
     app = moduleRef.createNestApplication();
-
-    // Replicate global prefix exclusions
     app.setGlobalPrefix('api/v1', {
       exclude: [
         'api',
@@ -32,63 +64,18 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
       ],
     });
 
-    // Replicate static asset & SPA fallback middleware
-    const adminDist = path.join(process.cwd(), 'dist/admin');
-    const creatorDist = path.join(process.cwd(), 'dist/creator');
-    const websiteDist = path.join(process.cwd(), 'dist/website');
+    const hostingPaths: FrontendHostingPaths = {
+      distRoot: temporaryDistRoot,
+      websiteDist,
+      adminDist,
+      creatorDist,
+    };
 
-    const expressApp = app.getHttpAdapter().getInstance();
-    expressApp.use('/admin', express.static(adminDist));
-    expressApp.use('/creator', express.static(creatorDist));
-    expressApp.use('/', express.static(websiteDist));
-
-    expressApp.use(
-      (
-        req: express.Request,
-        res: express.Response,
-        next: express.NextFunction,
-      ) => {
-        if (req.method !== 'GET') {
-          return next();
-        }
-
-        const reqPath = req.path;
-
-        if (
-          reqPath.startsWith('/api') ||
-          reqPath.startsWith('/socket.io') ||
-          reqPath.startsWith('/uploads') ||
-          reqPath.startsWith('/health') ||
-          reqPath.startsWith('/metrics') ||
-          reqPath.startsWith('/docs')
-        ) {
-          return next();
-        }
-
-        if (path.extname(reqPath) !== '') {
-          return next();
-        }
-
-        if (reqPath === '/admin' || reqPath.startsWith('/admin/')) {
-          const adminIndex = path.join(adminDist, 'index.html');
-          if (fs.existsSync(adminIndex)) {
-            return res.sendFile(adminIndex);
-          }
-        }
-
-        if (reqPath === '/creator' || reqPath.startsWith('/creator/')) {
-          const creatorIndex = path.join(creatorDist, 'index.html');
-          if (fs.existsSync(creatorIndex)) {
-            return res.sendFile(creatorIndex);
-          }
-        }
-
-        const websiteIndex = path.join(websiteDist, 'index.html');
-        if (fs.existsSync(websiteIndex)) {
-          return res.sendFile(websiteIndex);
-        }
-
-        next();
+    registerFrontendHosting(
+      app.getHttpAdapter().getInstance(),
+      hostingPaths,
+      {
+        log: () => undefined,
       },
     );
 
@@ -99,55 +86,84 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
     if (app) {
       await app.close();
     }
+
+    if (temporaryDistRoot) {
+      fs.rmSync(temporaryDistRoot, { recursive: true, force: true });
+    }
   });
 
   it('GET /api should return API metadata JSON', async () => {
-    const res = await request(app.getHttpServer()).get('/api').expect(200);
-    expect(res.body.name).toBe('VoiceCloud Monolith API');
-    expect(res.body.version).toBe('1.0.0');
-    expect(res.body.status).toBe('online');
+    const response = await request(app.getHttpServer()).get('/api').expect(200);
+    expect(response.body.name).toBe('VoiceCloud Monolith API');
+    expect(response.body.version).toBe('1.0.0');
+    expect(response.body.status).toBe('online');
   });
 
   it('GET /api/info should return API metadata detail JSON', async () => {
-    const res = await request(app.getHttpServer()).get('/api/info').expect(200);
-    expect(res.body.name).toBe('VoiceCloud Monolith API');
-    expect(res.body.api).toBe('/api');
-    expect(res.body.health).toBe('/health');
+    const response = await request(app.getHttpServer())
+      .get('/api/info')
+      .expect(200);
+    expect(response.body.name).toBe('VoiceCloud Monolith API');
+    expect(response.body.api).toBe('/api');
+    expect(response.body.health).toBe('/health');
   });
 
-  it('GET / should serve Landing Website HTML if built', async () => {
-    const websiteIndex = path.join(process.cwd(), 'dist/website/index.html');
-    if (fs.existsSync(websiteIndex)) {
-      const res = await request(app.getHttpServer()).get('/').expect(200);
-      expect(res.text).toContain('<html');
-    }
+  it.each([
+    ['Landing Website', '/', 'Landing'],
+    ['Admin Portal', '/admin/', 'Admin'],
+    ['Admin Portal index', '/admin/index.html', 'Admin'],
+    ['Admin Portal history fallback', '/admin/users', 'Admin'],
+    ['Creator Studio', '/creator/', 'Creator'],
+    ['Creator Studio index', '/creator/index.html', 'Creator'],
+    ['Creator Studio history fallback', '/creator/dashboard', 'Creator'],
+  ])('%s serves HTML from %s', async (_label, route, marker) => {
+    const response = await request(app.getHttpServer()).get(route).expect(200);
+    expect(response.headers['content-type']).toContain('text/html');
+    expect(response.text).toContain('<!doctype html>');
+    expect(response.text).toContain(marker);
   });
 
-  it('GET /admin/users should serve Admin Portal HTML if built', async () => {
-    const adminIndex = path.join(process.cwd(), 'dist/admin/index.html');
-    if (fs.existsSync(adminIndex)) {
-      const res = await request(app.getHttpServer())
-        .get('/admin/users')
+  it.each([
+    ['/administer', 'Landing'],
+    ['/creator-tools', 'Landing'],
+    ['/apiary', 'Landing'],
+    ['/healthcare', 'Landing'],
+  ])(
+    'does not misclassify the non-reserved route %s',
+    async (route, marker) => {
+      const response = await request(app.getHttpServer())
+        .get(route)
         .expect(200);
-      expect(res.text).toContain('<html');
-    }
+      expect(response.headers['content-type']).toContain('text/html');
+      expect(response.text).toContain(marker);
+    },
+  );
+
+  it.each([
+    ['/assets/app.js'],
+    ['/admin/assets/app.js'],
+    ['/creator/assets/app.js'],
+  ])('serves the compiled frontend asset %s', async (route) => {
+    const response = await request(app.getHttpServer()).get(route).expect(200);
+    expect(response.text).toContain('__VOICECLOUD_HOSTING_TEST__');
   });
 
-  it('GET /creator/dashboard should serve Creator Studio HTML if built', async () => {
-    const creatorIndex = path.join(process.cwd(), 'dist/creator/index.html');
-    if (fs.existsSync(creatorIndex)) {
-      const res = await request(app.getHttpServer())
-        .get('/creator/dashboard')
-        .expect(200);
-      expect(res.text).toContain('<html');
-    }
+  it('does not use an SPA fallback for non-GET requests', async () => {
+    const response = await request(app.getHttpServer()).post('/admin/users');
+    expect(response.status).toBe(404);
+    expect(response.headers['content-type']).toContain('application/json');
+    expect(response.text).not.toContain('<html');
   });
 
-  it('GET /api/nonexistent-route should return 404 JSON, not SPA HTML', async () => {
-    const res = await request(app.getHttpServer()).get(
-      '/api/v1/nonexistent-route',
-    );
-    expect(res.status).toBe(404);
-    expect(res.text).not.toContain('<html');
-  });
+  it(
+    'GET /api/nonexistent-route returns JSON 404 instead of SPA HTML',
+    async () => {
+      const response = await request(app.getHttpServer()).get(
+        '/api/v1/nonexistent-route',
+      );
+      expect(response.status).toBe(404);
+      expect(response.headers['content-type']).toContain('application/json');
+      expect(response.text).not.toContain('<html');
+    },
+  );
 });

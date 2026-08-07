@@ -12,6 +12,9 @@ const MANIFEST_PATH = 'docs/wp08/wp08-03-01-economy-contract-lock.json';
 const REPORT_PATH =
   'docs/wp08/WP08-03-01-ECONOMY-AUDIT-AND-CONTRACT-LOCK.md';
 const CHECKER_PATH = 'scripts/wp08/wp08-03-01-check.ps1';
+const FRONTEND_SMOKE_PATH = 'scripts/wp08/wp08-03-01-frontend-smoke.mjs';
+const FRONTEND_HOSTING_PATH = 'src/hosting/frontend-hosting.ts';
+const MAIN_PATH = 'src/main.ts';
 
 const readBytes = (relativePath) => {
   return readFileSync(join(root, relativePath));
@@ -28,6 +31,9 @@ const sha256 = (relativePath) => {
 const manifest = JSON.parse(readText(MANIFEST_PATH));
 const report = readText(REPORT_PATH);
 const checker = readText(CHECKER_PATH);
+const frontendSmoke = readText(FRONTEND_SMOKE_PATH);
+const frontendHosting = readText(FRONTEND_HOSTING_PATH);
+const mainSource = readText(MAIN_PATH);
 const packageJson = JSON.parse(readText('package.json'));
 
 const fail = (message) => {
@@ -84,16 +90,21 @@ for (const section of requiredReportSections) {
 
 const scripts = packageJson.scripts;
 const expectedScripts = {
+  'start:full': 'npm run build && node scripts/start-local-full.mjs',
   'format:wp08:03:01':
-    'prettier --write "src/wp08/wp08-03-01-economy-contract.spec.ts" "scripts/wp08/wp08-03-01-self-check.mjs"',
+    'prettier --write "src/main.ts" "src/hosting/frontend-hosting.ts" "src/hosting-routing.spec.ts" "src/wp08/wp08-03-01-economy-contract.spec.ts" "scripts/start-local-full.mjs" "scripts/wp08/wp08-03-01-self-check.mjs" "scripts/wp08/wp08-03-01-frontend-smoke.mjs"',
   'format:check:wp08:03:01':
-    'prettier --check "src/wp08/wp08-03-01-economy-contract.spec.ts" "scripts/wp08/wp08-03-01-self-check.mjs"',
+    'prettier --check "src/main.ts" "src/hosting/frontend-hosting.ts" "src/hosting-routing.spec.ts" "src/wp08/wp08-03-01-economy-contract.spec.ts" "scripts/start-local-full.mjs" "scripts/wp08/wp08-03-01-self-check.mjs" "scripts/wp08/wp08-03-01-frontend-smoke.mjs"',
+  'lint:fix:wp08:03:01':
+    'eslint "src/main.ts" "src/hosting/frontend-hosting.ts" "src/hosting-routing.spec.ts" "src/wp08/wp08-03-01-economy-contract.spec.ts" --fix --no-cache',
   'lint:wp08:03:01':
-    'eslint "src/wp08/wp08-03-01-economy-contract.spec.ts" --no-cache',
+    'eslint "src/main.ts" "src/hosting/frontend-hosting.ts" "src/hosting-routing.spec.ts" "src/wp08/wp08-03-01-economy-contract.spec.ts" --no-cache',
   'wp08:03:01:self-check':
     'node scripts/wp08/wp08-03-01-self-check.mjs',
   'test:wp08:03:01':
-    'jest --runInBand --runTestsByPath src/wp08/wp08-03-01-economy-contract.spec.ts',
+    'jest --runInBand --runTestsByPath src/wp08/wp08-03-01-economy-contract.spec.ts src/hosting-routing.spec.ts',
+  'wp08:03:01:frontend-smoke':
+    'node scripts/wp08/wp08-03-01-frontend-smoke.mjs',
   'wp08:03:01:check':
     'powershell -ExecutionPolicy Bypass -File scripts/wp08/wp08-03-01-check.ps1',
 };
@@ -104,28 +115,100 @@ for (const [name, command] of Object.entries(expectedScripts)) {
   }
 }
 
-if (!checker.includes('package-owned files')) {
+if (!checker.includes('package-owned formatting')) {
   fail('checker does not identify package-scoped formatting handling');
 }
 
 if (!checker.includes('npm.cmd run format:wp08:03:01')) {
-  fail('checker does not normalize package-owned formatting');
+  fail('checker does not normalize the package-scoped formatting before verification');
 }
 
 if (!checker.includes('npm.cmd run format:check:wp08:03:01')) {
   fail('checker does not run the package-scoped formatting check');
 }
 
+if (!checker.includes('npm.cmd run lint:fix:wp08:03:01')) {
+  fail('checker does not normalize package-scoped ESLint fixes before verification');
+}
+
 if (!checker.includes('npm.cmd run lint:wp08:03:01')) {
-  fail('checker does not run the package-scoped lint check');
+  fail('checker does not run the package-scoped lint verification');
 }
 
-if (/npm\.cmd\s+run\s+format(?:\s|$)/.test(checker)) {
-  fail('checker must not run the mutating format command');
+if (!checker.includes('npm.cmd run wp08:03:01:frontend-smoke')) {
+  fail('checker does not run the compiled frontend runtime smoke test');
 }
 
-if (/eslint[^\r\n]*--fix/.test(checker)) {
-  fail('checker must not run mutating ESLint');
+if (!checker.includes('R05 FULL BUILD AND FRONTEND RUNTIME CHECKS PASSED')) {
+  fail('checker is missing the R05 runtime success marker');
+}
+
+if (
+  !checker.includes('COLLECTED FAILURES:') ||
+  !checker.includes('$Failures')
+) {
+  fail('checker does not aggregate independent failures into one report');
+}
+
+for (const route of [
+  "'/'",
+  "'/pricing'",
+  "'/apiary'",
+  "'/admin/'",
+  "'/admin/index.html'",
+  "'/admin/login'",
+  "'/creator/'",
+  "'/creator/index.html'",
+  "'/creator/login'",
+  "'/api/v1/nonexistent-route'",
+]) {
+  if (!frontendSmoke.includes(route)) {
+    fail(`frontend smoke test is missing route ${route}`);
+  }
+}
+
+if (!frontendSmoke.includes("contentType.includes('text/html')")) {
+  fail('frontend smoke test does not enforce HTML content types');
+}
+
+if (!frontendSmoke.includes('assetResponse.ok')) {
+  fail('frontend smoke test does not verify compiled frontend assets');
+}
+
+if (!frontendSmoke.includes('VOICECLOUD_LOCAL_PORT')) {
+  fail('frontend smoke test does not isolate its runtime port');
+}
+
+if (!readText('scripts/start-local-full.mjs').includes(
+  "process.env.VOICECLOUD_LOCAL_PORT || '3000'",
+)) {
+  fail('full local startup does not default deterministically to port 3000');
+}
+
+if (!mainSource.includes('app.getHttpAdapter().getInstance()')) {
+  fail('main bootstrap does not use the underlying Express adapter instance');
+}
+
+if (!mainSource.includes('registerFrontendHosting(expressApp')) {
+  fail('main bootstrap does not register frontend hosting on Express');
+}
+
+if (!frontendHosting.includes("expressApp.use('/admin'")) {
+  fail('frontend hosting does not register Admin static assets directly');
+}
+
+if (!frontendHosting.includes("expressApp.use('/creator'")) {
+  fail('frontend hosting does not register Creator static assets directly');
+}
+
+if (!frontendHosting.includes('const websiteStatic = express.static')) {
+  fail('frontend hosting does not create Landing static middleware');
+}
+
+if (
+  !frontendHosting.includes('return websiteStatic(request, response, next)')
+) {
+  fail('frontend hosting does not register Landing static middleware');
 }
 
 if (/npm\s+audit\s+fix/.test(checker)) {

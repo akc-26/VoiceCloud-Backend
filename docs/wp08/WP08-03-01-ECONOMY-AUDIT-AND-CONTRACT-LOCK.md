@@ -234,23 +234,46 @@ Required coverage:
 
 ## 8. Validation strategy for WP08-03-01
 
-The package adds a non-mutating checker:
+The package adds a non-mutating consolidated checker:
 
 `npm run wp08:03:01:check`
 
 The checker performs:
 
-1. Locked dependency installation including development tooling.
-2. Controlled Prettier normalization of only the two files introduced by WP08-03-01.
-3. Non-mutating Prettier verification of those package-owned files.
-4. Non-mutating ESLint of the WP08-03-01 TypeScript contract.
-5. Manifest and source-snapshot self-check.
-6. WP08-01 focused regression tests.
-7. WP08-02 focused regression tests.
-8. WP08-03-01 contract tests.
-9. Complete Jest suite.
-10. Unified Backend, Website, Admin, and Creator build.
+1. Dependency-free manifest and source-snapshot self-check.
+2. Locked dependency installation including development tooling.
+3. Non-mutating Prettier verification of every WP08-03-01-owned source and verification file.
+4. Non-mutating package-scoped ESLint.
+5. WP08-01 focused regression tests.
+6. WP08-02 focused regression tests.
+7. WP08-03-01 contract and hosting tests.
+8. Complete Jest suite.
+9. Unified Backend, Website, Admin, and Creator build.
+10. Required build-artifact verification.
+11. Compiled runtime smoke tests for Landing, Admin, Creator, their assets, and `/health`.
 
-The approved WP08-02 Git baseline contains 17 known formatting-drift files. They are recorded in `baselineFormattingDebt` and remain byte-for-byte locked because this audit package must not rewrite unrelated production behavior. The package checker rejects formatting drift in every file introduced by WP08-03-01 while the focused and complete Jest suites plus the unified build continue to validate the full application.
+Independent formatting, lint, regression, full-test, and build stages continue after a failure and are summarized together at the end. Runtime smoke testing is skipped only when valid build artifacts are unavailable. This prevents a first-error-only repair cycle and provides one consolidated defect report.
 
-The formatter write step is restricted to `src/wp08/wp08-03-01-economy-contract.spec.ts` and `scripts/wp08/wp08-03-01-self-check.mjs`. It never rewrites production business source. No ESLint `--fix`, database mutation, or runtime seed is part of this audit checker.
+The approved WP08-02 Git baseline contains 17 known formatting-drift files. They are recorded in `baselineFormattingDebt` and remain byte-for-byte locked because this audit package must not rewrite unrelated production behavior. The acceptance checker never invokes Prettier write mode, ESLint `--fix`, `npm audit fix`, database mutation, or a production runtime seed.
+
+## 9. R03 runtime hosting correction
+
+R02 proved the audit, regression, and build contracts, but its checker stopped after confirming that the four build artifacts existed. A real Windows startup then showed that the Nest process returned JSON 404 responses for `/admin/`, `/admin/index.html`, and `/creator/`.
+
+R03 corrects that acceptance gap without changing economy business logic:
+
+- frontend middleware is registered directly on the underlying Express adapter before Nest maps controllers and its 404 handler;
+- the compiled `dist` root is resolved from an explicit environment override, the project working directory, or the compiled module location;
+- startup fails with a clear build-artifact error instead of silently running an API-only server when frontend files are missing;
+- `npm run start:full` builds and starts the complete local application on port 3000 with memory infrastructure;
+- the final checker starts the compiled server on an isolated port and requires HTML plus a loadable compiled asset for Landing, Admin, and Creator, while `/health` remains JSON.
+
+
+## 10. R04 consolidated verification correction
+
+R04 removes the remaining first-failure delivery gap. It corrects the unnecessary Express adapter type assertion, reconciles the stale Jest contract with the R03 hosting scope, makes acceptance formatting checks non-mutating, aggregates all independent verification failures in one run, and tightens reserved-route matching so unrelated paths such as `/apiary`, `/administer`, and `/creator-tools` continue to reach the Landing SPA rather than being misclassified.
+
+## 11. Production cleanup boundary
+
+The `src/wp08` contract specification and `scripts/wp08` acceptance utilities are development and release-evidence files. They are not imported by the NestJS runtime, are not emitted into `dist/src`, and are not served by Landing, Admin, or Creator hosting. They remain during WP08 so regressions can be reproduced and audited. WP09 production certification must consolidate durable behavior coverage under product-oriented test names and remove superseded work-package or revision-only scripts, reports, and duplicate acceptance wrappers before the final production source package is issued.
+

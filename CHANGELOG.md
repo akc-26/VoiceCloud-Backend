@@ -1,3 +1,29 @@
+
+## VC-PH08-WP08-03-01 R05 - Consolidated formatting gate correction
+
+- Preserves the R04 runtime-hosting correction and all passing regression/build/runtime stages.
+- Normalizes only the seven WP08-03-01 package-owned files before the non-mutating Prettier verification.
+- Prevents formatting drift from being reported a second time through ESLint's `prettier/prettier` rule.
+- Runs scoped ESLint auto-fix only on the four WP08-03-01-owned TypeScript files before non-mutating lint verification; all regression/build/runtime stages then run against the normalized result.
+- Does not mutate dependencies or modify production business files outside the locked WP08-03-01 hosting scope.
+
+# VC-PH08-WP08-03-01 R04 — Consolidated Verification and Route Boundary Correction
+
+- Removed the unnecessary Express adapter type assertion that failed package-scoped ESLint.
+- Reconciled the WP08-03-01 Jest contract with the complete R03 hosting and smoke-test scope.
+- Replaced acceptance-time formatting mutation with non-mutating Prettier verification.
+- Changed the Windows acceptance checker to collect all independent lint, test, and build failures in one run instead of stopping at the first error.
+- Tightened frontend/backend route-prefix boundaries so unrelated routes such as `/apiary`, `/administer`, and `/creator-tools` are not misclassified.
+- Added regression coverage for route-boundary collisions and non-GET SPA fallback isolation.
+
+# VC-PH08-WP08-03-01 R03 — Compiled Frontend Runtime Hosting Correction
+
+- Corrected runtime static hosting by registering Landing, Admin, and Creator middleware on the underlying Express adapter before Nest route mapping.
+- Added robust compiled `dist` discovery and explicit startup failure when full frontend artifacts are missing.
+- Added `npm run start:full` for a deterministic complete local application startup on port 3000.
+- Replaced conditional hosting tests with deterministic temporary-build tests for root pages, history fallbacks, index files, and compiled assets.
+- Added a post-build child-process smoke test that loads Landing, Admin, Creator, their assets, and `/health` before acceptance can pass.
+
 # VC-PH08-WP08-03-01 R02 — Acceptance Checker Correction
 
 - Corrected the WP08-03-01 checker so it does not fail on 17 formatting-drift files inherited byte-for-byte from the approved WP08-02 Git baseline.

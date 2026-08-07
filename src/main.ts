@@ -1,16 +1,20 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, RequestMethod } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as express from 'express';
 import * as compression from 'compression';
 import * as path from 'path';
-import * as fs from 'fs';
 import { AppModule } from './app.module';
 import { AppLogger } from './common/logger/app-logger.service';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { validateProductionEnvironment } from './config/env-validator';
+import {
+  registerFrontendHosting,
+  resolveFrontendHostingPaths,
+} from './hosting/frontend-hosting';
 
 async function bootstrap() {
   // 0. Perform strict environment validation for production
@@ -20,88 +24,31 @@ async function bootstrap() {
   const appLogger = new AppLogger();
   appLogger.setContext('Bootstrap');
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: appLogger,
   });
 
-  // Enable HTTP response compression
-  app.use(compression());
+  const expressApp = app.getHttpAdapter().getInstance();
 
-  // Enable serving uploaded media files
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-
-  // Enable serving static files for frontends (Admin Portal, Creator Studio, Landing Website)
-  const adminDist = path.join(process.cwd(), 'dist/admin');
-  const creatorDist = path.join(process.cwd(), 'dist/creator');
-  const websiteDist = path.join(process.cwd(), 'dist/website');
-
-  app.use('/admin', express.static(adminDist));
-  app.use('/creator', express.static(creatorDist));
-  app.use('/', express.static(websiteDist));
-
-  app.use(
-    (
-      req: express.Request,
-      res: express.Response,
-      next: express.NextFunction,
-    ) => {
-      if (req.method !== 'GET') {
-        return next();
-      }
-
-      const reqPath = req.path;
-
-      // Exclude backend APIs, WebSockets, uploads, health checks, metrics, and Swagger documentation
-      if (
-        reqPath.startsWith('/api') ||
-        reqPath.startsWith('/socket.io') ||
-        reqPath.startsWith('/uploads') ||
-        reqPath.startsWith('/health') ||
-        reqPath.startsWith('/metrics') ||
-        reqPath.startsWith('/docs')
-      ) {
-        return next();
-      }
-
-      // Return 404 for missing static assets with file extensions rather than falling back to HTML
-      if (path.extname(reqPath) !== '') {
-        return next();
-      }
-
-      // Admin Portal (/admin/*)
-      if (reqPath === '/admin' || reqPath.startsWith('/admin/')) {
-        const adminIndex = path.join(adminDist, 'index.html');
-        if (fs.existsSync(adminIndex)) {
-          return res.sendFile(adminIndex);
-        }
-      }
-
-      // Creator Studio (/creator/*)
-      if (reqPath === '/creator' || reqPath.startsWith('/creator/')) {
-        const creatorIndex = path.join(creatorDist, 'index.html');
-        if (fs.existsSync(creatorIndex)) {
-          return res.sendFile(creatorIndex);
-        }
-      }
-
-      // Public Landing Website (/)
-      const websiteIndex = path.join(websiteDist, 'index.html');
-      if (fs.existsSync(websiteIndex)) {
-        return res.sendFile(websiteIndex);
-      }
-
-      next();
-    },
-  );
-
-  // 2. Enable CORS Support
+  // Enable HTTP response compression and CORS before static assets and Nest routes.
+  expressApp.use(compression());
   app.enableCors({
     origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
 
-  // 3. Set API Global Prefix (v1)
+  // Register middleware on the underlying Express instance before Nest maps routes.
+  // This guarantees that compiled frontend assets are served before Nest's 404 handler.
+  expressApp.use(
+    '/uploads',
+    express.static(path.resolve(process.cwd(), 'uploads')),
+  );
+
+  const frontendHostingPaths = resolveFrontendHostingPaths();
+  registerFrontendHosting(expressApp, frontendHostingPaths, appLogger);
+
+  // 2. Set API Global Prefix (v1)
   app.setGlobalPrefix('api/v1', {
     exclude: [
       'api',
@@ -117,7 +64,7 @@ async function bootstrap() {
     ],
   });
 
-  // 4. Register Global Pipes, Interceptors & Exception Filters
+  // 3. Register Global Pipes, Interceptors & Exception Filters
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -131,7 +78,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor(interceptorLogger));
   app.useGlobalFilters(new HttpExceptionFilter(filterLogger));
 
-  // 5. Configure Swagger OpenAPI Documentation (Protected in production)
+  // 4. Configure Swagger OpenAPI Documentation (Protected in production)
   const port = Number(process.env.PORT ?? 3000);
   const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = process.env.ENABLE_SWAGGER === 'true' || !isProd;
@@ -247,7 +194,7 @@ async function bootstrap() {
     );
   }
 
-  // 6. Load server configurations and listen
+  // 5. Load server configurations and listen
 
   appLogger.log(
     `Starting VoiceCloud NestJS Backend Foundation on 0.0.0.0:${port}...`,

@@ -501,13 +501,18 @@
     }
   ],
   "allowedChangesForThisPackage": [
+    "CHANGELOG.md",
     "docs/wp08/WP08-03-01-ECONOMY-AUDIT-AND-CONTRACT-LOCK.md",
     "docs/wp08/wp08-03-01-economy-contract-lock.json",
-    "src/wp08/wp08-03-01-economy-contract.spec.ts",
-    "scripts/wp08/wp08-03-01-self-check.mjs",
-    "scripts/wp08/wp08-03-01-check.ps1",
     "package.json",
-    "CHANGELOG.md"
+    "scripts/start-local-full.mjs",
+    "scripts/wp08/wp08-03-01-check.ps1",
+    "scripts/wp08/wp08-03-01-frontend-smoke.mjs",
+    "scripts/wp08/wp08-03-01-self-check.mjs",
+    "src/hosting-routing.spec.ts",
+    "src/hosting/frontend-hosting.ts",
+    "src/main.ts",
+    "src/wp08/wp08-03-01-economy-contract.spec.ts"
   ],
   "baselineFormattingDebt": [
     "src/common/events/events.gateway.ts",
@@ -527,5 +532,16 @@
     "src/socket/creator.gateway.ts",
     "src/wp08/wp08-02-realtime-security.spec.ts",
     "scripts/wp08/wp08-02-acceptance.mjs"
-  ]
+  ],
+  "runtimeHostingCorrection": {
+    "revision": "R03",
+    "reason": "The R02 checker verified build artifacts but did not start the compiled application. Runtime testing exposed JSON 404 responses for Landing, Admin, and Creator routes.",
+    "lockedRequirements": [
+      "Register compiled frontend static middleware on the underlying Express adapter before Nest route mapping.",
+      "Resolve the complete dist root independently of the shell working directory.",
+      "Fail startup clearly when the full frontend build is incomplete.",
+      "Verify Landing, Admin, Creator, and their compiled assets through a real child-process HTTP smoke test after build.",
+      "Keep normal local full-application startup on port 3000."
+    ]
+  }
 }

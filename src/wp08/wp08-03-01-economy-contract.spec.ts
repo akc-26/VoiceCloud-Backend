@@ -137,34 +137,54 @@ describe('WP08-03-01 economy audit and contract lock', () => {
   });
 
   it('provides controlled package-scoped quality checks', () => {
-    expect(checkerSource).toContain('package-owned files');
+    expect(checkerSource).toContain('package-owned formatting');
     expect(checkerSource).toContain('npm.cmd run format:wp08:03:01');
     expect(checkerSource).toContain(
       'npm.cmd run format:check:wp08:03:01',
     );
+    expect(checkerSource).toContain('npm.cmd run lint:fix:wp08:03:01');
     expect(checkerSource).toContain('npm.cmd run lint:wp08:03:01');
-    expect(checkerSource).not.toMatch(/npm\.cmd\s+run\s+format(?:\s|$)/);
-    expect(checkerSource).not.toContain('eslint --fix');
     expect(checkerSource).not.toContain('npm audit fix');
   });
 
   it('registers focused formatting, lint, test, and full checks', () => {
-    expect(packageJson.scripts['format:wp08:03:01']).toBe(
-      'prettier --write "src/wp08/wp08-03-01-economy-contract.spec.ts" "scripts/wp08/wp08-03-01-self-check.mjs"',
-    );
-    expect(packageJson.scripts['format:check:wp08:03:01']).toContain(
-      'prettier --check',
-    );
-    expect(packageJson.scripts['lint:wp08:03:01']).toContain('eslint');
+    const formatScript = packageJson.scripts['format:wp08:03:01'];
+    const formatCheckScript = packageJson.scripts['format:check:wp08:03:01'];
+    const lintFixScript = packageJson.scripts['lint:fix:wp08:03:01'];
+    const lintScript = packageJson.scripts['lint:wp08:03:01'];
+    const testScript = packageJson.scripts['test:wp08:03:01'];
+
+    for (const requiredPath of [
+      'src/main.ts',
+      'src/hosting/frontend-hosting.ts',
+      'src/hosting-routing.spec.ts',
+      'src/wp08/wp08-03-01-economy-contract.spec.ts',
+      'scripts/start-local-full.mjs',
+      'scripts/wp08/wp08-03-01-self-check.mjs',
+      'scripts/wp08/wp08-03-01-frontend-smoke.mjs',
+    ]) {
+      expect(formatScript).toContain(requiredPath);
+      expect(formatCheckScript).toContain(requiredPath);
+    }
+
+    expect(formatScript).toContain('prettier --write');
+    expect(formatCheckScript).toContain('prettier --check');
+    expect(lintFixScript).toContain('eslint');
+    expect(lintFixScript).toContain('--fix');
+    expect(lintScript).toContain('eslint');
+    expect(lintScript).not.toContain('--fix');
     expect(packageJson.scripts['wp08:03:01:self-check']).toBe(
       'node scripts/wp08/wp08-03-01-self-check.mjs',
     );
-    expect(packageJson.scripts['test:wp08:03:01']).toBe(
-      'jest --runInBand --runTestsByPath src/wp08/wp08-03-01-economy-contract.spec.ts',
+    expect(testScript).toContain(
+      'src/wp08/wp08-03-01-economy-contract.spec.ts',
     );
+    expect(testScript).toContain('src/hosting-routing.spec.ts');
     expect(packageJson.scripts['wp08:03:01:check']).toBe(
       'powershell -ExecutionPolicy Bypass -File scripts/wp08/wp08-03-01-check.ps1',
     );
+    expect(checkerSource).toContain('COLLECTED FAILURES:');
+    expect(checkerSource).toContain('$Failures');
   });
 
   it('limits the audit package to acceptance tooling', () => {
