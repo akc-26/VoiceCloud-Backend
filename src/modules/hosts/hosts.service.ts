@@ -40,6 +40,7 @@ import {
   HostStateTransitionAction,
   HostStateTransitionService,
 } from './host-state-transition.service';
+import { HostFinancialAuthorityService } from './host-financial-authority.service';
 
 @Injectable()
 export class HostsService {
@@ -69,6 +70,8 @@ export class HostsService {
     private readonly hostLevelConfigService?: HostLevelConfigService,
     @Optional()
     private readonly hostStateTransitionService?: HostStateTransitionService,
+    @Optional()
+    private readonly hostFinancialAuthorityService?: HostFinancialAuthorityService,
   ) {}
 
   // ==========================================
@@ -893,8 +896,11 @@ export class HostsService {
   }
 
   async getEarnings(userId: string): Promise<HostEarnings> {
+    if (this.hostFinancialAuthorityService) {
+      return this.hostFinancialAuthorityService.getEarnings(userId);
+    }
     const host = await this.getHostProfile(userId);
-    return await this.getOrCreateEarnings(host.id, userId);
+    return this.getOrCreateEarnings(host.id, userId);
   }
 
   async recordIncome(
@@ -903,10 +909,18 @@ export class HostsService {
     vipBonusIncome = 0,
     roomBonusIncome = 0,
   ): Promise<HostEarnings> {
+    const totalNew = giftIncome + vipBonusIncome + roomBonusIncome;
+    if (this.hostFinancialAuthorityService) {
+      const saved = await this.hostFinancialAuthorityService.recordIncome(
+        userId,
+        { giftIncome, vipBonusIncome, roomBonusIncome },
+      );
+      await this.addXP(userId, Math.floor(totalNew));
+      return saved;
+    }
+
     const host = await this.getHostProfile(userId);
     const earnings = await this.getOrCreateEarnings(host.id, userId);
-
-    const totalNew = giftIncome + vipBonusIncome + roomBonusIncome;
 
     earnings.giftIncome = Number(earnings.giftIncome) + giftIncome;
     earnings.vipBonusIncome = Number(earnings.vipBonusIncome) + vipBonusIncome;
@@ -929,7 +943,19 @@ export class HostsService {
   async requestSettlement(
     userId: string,
     amount: number,
+    operationKey?: string,
   ): Promise<HostEarnings> {
+    if (this.hostFinancialAuthorityService) {
+      return this.hostFinancialAuthorityService.requestSettlement(
+        userId,
+        amount,
+        operationKey,
+      );
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Settlement amount must be greater than zero');
+    }
     const earnings = await this.getEarnings(userId);
     const available =
       Number(earnings.lifetimeEarnings) -
@@ -950,7 +976,17 @@ export class HostsService {
     hostProfileId: string,
     amount: number,
     adminId = 'ADMIN',
+    operationKey?: string,
   ): Promise<HostEarnings> {
+    if (this.hostFinancialAuthorityService) {
+      return this.hostFinancialAuthorityService.completeSettlement(
+        hostProfileId,
+        amount,
+        adminId,
+        operationKey,
+      );
+    }
+
     let host = await this.hostRepository.findOne({
       where: { id: hostProfileId },
     });
@@ -974,10 +1010,16 @@ export class HostsService {
       throw new NotFoundException('Host earnings record not found');
     }
 
-    earnings.pendingSettlements = Math.max(
-      0,
-      Number(earnings.pendingSettlements) - amount,
-    );
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Settlement amount must be greater than zero');
+    }
+    if (amount > Number(earnings.pendingSettlements)) {
+      throw new BadRequestException(
+        'Settlement amount exceeds reserved pending balance',
+      );
+    }
+    earnings.pendingSettlements =
+      Number(earnings.pendingSettlements) - amount;
     earnings.completedSettlements =
       Number(earnings.completedSettlements) + amount;
     const saved = await this.earningsRepository.save(earnings);
@@ -993,6 +1035,10 @@ export class HostsService {
   }
 
   async getEarningsOverviewAdmin() {
+    if (this.hostFinancialAuthorityService) {
+      return this.hostFinancialAuthorityService.getEarningsOverviewAdmin();
+    }
+
     const allEarnings = await this.earningsRepository.find();
     const totalLifetime = allEarnings.reduce(
       (acc, e) => acc + Number(e.lifetimeEarnings),

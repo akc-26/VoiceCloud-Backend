@@ -38,6 +38,9 @@ import {
 } from './dto/send-gift-phase22.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 
 @ApiTags('Phase 22 Gift System & Catalog Management')
 @Controller('gifts')
@@ -118,7 +121,8 @@ export class GiftsController {
 
   // ================= ADMINISTRATION ENDPOINTS =================
   @Post('admin')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary:
@@ -130,7 +134,8 @@ export class GiftsController {
   }
 
   @Patch('admin/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update gift rules, pricing, or metadata (Admin)' })
   @ApiParam({ name: 'id', description: 'Gift ID' })
@@ -143,7 +148,8 @@ export class GiftsController {
   }
 
   @Delete('admin/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete gift from catalog (Admin)' })
@@ -154,7 +160,8 @@ export class GiftsController {
   }
 
   @Post('admin/:id/archive')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Archive gift item (Admin)' })
@@ -165,7 +172,8 @@ export class GiftsController {
   }
 
   @Post('admin/:id/restore')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Restore archived gift item (Admin)' })
@@ -176,7 +184,8 @@ export class GiftsController {
   }
 
   @Patch('admin/:id/enable')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Enable gift item (Admin)' })
   @ApiParam({ name: 'id', description: 'Gift ID' })
@@ -186,7 +195,8 @@ export class GiftsController {
   }
 
   @Patch('admin/:id/disable')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Disable gift item (Admin)' })
   @ApiParam({ name: 'id', description: 'Gift ID' })
@@ -196,7 +206,8 @@ export class GiftsController {
   }
 
   @Patch('admin/reorder')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Reorder gift catalog items display order (Admin)' })
   @ApiResponse({ status: 200, description: 'Catalog reordered successfully' })
@@ -205,7 +216,8 @@ export class GiftsController {
   }
 
   @Post('admin/categories')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create gift category (Admin)' })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
@@ -214,7 +226,8 @@ export class GiftsController {
   }
 
   @Patch('admin/categories/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update gift category (Admin)' })
   @ApiParam({ name: 'id', description: 'Category ID' })
@@ -227,7 +240,8 @@ export class GiftsController {
   }
 
   @Delete('admin/categories/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete gift category (Admin)' })

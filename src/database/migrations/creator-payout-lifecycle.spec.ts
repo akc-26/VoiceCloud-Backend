@@ -3,9 +3,7 @@ import { Phase08CreatorPayoutLifecycle1700000000011 } from './1700000000011-Phas
 describe('Phase08CreatorPayoutLifecycle1700000000011', () => {
   it('adds durable reservation, settlement and release evidence', async () => {
     const queries: string[] = [];
-    const runner = {
-      query: jest.fn(async (sql: string) => queries.push(sql)),
-    } as any;
+    const runner = { query: jest.fn(async (sql: string) => queries.push(sql)) } as any;
     const migration = new Phase08CreatorPayoutLifecycle1700000000011();
     await migration.up(runner);
     const sql = queries.join('\n');
@@ -20,9 +18,7 @@ describe('Phase08CreatorPayoutLifecycle1700000000011', () => {
 
   it('is reversible', async () => {
     const queries: string[] = [];
-    const runner = {
-      query: jest.fn(async (sql: string) => queries.push(sql)),
-    } as any;
+    const runner = { query: jest.fn(async (sql: string) => queries.push(sql)) } as any;
     const migration = new Phase08CreatorPayoutLifecycle1700000000011();
     await migration.down(runner);
     expect(queries.join('\n')).toContain('DROP COLUMN IF EXISTS "reservedAt"');

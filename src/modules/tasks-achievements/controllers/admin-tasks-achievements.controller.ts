@@ -17,6 +17,9 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { UserRole } from '../../../common/enums';
 import { DailyTasksService } from '../services/daily-tasks.service';
 import { AchievementService } from '../services/achievement.service';
 import { SeasonalEventService } from '../services/seasonal-event.service';
@@ -34,7 +37,8 @@ import { ManualGrantRewardDto } from '../dto/manual-grant-reward.dto';
 
 @ApiTags('Admin Daily Tasks & Achievements Management')
 @Controller('admin/tasks-achievements')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
 @ApiBearerAuth()
 export class AdminTasksAchievementsController {
   constructor(

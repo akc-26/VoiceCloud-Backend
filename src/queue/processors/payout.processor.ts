@@ -96,4 +96,5 @@ export class PayoutProcessor extends WorkerHost {
       throw error;
     }
   }
+
 }

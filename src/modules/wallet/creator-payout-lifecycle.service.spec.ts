@@ -58,6 +58,16 @@ describe('CreatorPayoutLifecycleService', () => {
             ) || null
           );
         }
+        if (where.creatorId && where.diamondAmount && where.status) {
+          return (
+            payouts.find(
+              (payout) =>
+                payout.creatorId === where.creatorId &&
+                payout.diamondAmount === where.diamondAmount &&
+                payout.status === where.status,
+            ) || null
+          );
+        }
         return payouts.find((payout) => payout.id === where.id) || null;
       }),
       create: jest.fn((value) => ({ ...value }) as CreatorPayoutRequest),
@@ -75,8 +85,7 @@ describe('CreatorPayoutLifecycleService', () => {
         return (
           transactions.find(
             (transaction) =>
-              (where.operationKey &&
-                transaction.operationKey === where.operationKey) ||
+              (where.operationKey && transaction.operationKey === where.operationKey) ||
               (where.id && transaction.id === where.id),
           ) || null
         );
@@ -194,5 +203,23 @@ describe('CreatorPayoutLifecycleService', () => {
       'must be APPROVED before settlement',
     );
     expect(harness.wallet.frozenBalance).toBe(1000);
+  });
+  it('legacy settlement delegates only to an approved reserved payout', async () => {
+    const harness = createHarness();
+    const payout = await harness.service.reserve(creatorId, {
+      diamondAmount: 1000,
+      payoutMethod: PayoutMethod.BANK_TRANSFER,
+    });
+
+    await expect(
+      harness.service.settleLegacy(creatorId, 1000, adminId),
+    ).rejects.toThrow('requires an approved reserved payout request');
+
+    await harness.service.approve(payout.id, adminId);
+    const result = await harness.service.settleLegacy(creatorId, 1000, adminId);
+
+    expect(result.payout.status).toBe(PayoutStatus.PROCESSED);
+    expect(harness.wallet.frozenBalance).toBe(0);
+    expect(harness.wallet.totalDiamondsWithdrawn).toBe(1000);
   });
 });

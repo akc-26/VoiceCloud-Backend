@@ -25,6 +25,9 @@ import { CreateVipRewardDto } from './dto/create-vip-reward.dto';
 import { ClaimRewardDto } from './dto/claim-reward.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 
 @ApiTags('VIP Membership')
 @Controller('vip')
@@ -226,6 +229,8 @@ export class VipController {
   }
 
   // --- Admin Endpoints ---
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Get('admin/dashboard')
   @ApiOperation({ summary: 'Admin: Get VIP Analytics and overview metrics' })
   @ApiResponse({ status: 200, description: 'VIP analytics retrieved.' })
@@ -233,6 +238,8 @@ export class VipController {
     return this.vipService.getVipAnalytics();
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post('admin/tiers')
   @ApiOperation({ summary: 'Admin: Create a new VIP tier' })
   @ApiResponse({ status: 201, description: 'VIP tier created.' })
@@ -240,6 +247,8 @@ export class VipController {
     return this.vipService.createTier(dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post('admin/plans')
   @ApiOperation({ summary: 'Admin: Create a new VIP plan (Legacy Alias)' })
   @ApiResponse({ status: 201, description: 'VIP plan created.' })
@@ -247,6 +256,8 @@ export class VipController {
     return this.vipService.createTier(dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Get('admin/tiers')
   @ApiOperation({ summary: 'Admin: List all VIP tiers including inactive' })
   @ApiResponse({ status: 200, description: 'All VIP tiers retrieved.' })
@@ -254,6 +265,8 @@ export class VipController {
     return this.vipService.findAllTiers(true);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Get('admin/plans')
   @ApiOperation({
     summary: 'Admin: List all VIP plans including inactive (Legacy Alias)',
@@ -263,6 +276,8 @@ export class VipController {
     return this.vipService.findAllPlans(true);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Put('admin/tiers/:id')
   @ApiOperation({ summary: 'Admin: Update an existing VIP tier' })
   @ApiResponse({ status: 200, description: 'VIP tier updated.' })
@@ -270,6 +285,8 @@ export class VipController {
     return this.vipService.updateTier(id, dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Put('admin/plans/:id')
   @ApiOperation({
     summary: 'Admin: Update an existing VIP plan (Legacy Alias)',
@@ -279,6 +296,8 @@ export class VipController {
     return this.vipService.updateTier(id, dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Delete('admin/tiers/:id')
   @ApiOperation({ summary: 'Admin: Delete a VIP tier' })
   @ApiResponse({ status: 200, description: 'VIP tier deleted.' })
@@ -286,6 +305,8 @@ export class VipController {
     return this.vipService.deleteTier(id);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Delete('admin/plans/:id')
   @ApiOperation({ summary: 'Admin: Delete a VIP plan (Legacy Alias)' })
   @ApiResponse({ status: 200, description: 'VIP plan deleted.' })
@@ -293,6 +314,8 @@ export class VipController {
     return this.vipService.deleteTier(id);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Get('admin/memberships')
   @ApiOperation({ summary: 'Admin: List user VIP memberships' })
   @ApiResponse({ status: 200, description: 'All memberships retrieved.' })
@@ -300,6 +323,8 @@ export class VipController {
     return this.vipService.getAllMembershipsAdmin();
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Get('admin/benefits')
   @ApiOperation({ summary: 'Admin: List all VIP benefit configurations' })
   @ApiResponse({ status: 200, description: 'All benefits retrieved.' })
@@ -307,6 +332,8 @@ export class VipController {
     return this.vipService.findAllBenefits();
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post('admin/benefits')
   @ApiOperation({ summary: 'Admin: Create a new VIP benefit' })
   @ApiResponse({ status: 201, description: 'Benefit created.' })
@@ -314,6 +341,8 @@ export class VipController {
     return this.vipService.createBenefit(dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Put('admin/benefits/:id')
   @ApiOperation({ summary: 'Admin: Update a VIP benefit' })
   @ApiResponse({ status: 200, description: 'Benefit updated.' })
@@ -324,6 +353,8 @@ export class VipController {
     return this.vipService.updateBenefit(id, dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Get('admin/rewards')
   @ApiOperation({ summary: 'Admin: List all VIP rewards' })
   @ApiResponse({ status: 200, description: 'All rewards retrieved.' })
@@ -331,6 +362,8 @@ export class VipController {
     return this.vipService.findAllRewards();
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Post('admin/rewards')
   @ApiOperation({ summary: 'Admin: Create a new VIP reward' })
   @ApiResponse({ status: 201, description: 'Reward created.' })
@@ -338,6 +371,8 @@ export class VipController {
     return this.vipService.createReward(dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Put('admin/rewards/:id')
   @ApiOperation({ summary: 'Admin: Update a VIP reward' })
   @ApiResponse({ status: 200, description: 'Reward updated.' })
@@ -348,6 +383,8 @@ export class VipController {
     return this.vipService.updateReward(id, dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Get('admin/revenue')
   @ApiOperation({ summary: 'Admin: Revenue reports by tier and cycle' })
   @ApiResponse({ status: 200, description: 'Revenue analytics retrieved.' })
@@ -360,6 +397,8 @@ export class VipController {
     };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @Get('admin/renewals')
   @ApiOperation({
     summary: 'Admin: Renewal and upcoming expiration monitoring',

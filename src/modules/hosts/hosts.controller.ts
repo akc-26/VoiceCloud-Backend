@@ -393,7 +393,11 @@ export class HostsController {
     @CurrentUser('userId') userId: string,
     @Body() dto: SettlementActionDto,
   ) {
-    return this.hostsService.requestSettlement(userId, dto.amount);
+    return this.hostsService.requestSettlement(
+      userId,
+      dto.amount,
+      dto.operationKey,
+    );
   }
 
   // ==========================================
@@ -713,6 +717,11 @@ export class HostsController {
     @Body() dto: SettlementActionDto,
     @CurrentUser('userId') adminId: string,
   ) {
-    return this.hostsService.completeSettlement(id, dto.amount, adminId);
+    return this.hostsService.completeSettlement(
+      id,
+      dto.amount,
+      adminId,
+      dto.operationKey,
+    );
   }
 }

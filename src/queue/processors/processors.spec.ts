@@ -67,6 +67,8 @@ describe('Phase 3C Queue Processors (Workers)', () => {
     save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
   };
 
+
+
   const mockPayoutLifecycleService = {
     approve: jest.fn(),
     reject: jest.fn(),
@@ -80,16 +82,7 @@ describe('Phase 3C Queue Processors (Workers)', () => {
   };
 
   beforeEach(async () => {
-    mockPayoutLifecycleService.settle.mockResolvedValue({
-      payout: {
-        id: 'payout-1',
-        creatorId: 'creator-1',
-        diamondAmount: 1000,
-        payoutAmount: 5,
-        status: PayoutStatus.PROCESSED,
-      },
-      idempotent: false,
-    });
+    mockPayoutLifecycleService.settle.mockResolvedValue({ payout: { id: 'payout-1', creatorId: 'creator-1', diamondAmount: 1000, payoutAmount: 5, status: PayoutStatus.PROCESSED }, idempotent: false });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationProcessor,

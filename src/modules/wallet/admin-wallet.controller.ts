@@ -39,7 +39,8 @@ import { PayoutStatus, UserRole } from '../../common/enums';
 
 @ApiTags('Admin Wallet')
 @Controller('admin/wallet')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
 @ApiBearerAuth()
 export class AdminWalletController {
   constructor(
@@ -106,8 +107,22 @@ export class AdminWalletController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Process creator revenue settlement' })
   @ApiResponse({ status: 200, description: 'Creator settlement processed' })
-  async processCreatorSettlement(@Body() dto: CreatorSettlementDto) {
-    return this.walletService.processCreatorSettlement(dto.creatorId, dto);
+  async processCreatorSettlement(
+    @Body() dto: CreatorSettlementDto,
+    @CurrentUser('userId') adminId: string,
+  ) {
+    const result = await this.creatorPayoutLifecycleService.settleLegacy(
+      dto.creatorId,
+      dto.diamondsToSettle,
+      adminId,
+    );
+    return {
+      success: true,
+      settlement: result.payout,
+      payout: result.payout,
+      transaction: result.transaction,
+      idempotent: result.idempotent,
+    };
   }
 
   @Get('creator/payouts')
@@ -134,9 +149,7 @@ export class AdminWalletController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({
-    summary: 'Reject a creator payout and release reserved funds',
-  })
+  @ApiOperation({ summary: 'Reject a creator payout and release reserved funds' })
   async rejectCreatorPayout(
     @Param('id') id: string,
     @CurrentUser('userId') adminId: string,

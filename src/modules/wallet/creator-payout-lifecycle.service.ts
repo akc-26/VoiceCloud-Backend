@@ -307,8 +307,7 @@ export class CreatorPayoutLifecycleService {
       const frozenBefore = wallet.frozenBalance;
       const totalWithdrawnBefore = wallet.totalDiamondsWithdrawn || 0;
       wallet.frozenBalance -= payout.diamondAmount;
-      wallet.totalDiamondsWithdrawn =
-        totalWithdrawnBefore + payout.diamondAmount;
+      wallet.totalDiamondsWithdrawn = totalWithdrawnBefore + payout.diamondAmount;
       await manager.getRepository(WalletBalance).save(wallet);
 
       const transaction = await this.writeLedger(manager, wallet, {
@@ -345,6 +344,34 @@ export class CreatorPayoutLifecycleService {
         idempotent: false,
       };
     });
+  }
+
+  async settleLegacy(
+    creatorId: string,
+    diamondAmount: number,
+    reviewedBy: string,
+  ): Promise<PayoutLifecycleResult> {
+    if (!Number.isInteger(diamondAmount) || diamondAmount <= 0) {
+      throw new BadRequestException(
+        'Legacy settlement amount must be a positive diamond integer',
+      );
+    }
+
+    const repository = this.dataSource.getRepository(CreatorPayoutRequest);
+    const approved = await repository.findOne({
+      where: {
+        creatorId,
+        diamondAmount,
+        status: PayoutStatus.APPROVED,
+      },
+      order: { createdAt: 'ASC' },
+    });
+    if (approved) {
+      return this.settle(approved.id, reviewedBy);
+    }
+    throw new ConflictException(
+      'Legacy Creator settlement requires an approved reserved payout request',
+    );
   }
 
   async list(status?: PayoutStatus): Promise<CreatorPayoutRequest[]> {

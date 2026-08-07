@@ -22,6 +22,9 @@ import { QueryNotificationDto } from './dto/query-notification.dto';
 import { RegisterDeviceDto } from './dto/register-device.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 
 @ApiTags('Notifications')
 @Controller('notifications')
@@ -115,6 +118,8 @@ export class NotificationsController {
   }
 
   @Post('admin')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: Create and send a notification' })
   @ApiResponse({
     status: 201,

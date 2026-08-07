@@ -44,6 +44,12 @@ export class HostEarnings {
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0.0 })
   roomBonusIncome: number;
 
+  @Column({ type: 'timestamp', nullable: true })
+  authorityInitializedAt: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  authorityBaselineTransactionId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

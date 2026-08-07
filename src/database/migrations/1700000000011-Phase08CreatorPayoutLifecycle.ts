@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class Phase08CreatorPayoutLifecycle1700000000011 implements MigrationInterface {
+export class Phase08CreatorPayoutLifecycle1700000000011
+  implements MigrationInterface
+{
   name = 'Phase08CreatorPayoutLifecycle1700000000011';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

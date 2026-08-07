@@ -19,7 +19,10 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdatePrivacySettingsDto } from './dto/update-privacy-settings.dto';
 import { AddExperienceDto, ExperienceType } from './dto/experience.dto';
 import { SearchUsersDto } from './dto/search-users.dto';
-import { SubscriptionStatus, PayoutMethod } from '../../common/enums';
+import {
+  SubscriptionStatus,
+  PayoutMethod,
+} from '../../common/enums';
 
 @Injectable()
 export class UsersService {

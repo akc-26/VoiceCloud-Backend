@@ -457,9 +457,7 @@ describe('Phase 2D Creator Economy Business APIs', () => {
 
     it('should throw ConflictException if duplicate pending payout exists', async () => {
       mockCreatorPayoutLifecycleService.reserve.mockRejectedValueOnce(
-        new ConflictException(
-          'You already have a payout request with reserved funds',
-        ),
+        new ConflictException('You already have a payout request with reserved funds'),
       );
 
       await expect(
@@ -498,9 +496,7 @@ describe('Phase 2D Creator Economy Business APIs', () => {
         status: PayoutStatus.PENDING,
       };
 
-      mockCreatorPayoutLifecycleService.reserve.mockResolvedValueOnce(
-        mockRequest,
-      );
+      mockCreatorPayoutLifecycleService.reserve.mockResolvedValueOnce(mockRequest);
 
       const res = await service.submitPayoutRequest('creator-1', {
         diamondAmount: 1000,

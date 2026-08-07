@@ -88,48 +88,34 @@ export class CreatorPayoutRequest {
   @IsOptional()
   reviewedAt: Date;
 
-  @ApiPropertyOptional({
-    description: 'Timestamp when payout funds were reserved',
-  })
+
+  @ApiPropertyOptional({ description: 'Timestamp when payout funds were reserved' })
   @Column({ type: 'timestamp', nullable: true })
   reservedAt?: Date | null;
 
-  @ApiPropertyOptional({
-    description: 'Timestamp when payout was financially settled',
-  })
+  @ApiPropertyOptional({ description: 'Timestamp when payout was financially settled' })
   @Column({ type: 'timestamp', nullable: true })
   settledAt?: Date | null;
 
-  @ApiPropertyOptional({
-    description: 'Timestamp when reserved payout funds were released',
-  })
+  @ApiPropertyOptional({ description: 'Timestamp when reserved payout funds were released' })
   @Column({ type: 'timestamp', nullable: true })
   releasedAt?: Date | null;
 
-  @ApiPropertyOptional({
-    description: 'Persistent payout lifecycle operation group ID',
-  })
+  @ApiPropertyOptional({ description: 'Persistent payout lifecycle operation group ID' })
   @Index('IDX_creator_payout_requests_operationGroupId')
   @Column({ type: 'varchar', nullable: true })
   operationGroupId?: string | null;
 
   @ApiPropertyOptional({ description: 'Persistent reserve operation key' })
-  @Index('UQ_creator_payout_requests_reserveOperationKey', {
-    unique: true,
-    where: '"reserveOperationKey" IS NOT NULL',
-  })
+  @Index('UQ_creator_payout_requests_reserveOperationKey', { unique: true, where: '"reserveOperationKey" IS NOT NULL' })
   @Column({ type: 'varchar', nullable: true })
   reserveOperationKey?: string | null;
 
-  @ApiPropertyOptional({
-    description: 'Reservation wallet ledger transaction ID',
-  })
+  @ApiPropertyOptional({ description: 'Reservation wallet ledger transaction ID' })
   @Column({ type: 'uuid', nullable: true })
   reservationTransactionId?: string | null;
 
-  @ApiPropertyOptional({
-    description: 'Settlement wallet ledger transaction ID',
-  })
+  @ApiPropertyOptional({ description: 'Settlement wallet ledger transaction ID' })
   @Column({ type: 'uuid', nullable: true })
   settlementTransactionId?: string | null;
 
@@ -137,9 +123,7 @@ export class CreatorPayoutRequest {
   @Column({ type: 'uuid', nullable: true })
   releaseTransactionId?: string | null;
 
-  @ApiPropertyOptional({
-    description: 'Reason supplied when payout is rejected',
-  })
+  @ApiPropertyOptional({ description: 'Reason supplied when payout is rejected' })
   @Column({ type: 'text', nullable: true })
   rejectionReason?: string | null;
 

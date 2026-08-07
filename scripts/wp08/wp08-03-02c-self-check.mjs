@@ -13,15 +13,13 @@ const baseline = {
 const failures = [];
 const read = (path) => readFileSync(join(root, path), 'utf8');
 const requireFile = (path) => {
-  if (!existsSync(join(root, path)))
-    failures.push(`Missing required file: ${path}`);
+  if (!existsSync(join(root, path))) failures.push(`Missing required file: ${path}`);
 };
 const requireText = (path, text) => {
   if (!read(path).includes(text)) failures.push(`${path} missing: ${text}`);
 };
 const forbidText = (path, text) => {
-  if (read(path).includes(text))
-    failures.push(`${path} must not contain: ${text}`);
+  if (read(path).includes(text)) failures.push(`${path} must not contain: ${text}`);
 };
 
 for (const path of [
@@ -39,9 +37,7 @@ const lockHash = createHash('sha256')
   .update(readFileSync(join(root, 'package-lock.json')))
   .digest('hex');
 if (lockHash !== baseline.packageLockSha256) {
-  failures.push(
-    `package-lock.json changed from accepted 03-02B baseline: ${lockHash}`,
-  );
+  failures.push(`package-lock.json changed from accepted 03-02B baseline: ${lockHash}`);
 }
 
 const lifecycle = 'src/modules/wallet/creator-payout-lifecycle.service.ts';
@@ -62,10 +58,7 @@ for (const text of [
   requireText(lifecycle, text);
 }
 
-requireText(
-  'src/modules/creator/dto/create-payout-request.dto.ts',
-  'operationKey?: string',
-);
+requireText('src/modules/creator/dto/create-payout-request.dto.ts', 'operationKey?: string');
 requireText(
   'src/modules/creator/creator.service.ts',
   'this.creatorPayoutLifecycleService.reserve',
@@ -78,16 +71,13 @@ requireText(
   'src/queue/processors/payout.processor.ts',
   'this.payoutLifecycleService.settle',
 );
-forbidText(
-  'src/queue/processors/payout.processor.ts',
-  'payout.status = nextStatus',
-);
+forbidText('src/queue/processors/payout.processor.ts', 'payout.status = nextStatus');
 
 for (const text of [
-  '@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)',
-  'creator/payouts/:id/approve',
-  'creator/payouts/:id/reject',
-  'creator/payouts/:id/process',
+  "@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)",
+  "creator/payouts/:id/approve",
+  "creator/payouts/:id/reject",
+  "creator/payouts/:id/process",
 ]) {
   requireText('src/modules/wallet/admin-wallet.controller.ts', text);
 }
@@ -129,8 +119,7 @@ const walk = (directory) => {
       continue;
     }
     const path = relative(root, absolute).replaceAll('\\', '/');
-    if (/wp08-03-02c.*\.spec\.ts$/i.test(path))
-      revisionSpecificTests.push(path);
+    if (/wp08-03-02c.*\.spec\.ts$/i.test(path)) revisionSpecificTests.push(path);
   }
 };
 walk(join(root, 'src'));
@@ -150,9 +139,5 @@ console.log('WP08-03-02C Creator payout lifecycle self-check passed.');
 console.log(`Baseline branch: ${baseline.branch}`);
 console.log(`Baseline commit: ${baseline.commit}`);
 console.log('Creator payout funds are reserved before Admin review.');
-console.log(
-  'Settlement and rejection release are PostgreSQL-authoritative and idempotent.',
-);
-console.log(
-  'package-lock.json remains byte-identical to accepted 03-02B baseline.',
-);
+console.log('Settlement and rejection release are PostgreSQL-authoritative and idempotent.');
+console.log('package-lock.json remains byte-identical to accepted 03-02B baseline.');

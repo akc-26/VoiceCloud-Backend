@@ -22,6 +22,8 @@ import { SystemSetting } from '../admin/entities/system-setting.entity';
 import { HostEligibilityService } from './host-eligibility.service';
 import { HostLevelConfigService } from './host-level-config.service';
 import { HostStateTransitionService } from './host-state-transition.service';
+import { HostSettlementRequest } from './entities/host-settlement-request.entity';
+import { HostFinancialAuthorityService } from './host-financial-authority.service';
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { HostStateTransitionService } from './host-state-transition.service';
       Room,
       ModerationAction,
       SystemSetting,
+      HostSettlementRequest,
     ]),
     StorageModule,
   ],
@@ -51,6 +54,7 @@ import { HostStateTransitionService } from './host-state-transition.service';
     HostEligibilityService,
     HostLevelConfigService,
     HostStateTransitionService,
+    HostFinancialAuthorityService,
   ],
   exports: [
     HostsService,
@@ -59,6 +63,7 @@ import { HostStateTransitionService } from './host-state-transition.service';
     HostEligibilityService,
     HostLevelConfigService,
     HostStateTransitionService,
+    HostFinancialAuthorityService,
   ],
 })
 export class HostsModule {}
