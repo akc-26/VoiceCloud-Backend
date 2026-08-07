@@ -234,16 +234,18 @@ Required coverage:
 
 ## 8. Validation strategy for WP08-03-01
 
-The package adds a non-mutating consolidated checker:
+The accepted R05 package exposes this consolidated checker:
 
 `npm run wp08:03:01:check`
+
+R05 was a recovery release after repeated formatting/lint delivery defects. Its checker therefore performs a narrowly scoped Prettier write and ESLint `--fix` normalization before immediately verifying the same files. This is historical behavior of R05, not the validation model for later work packages. WP08-03-02A and later packages separate mutating development preparation from non-mutating final acceptance.
 
 The checker performs:
 
 1. Dependency-free manifest and source-snapshot self-check.
 2. Locked dependency installation including development tooling.
-3. Non-mutating Prettier verification of every WP08-03-01-owned source and verification file.
-4. Non-mutating package-scoped ESLint.
+3. Package-scoped Prettier normalization followed immediately by Prettier verification.
+4. Package-scoped ESLint normalization followed immediately by non-mutating ESLint verification.
 5. WP08-01 focused regression tests.
 6. WP08-02 focused regression tests.
 7. WP08-03-01 contract and hosting tests.
@@ -254,7 +256,7 @@ The checker performs:
 
 Independent formatting, lint, regression, full-test, and build stages continue after a failure and are summarized together at the end. Runtime smoke testing is skipped only when valid build artifacts are unavailable. This prevents a first-error-only repair cycle and provides one consolidated defect report.
 
-The approved WP08-02 Git baseline contains 17 known formatting-drift files. They are recorded in `baselineFormattingDebt` and remain byte-for-byte locked because this audit package must not rewrite unrelated production behavior. The acceptance checker never invokes Prettier write mode, ESLint `--fix`, `npm audit fix`, database mutation, or a production runtime seed.
+The approved WP08-02 Git baseline contains 17 known formatting-drift files. They are recorded in `baselineFormattingDebt` and remain byte-for-byte locked because this audit package must not rewrite unrelated production behavior. The accepted R05 checker invokes Prettier write mode and ESLint `--fix` only on its explicitly owned recovery files, then verifies them. It never invokes `npm audit fix`, database mutation, or a production runtime seed. Later work packages must not repeat the self-repair pattern: development uses a separate `prepare` command and final acceptance is source-immutable.
 
 ## 9. R03 runtime hosting correction
 

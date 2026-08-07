@@ -30,6 +30,12 @@ const decimalTransformer = {
     value === null || value === undefined ? 0 : Number(value),
 };
 
+const nullableDecimalTransformer = {
+  to: (value?: number | null) => value ?? null,
+  from: (value?: string | number | null) =>
+    value === null || value === undefined ? null : Number(value),
+};
+
 @Entity('wallet_transactions')
 export class WalletTransaction {
   @ApiProperty({ description: 'Unique transaction ID' })
@@ -140,6 +146,51 @@ export class WalletTransaction {
   @IsOptional()
   @IsObject()
   metadata: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description: 'Persistent idempotency key for the logical financial operation',
+  })
+  @Index('UQ_wallet_transactions_operationKey', {
+    unique: true,
+    where: '"operationKey" IS NOT NULL',
+  })
+  @Column({ type: 'varchar', nullable: true })
+  @IsOptional()
+  @IsString()
+  operationKey?: string;
+
+  @ApiPropertyOptional({
+    description: 'Groups multiple immutable ledger legs into one operation',
+  })
+  @Index('IDX_wallet_transactions_operationGroupId')
+  @Column({ type: 'varchar', nullable: true })
+  @IsOptional()
+  @IsString()
+  operationGroupId?: string;
+
+  @ApiPropertyOptional({ description: 'Authoritative balance before mutation' })
+  @Column({
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    nullable: true,
+    transformer: nullableDecimalTransformer,
+  })
+  @IsOptional()
+  @IsNumber()
+  balanceBefore?: number | null;
+
+  @ApiPropertyOptional({ description: 'Authoritative balance after mutation' })
+  @Column({
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    nullable: true,
+    transformer: nullableDecimalTransformer,
+  })
+  @IsOptional()
+  @IsNumber()
+  balanceAfter?: number | null;
 
   @CreateDateColumn()
   @Index('IDX_wallet_transactions_createdAt')

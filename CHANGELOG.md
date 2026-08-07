@@ -190,3 +190,20 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Added a dedicated TypeORM CLI data-source wrapper that exports exactly one `DataSource` instance.
 - Updated development and production migration scripts to use the CLI-only wrapper.
 - Preserved the existing `AppDataSource` named export used by repository tests and application tooling.
+
+## VC-PH08-WP08-03-02A — Financial Authority & Idempotency Foundation
+
+- Replaced unsafe non-zero wallet bootstrap and User auto-provisioning with existing-User-only zero wallet creation.
+- Added PostgreSQL transactional wallet mutation authority with pessimistic locking and deterministic multi-wallet lock order.
+- Added persistent wallet ledger idempotency/audit fields and reversible Phase08 economy migration.
+- Converted credit, debit, transfer, diamond conversion, and Creator earnings to atomic balance+ledger transactions.
+- Added optional backward-compatible operation keys and product-oriented wallet/migration regression tests.
+- Split mutating development preparation from cross-platform non-mutating final acceptance with before/after source hash verification.
+
+## VC-PH08-WP08-03-02A-R02 — Cross-Platform Acceptance Launcher Correction
+
+- Corrected the Node acceptance verifier on Windows by removing direct `spawnSync` execution of `npm.cmd`/`npx.cmd` shims with `shell: false`, which produced `spawnSync npm.cmd EINVAL`.
+- The verifier now invokes the active npm CLI (`process.env.npm_execpath`) through the current Node executable (`process.execPath`) on every platform.
+- Removed the `npx` dependency from acceptance execution; focused and full Jest stages now run through the repository's locked `npm test` script.
+- Added a dependency-free self-check that rejects future direct `.cmd` spawning and requires the cross-platform Node/npm launcher contract.
+- No wallet, migration, DTO, API, frontend, or business implementation changed from WP08-03-02A-R01.

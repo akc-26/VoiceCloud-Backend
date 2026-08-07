@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsUUID,
-  IsNumber,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 import { WalletBalanceType } from '../../../common/enums';
@@ -31,4 +31,12 @@ export class WalletTransferDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional idempotency key for safely retrying this financial operation',
+  })
+  @IsOptional()
+  @IsString()
+  operationKey?: string;
 }

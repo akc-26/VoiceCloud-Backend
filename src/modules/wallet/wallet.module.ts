@@ -10,6 +10,7 @@ import { CreatorSettlement } from './entities/creator-settlement.entity';
 import { User } from '../users/entities/user.entity';
 
 import { WalletService } from './wallet.service';
+import { WalletMutationService } from './wallet-mutation.service';
 import { WalletController } from './wallet.controller';
 import { AdminWalletController } from './admin-wallet.controller';
 
@@ -36,6 +37,7 @@ import { PaymentGatewayFactory } from './providers/payment-gateway.factory';
   controllers: [WalletController, AdminWalletController],
   providers: [
     WalletService,
+    WalletMutationService,
     GooglePlayProvider,
     AppleIapProvider,
     StripeProvider,
@@ -43,6 +45,6 @@ import { PaymentGatewayFactory } from './providers/payment-gateway.factory';
     PaypalProvider,
     PaymentGatewayFactory,
   ],
-  exports: [WalletService, TypeOrmModule],
+  exports: [WalletService, WalletMutationService, TypeOrmModule],
 })
 export class WalletModule {}

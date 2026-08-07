@@ -8,7 +8,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository } from 'typeorm';
 import { WalletBalance } from './entities/wallet-balance.entity';
 import { WalletTransaction } from './entities/wallet-transaction.entity';
 import { CoinPackage } from './entities/coin-package.entity';
@@ -16,7 +16,6 @@ import { PaymentProvider } from './entities/payment-provider.entity';
 import { Purchase } from './entities/purchase.entity';
 import { Refund } from './entities/refund.entity';
 import { CreatorSettlement } from './entities/creator-settlement.entity';
-import { User } from '../users/entities/user.entity';
 
 import { TransactionQueryDto } from './dto/transaction-query.dto';
 import { LedgerQueryDto } from './dto/ledger-query.dto';
@@ -34,6 +33,7 @@ import {
   UpdateCoinPackageDto,
 } from './dto/coin-package.dto';
 import { ConvertDiamondsDto } from './dto/convert-diamonds.dto';
+import { WalletMutationService } from './wallet-mutation.service';
 
 import { PaymentGatewayFactory } from './providers/payment-gateway.factory';
 import { RedisService } from '../../redis/redis.service';
@@ -70,10 +70,8 @@ export class WalletService {
     private readonly refundRepository: Repository<Refund>,
     @InjectRepository(CreatorSettlement)
     private readonly creatorSettlementRepository: Repository<CreatorSettlement>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
     private readonly paymentGatewayFactory: PaymentGatewayFactory,
-    private readonly dataSource: DataSource,
+    private readonly walletMutationService: WalletMutationService,
     @Optional() private readonly redisService?: RedisService,
     @Optional() private readonly queueService?: QueueService,
   ) {}
@@ -84,48 +82,7 @@ export class WalletService {
    * Validates user existence first to prevent foreign key constraint violations.
    */
   async getOrCreateWalletBalance(userId: string): Promise<WalletBalance> {
-    let user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      try {
-        user = this.userRepository.create({
-          id: userId,
-          username: `user_${userId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)}`,
-          displayName: `User ${userId.slice(0, 6)}`,
-          email: `${userId.slice(0, 8)}@voicecloud.app`,
-          role: 'USER',
-          isGuest: false,
-          phoneVerified: true,
-        });
-        user = await this.userRepository.save(user);
-      } catch (err) {
-        this.logger.warn(
-          `Could not auto-provision user '${userId}' for wallet: ${(err as Error).message}`,
-        );
-      }
-    }
-
-    let wallet = await this.walletBalanceRepository.findOne({
-      where: { userId },
-    });
-
-    if (!wallet) {
-      wallet = this.walletBalanceRepository.create({
-        userId,
-        coinBalance: 1000,
-        diamondBalance: 500,
-        bonusBalance: 100,
-        promotionalBalance: 50,
-        frozenBalance: 0,
-        withdrawableBalance: 250,
-        totalCoinsPurchased: 5000,
-        totalCoinsSpent: 4000,
-        totalDiamondsEarned: 2000,
-        totalDiamondsWithdrawn: 1500,
-      });
-      wallet = await this.walletBalanceRepository.save(wallet);
-    }
-
-    return wallet;
+    return this.walletMutationService.getOrCreateWalletBalance(userId);
   }
 
   /**
@@ -238,48 +195,25 @@ export class WalletService {
    * POST /wallet/transactions/credit (Admin or Internal)
    */
   async creditWallet(dto: CreditWalletDto, adminId?: string) {
-    const wallet = await this.getOrCreateWalletBalance(dto.userId);
     const balanceType = dto.balanceType || WalletBalanceType.COIN;
-
-    if (balanceType === WalletBalanceType.COIN) {
-      wallet.coinBalance += dto.amount;
-    } else if (balanceType === WalletBalanceType.DIAMOND) {
-      wallet.diamondBalance += dto.amount;
-      wallet.totalDiamondsEarned += dto.amount;
-    } else if (balanceType === WalletBalanceType.BONUS) {
-      wallet.bonusBalance = (wallet.bonusBalance || 0) + dto.amount;
-    } else if (balanceType === WalletBalanceType.PROMOTIONAL) {
-      wallet.promotionalBalance = (wallet.promotionalBalance || 0) + dto.amount;
-    } else if (balanceType === WalletBalanceType.FROZEN) {
-      wallet.frozenBalance = (wallet.frozenBalance || 0) + dto.amount;
-    } else if (balanceType === WalletBalanceType.WITHDRAWABLE) {
-      wallet.withdrawableBalance =
-        (wallet.withdrawableBalance || 0) + dto.amount;
-    }
-
-    await this.walletBalanceRepository.save(wallet);
-
-    const ledgerTx = await this.recordLedgerEntry({
-      walletId: wallet.id,
+    const result = await this.walletMutationService.credit({
       userId: dto.userId,
       transactionType: dto.transactionType || WalletTransactionType.CREDIT,
       amount: dto.amount,
-      currency:
-        balanceType === WalletBalanceType.DIAMOND
-          ? WalletCurrency.DIAMOND
-          : WalletCurrency.COIN,
       balanceType,
       source: adminId ? `ADMIN:${adminId}` : 'SYSTEM',
       destination: dto.userId,
       referenceType: dto.referenceType || 'CREDIT',
       referenceId: dto.referenceId,
       remarks: dto.remarks || `Credited ${dto.amount} ${balanceType}`,
+      operationKey: dto.operationKey,
     });
 
     return {
       success: true,
-      wallet,
-      transaction: ledgerTx,
+      wallet: result.wallet,
+      transaction: result.transaction,
+      idempotent: result.idempotent,
     };
   }
 
@@ -287,64 +221,25 @@ export class WalletService {
    * POST /wallet/transactions/debit (Admin or Internal)
    */
   async debitWallet(dto: DebitWalletDto, adminId?: string) {
-    const wallet = await this.getOrCreateWalletBalance(dto.userId);
     const balanceType = dto.balanceType || WalletBalanceType.COIN;
-
-    let currentBalance = 0;
-    if (balanceType === WalletBalanceType.COIN)
-      currentBalance = wallet.coinBalance;
-    else if (balanceType === WalletBalanceType.DIAMOND)
-      currentBalance = wallet.diamondBalance;
-    else if (balanceType === WalletBalanceType.BONUS)
-      currentBalance = wallet.bonusBalance || 0;
-    else if (balanceType === WalletBalanceType.PROMOTIONAL)
-      currentBalance = wallet.promotionalBalance || 0;
-    else if (balanceType === WalletBalanceType.WITHDRAWABLE)
-      currentBalance = wallet.withdrawableBalance || 0;
-
-    if (currentBalance < dto.amount) {
-      throw new BadRequestException(
-        `Insufficient ${balanceType} balance for debit`,
-      );
-    }
-
-    if (balanceType === WalletBalanceType.COIN) {
-      wallet.coinBalance -= dto.amount;
-      wallet.totalCoinsSpent += dto.amount;
-    } else if (balanceType === WalletBalanceType.DIAMOND) {
-      wallet.diamondBalance -= dto.amount;
-    } else if (balanceType === WalletBalanceType.BONUS) {
-      wallet.bonusBalance -= dto.amount;
-    } else if (balanceType === WalletBalanceType.PROMOTIONAL) {
-      wallet.promotionalBalance -= dto.amount;
-    } else if (balanceType === WalletBalanceType.WITHDRAWABLE) {
-      wallet.withdrawableBalance -= dto.amount;
-      wallet.totalDiamondsWithdrawn += dto.amount;
-    }
-
-    await this.walletBalanceRepository.save(wallet);
-
-    const ledgerTx = await this.recordLedgerEntry({
-      walletId: wallet.id,
+    const result = await this.walletMutationService.debit({
       userId: dto.userId,
       transactionType: dto.transactionType || WalletTransactionType.DEBIT,
       amount: dto.amount,
-      currency:
-        balanceType === WalletBalanceType.DIAMOND
-          ? WalletCurrency.DIAMOND
-          : WalletCurrency.COIN,
       balanceType,
       source: dto.userId,
       destination: adminId ? `ADMIN:${adminId}` : 'SYSTEM',
       referenceType: dto.referenceType || 'DEBIT',
       referenceId: dto.referenceId,
       remarks: dto.remarks || `Debited ${dto.amount} ${balanceType}`,
+      operationKey: dto.operationKey,
     });
 
     return {
       success: true,
-      wallet,
-      transaction: ledgerTx,
+      wallet: result.wallet,
+      transaction: result.transaction,
+      idempotent: result.idempotent,
     };
   }
 
@@ -356,81 +251,14 @@ export class WalletService {
       throw new BadRequestException('Cannot transfer funds to yourself');
     }
 
-    const senderWallet = await this.getOrCreateWalletBalance(senderUserId);
-    const recipientWallet = await this.getOrCreateWalletBalance(
-      dto.recipientUserId,
-    );
     const balanceType = dto.balanceType || WalletBalanceType.COIN;
-
-    if (
-      balanceType === WalletBalanceType.COIN &&
-      senderWallet.coinBalance < dto.amount
-    ) {
-      throw new BadRequestException('Insufficient coin balance for transfer');
-    } else if (
-      balanceType === WalletBalanceType.DIAMOND &&
-      senderWallet.diamondBalance < dto.amount
-    ) {
-      throw new BadRequestException(
-        'Insufficient diamond balance for transfer',
-      );
-    }
-
-    // Deduct sender
-    if (balanceType === WalletBalanceType.COIN) {
-      senderWallet.coinBalance -= dto.amount;
-      senderWallet.totalCoinsSpent += dto.amount;
-    } else {
-      senderWallet.diamondBalance -= dto.amount;
-    }
-    await this.walletBalanceRepository.save(senderWallet);
-
-    // Credit recipient
-    if (balanceType === WalletBalanceType.COIN) {
-      recipientWallet.coinBalance += dto.amount;
-    } else {
-      recipientWallet.diamondBalance += dto.amount;
-    }
-    await this.walletBalanceRepository.save(recipientWallet);
-
-    // Ledger for sender
-    const senderTx = await this.recordLedgerEntry({
-      walletId: senderWallet.id,
-      userId: senderUserId,
-      transactionType: WalletTransactionType.TRANSFER,
+    const result = await this.walletMutationService.transfer({
+      senderUserId,
+      recipientUserId: dto.recipientUserId,
       amount: dto.amount,
-      currency:
-        balanceType === WalletBalanceType.DIAMOND
-          ? WalletCurrency.DIAMOND
-          : WalletCurrency.COIN,
       balanceType,
-      source: senderUserId,
-      destination: dto.recipientUserId,
-      referenceType: 'USER_TRANSFER',
-      referenceId: dto.recipientUserId,
-      remarks:
-        dto.remarks ||
-        `Transferred ${dto.amount} ${balanceType} to user ${dto.recipientUserId}`,
-    });
-
-    // Ledger for recipient
-    await this.recordLedgerEntry({
-      walletId: recipientWallet.id,
-      userId: dto.recipientUserId,
-      transactionType: WalletTransactionType.TRANSFER,
-      amount: dto.amount,
-      currency:
-        balanceType === WalletBalanceType.DIAMOND
-          ? WalletCurrency.DIAMOND
-          : WalletCurrency.COIN,
-      balanceType,
-      source: senderUserId,
-      destination: dto.recipientUserId,
-      referenceType: 'USER_TRANSFER',
-      referenceId: senderUserId,
-      remarks:
-        dto.remarks ||
-        `Received ${dto.amount} ${balanceType} from user ${senderUserId}`,
+      remarks: dto.remarks,
+      operationKey: dto.operationKey,
     });
 
     return {
@@ -438,10 +266,12 @@ export class WalletService {
       amount: dto.amount,
       balanceType,
       senderWallet: {
-        coinBalance: senderWallet.coinBalance,
-        diamondBalance: senderWallet.diamondBalance,
+        coinBalance: result.senderWallet.coinBalance,
+        diamondBalance: result.senderWallet.diamondBalance,
       },
-      transaction: senderTx,
+      transaction: result.senderTransaction,
+      operationGroupId: result.operationGroupId,
+      idempotent: result.idempotent,
     };
   }
 
@@ -787,42 +617,24 @@ export class WalletService {
    * POST /wallet/convert-diamonds
    */
   async convertDiamonds(userId: string, dto: ConvertDiamondsDto) {
-    const wallet = await this.getOrCreateWalletBalance(userId);
-
-    if (wallet.diamondBalance < dto.diamondAmount) {
-      throw new BadRequestException(
-        'Insufficient diamond balance for conversion',
-      );
-    }
-
-    const conversionRate = 10; // 1 Diamond = 10 Coins
+    const conversionRate = 10;
     const coinsGranted = dto.diamondAmount * conversionRate;
-
-    wallet.diamondBalance -= dto.diamondAmount;
-    wallet.coinBalance += coinsGranted;
-    await this.walletBalanceRepository.save(wallet);
-
-    const ledgerTx = await this.recordLedgerEntry({
-      walletId: wallet.id,
+    const result = await this.walletMutationService.convertDiamonds({
       userId,
-      transactionType: WalletTransactionType.DIAMOND_CONVERSION,
-      amount: coinsGranted,
-      currency: WalletCurrency.COIN,
-      balanceType: 'COIN',
-      source: userId,
-      destination: userId,
-      referenceType: 'DIAMOND_CONVERSION',
-      referenceId: `conv_${Date.now()}`,
-      remarks: `Converted ${dto.diamondAmount} diamonds to ${coinsGranted} coins`,
+      diamondAmount: dto.diamondAmount,
+      coinsGranted,
+      operationKey: dto.operationKey,
     });
 
     return {
       success: true,
       diamondsConverted: dto.diamondAmount,
       coinsGranted,
-      newDiamondBalance: wallet.diamondBalance,
-      newCoinBalance: wallet.coinBalance,
-      transaction: ledgerTx,
+      newDiamondBalance: result.wallet.diamondBalance,
+      newCoinBalance: result.wallet.coinBalance,
+      transaction: result.coinTransaction,
+      operationGroupId: result.operationGroupId,
+      idempotent: result.idempotent,
     };
   }
 
@@ -835,38 +647,23 @@ export class WalletService {
     sourceId: string,
     sourceName = 'GIFT',
   ) {
-    const wallet = await this.getOrCreateWalletBalance(creatorId);
-
-    const platformSharePct = 0.2; // 20% platform share
+    const platformSharePct = 0.2;
     const netDiamonds = Math.floor(grossDiamonds * (1 - platformSharePct));
-
-    wallet.diamondBalance += netDiamonds;
-    wallet.totalDiamondsEarned += netDiamonds;
-    wallet.withdrawableBalance =
-      (wallet.withdrawableBalance || 0) + netDiamonds;
-
-    await this.walletBalanceRepository.save(wallet);
-
-    const ledgerTx = await this.recordLedgerEntry({
-      walletId: wallet.id,
-      userId: creatorId,
-      transactionType: WalletTransactionType.CREATOR_EARNINGS,
-      amount: netDiamonds,
-      currency: WalletCurrency.DIAMOND,
-      balanceType: 'DIAMOND',
-      source: sourceName,
-      destination: creatorId,
-      referenceType: sourceName,
-      referenceId: sourceId,
-      remarks: `Creator earned ${netDiamonds} net diamonds from ${sourceName} (Gross: ${grossDiamonds})`,
+    const result = await this.walletMutationService.recordCreatorEarnings({
+      creatorId,
+      grossDiamonds,
+      netDiamonds,
+      sourceId,
+      sourceName,
     });
 
     return {
       success: true,
       netDiamonds,
       grossDiamonds,
-      wallet,
-      transaction: ledgerTx,
+      wallet: result.wallet,
+      transaction: result.transaction,
+      idempotent: result.idempotent,
     };
   }
 

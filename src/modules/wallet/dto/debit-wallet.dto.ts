@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsUUID,
-  IsNumber,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 import {
@@ -52,4 +52,12 @@ export class DebitWalletDto {
   @IsOptional()
   @IsString()
   referenceType?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional idempotency key for safely retrying this financial operation',
+  })
+  @IsOptional()
+  @IsString()
+  operationKey?: string;
 }

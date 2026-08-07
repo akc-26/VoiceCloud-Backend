@@ -10,7 +10,6 @@ import {
   FrontendHostingPaths,
   registerFrontendHosting,
 } from './hosting/frontend-hosting';
-
 describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
   let app: INestApplication;
   let temporaryDistRoot: string;
@@ -23,7 +22,6 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
     const websiteDist = path.join(temporaryDistRoot, 'website');
     const adminDist = path.join(temporaryDistRoot, 'admin');
     const creatorDist = path.join(temporaryDistRoot, 'creator');
-
     for (const directory of [websiteDist, adminDist, creatorDist]) {
       fs.mkdirSync(path.join(directory, 'assets'), { recursive: true });
       fs.writeFileSync(
@@ -31,7 +29,6 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
         'window.__VOICECLOUD_HOSTING_TEST__ = true;',
       );
     }
-
     fs.writeFileSync(
       path.join(websiteDist, 'index.html'),
       '<!doctype html><html><body>Landing<script src="/assets/app.js"></script></body></html>',
@@ -44,7 +41,6 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
       path.join(creatorDist, 'index.html'),
       '<!doctype html><html><body>Creator<script src="/creator/assets/app.js"></script></body></html>',
     );
-
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [AppService],
@@ -63,7 +59,6 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
         { path: 'api/info', method: RequestMethod.GET },
       ],
     });
-
     const hostingPaths: FrontendHostingPaths = {
       distRoot: temporaryDistRoot,
       websiteDist,
@@ -91,14 +86,12 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
       fs.rmSync(temporaryDistRoot, { recursive: true, force: true });
     }
   });
-
   it('GET /api should return API metadata JSON', async () => {
     const response = await request(app.getHttpServer()).get('/api').expect(200);
     expect(response.body.name).toBe('VoiceCloud Monolith API');
     expect(response.body.version).toBe('1.0.0');
     expect(response.body.status).toBe('online');
   });
-
   it('GET /api/info should return API metadata detail JSON', async () => {
     const response = await request(app.getHttpServer())
       .get('/api/info')
@@ -107,7 +100,6 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
     expect(response.body.api).toBe('/api');
     expect(response.body.health).toBe('/health');
   });
-
   it.each([
     ['Landing Website', '/', 'Landing'],
     ['Admin Portal', '/admin/', 'Admin'],
@@ -122,7 +114,6 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
     expect(response.text).toContain('<!doctype html>');
     expect(response.text).toContain(marker);
   });
-
   it.each([
     ['/administer', 'Landing'],
     ['/creator-tools', 'Landing'],
@@ -138,7 +129,6 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
       expect(response.text).toContain(marker);
     },
   );
-
   it.each([
     ['/assets/app.js'],
     ['/admin/assets/app.js'],
@@ -147,14 +137,12 @@ describe('Hosting & SPA Routing Reconciliation (e2e/unit)', () => {
     const response = await request(app.getHttpServer()).get(route).expect(200);
     expect(response.text).toContain('__VOICECLOUD_HOSTING_TEST__');
   });
-
   it('does not use an SPA fallback for non-GET requests', async () => {
     const response = await request(app.getHttpServer()).post('/admin/users');
     expect(response.status).toBe(404);
     expect(response.headers['content-type']).toContain('application/json');
     expect(response.text).not.toContain('<html');
   });
-
   it(
     'GET /api/nonexistent-route returns JSON 404 instead of SPA HTML',
     async () => {

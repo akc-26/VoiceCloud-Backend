@@ -5,6 +5,7 @@ import { Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { JwtTokenService } from '../auth/jwt-token.service';
 import { WalletService } from './wallet.service';
+import { WalletMutationService } from './wallet-mutation.service';
 import { WalletController } from './wallet.controller';
 import { WalletBalance } from './entities/wallet-balance.entity';
 import { WalletTransaction } from './entities/wallet-transaction.entity';
@@ -88,6 +89,15 @@ describe('Phase 2C Wallet Business APIs', () => {
     createQueryRunner: jest.fn(),
   };
 
+  const mockWalletMutationService = {
+    getOrCreateWalletBalance: jest.fn(),
+    credit: jest.fn(),
+    debit: jest.fn(),
+    transfer: jest.fn(),
+    convertDiamonds: jest.fn(),
+    recordCreatorEarnings: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -135,6 +145,10 @@ describe('Phase 2C Wallet Business APIs', () => {
           provide: DataSource,
           useValue: mockDataSource,
         },
+        {
+          provide: WalletMutationService,
+          useValue: mockWalletMutationService,
+        },
         Reflector,
         {
           provide: JwtTokenService,
@@ -150,35 +164,21 @@ describe('Phase 2C Wallet Business APIs', () => {
   });
 
   describe('WalletService - getOrCreateWalletBalance', () => {
-    it('should return existing wallet balance if found', async () => {
+    it('should return the authoritative wallet mutation service result', async () => {
       const mockBalance = {
         userId: 'user-123',
         coinBalance: 500,
         diamondBalance: 50,
       };
-      mockWalletBalanceRepository.findOne.mockResolvedValue(mockBalance);
+      mockWalletMutationService.getOrCreateWalletBalance.mockResolvedValue(
+        mockBalance,
+      );
 
       const result = await service.getOrCreateWalletBalance('user-123');
       expect(result).toEqual(mockBalance);
-      expect(mockWalletBalanceRepository.findOne).toHaveBeenCalledWith({
-        where: { userId: 'user-123' },
-      });
-    });
-
-    it('should create and save a default zero-balance wallet if none exists', async () => {
-      mockWalletBalanceRepository.findOne.mockResolvedValue(null);
-      const createdWallet = {
-        userId: 'user-456',
-        coinBalance: 0,
-        diamondBalance: 0,
-      };
-      mockWalletBalanceRepository.create.mockReturnValue(createdWallet);
-      mockWalletBalanceRepository.save.mockResolvedValue(createdWallet);
-
-      const result = await service.getOrCreateWalletBalance('user-456');
-      expect(result).toEqual(createdWallet);
-      expect(mockWalletBalanceRepository.create).toHaveBeenCalled();
-      expect(mockWalletBalanceRepository.save).toHaveBeenCalled();
+      expect(
+        mockWalletMutationService.getOrCreateWalletBalance,
+      ).toHaveBeenCalledWith('user-123');
     });
   });
 
@@ -194,7 +194,9 @@ describe('Phase 2C Wallet Business APIs', () => {
         totalDiamondsWithdrawn: 50,
         updatedAt: new Date(),
       };
-      mockWalletBalanceRepository.findOne.mockResolvedValue(mockBalance);
+      mockWalletMutationService.getOrCreateWalletBalance.mockResolvedValue(
+        mockBalance,
+      );
 
       const result = await service.getWalletBalance('user-123');
       expect(result.coinBalance).toBe(1000);
@@ -217,7 +219,9 @@ describe('Phase 2C Wallet Business APIs', () => {
         totalDiamondsEarned: 30,
         totalDiamondsWithdrawn: 0,
       };
-      mockWalletBalanceRepository.findOne.mockResolvedValue(mockBalance);
+      mockWalletMutationService.getOrCreateWalletBalance.mockResolvedValue(
+        mockBalance,
+      );
 
       const mockTx = {
         id: 'tx-1',
