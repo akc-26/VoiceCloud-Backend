@@ -20,6 +20,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { WalletService } from './wallet.service';
+import { CreatorPayoutLifecycleService } from './creator-payout-lifecycle.service';
 import { LedgerQueryDto } from './dto/ledger-query.dto';
 import { CreditWalletDto } from './dto/credit-wallet.dto';
 import { DebitWalletDto } from './dto/debit-wallet.dto';
@@ -32,13 +33,19 @@ import {
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { PayoutStatus, UserRole } from '../../common/enums';
 
 @ApiTags('Admin Wallet')
 @Controller('admin/wallet')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class AdminWalletController {
-  constructor(private readonly walletService: WalletService) {}
+  constructor(
+    private readonly walletService: WalletService,
+    private readonly creatorPayoutLifecycleService: CreatorPayoutLifecycleService,
+  ) {}
 
   @Get('overview')
   @ApiOperation({
@@ -101,6 +108,53 @@ export class AdminWalletController {
   @ApiResponse({ status: 200, description: 'Creator settlement processed' })
   async processCreatorSettlement(@Body() dto: CreatorSettlementDto) {
     return this.walletService.processCreatorSettlement(dto.creatorId, dto);
+  }
+
+  @Get('creator/payouts')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'List creator payout requests for Admin review' })
+  async listCreatorPayouts(@Query('status') status?: PayoutStatus) {
+    return this.creatorPayoutLifecycleService.list(status);
+  }
+
+  @Post('creator/payouts/:id/approve')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Approve a reserved creator payout request' })
+  async approveCreatorPayout(
+    @Param('id') id: string,
+    @CurrentUser('userId') adminId: string,
+  ) {
+    return this.creatorPayoutLifecycleService.approve(id, adminId);
+  }
+
+  @Post('creator/payouts/:id/reject')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Reject a creator payout and release reserved funds',
+  })
+  async rejectCreatorPayout(
+    @Param('id') id: string,
+    @CurrentUser('userId') adminId: string,
+    @Body('reason') reason?: string,
+  ) {
+    return this.creatorPayoutLifecycleService.reject(id, adminId, reason);
+  }
+
+  @Post('creator/payouts/:id/process')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Settle an approved creator payout exactly once' })
+  async processCreatorPayout(
+    @Param('id') id: string,
+    @CurrentUser('userId') adminId: string,
+  ) {
+    return this.creatorPayoutLifecycleService.settle(id, adminId);
   }
 
   @Get('packages')

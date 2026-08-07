@@ -39,6 +39,7 @@ import { RankingsModule } from '../modules/rankings/rankings.module';
 import { TasksAchievementsModule } from '../modules/tasks-achievements/tasks-achievements.module';
 import { StoreModule } from '../modules/store/store.module';
 import { ReferralModule } from '../modules/referral/referral.module';
+import { WalletModule } from '../modules/wallet/wallet.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { ReferralModule } from '../modules/referral/referral.module';
     forwardRef(() => TasksAchievementsModule),
     forwardRef(() => StoreModule),
     forwardRef(() => ReferralModule),
+    WalletModule,
     ScheduleModule.forRoot(),
     TypeOrmModule.forFeature([
       UserDevice,

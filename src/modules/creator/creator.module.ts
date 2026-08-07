@@ -12,11 +12,13 @@ import { CreatorService } from './creator.service';
 import { CreatorController } from './creator.controller';
 import { CreatorGateway } from '../../socket/creator.gateway';
 import { SystemSettingsModule } from '../admin/system-settings/system-settings.module';
+import { WalletModule } from '../wallet/wallet.module';
 
 @Module({
   imports: [
     ConfigModule,
     SystemSettingsModule,
+    WalletModule,
     TypeOrmModule.forFeature([
       CreatorPlan,
       CreatorSubscription,

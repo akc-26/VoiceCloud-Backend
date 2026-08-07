@@ -11,6 +11,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtTokenService } from '../auth/jwt-token.service';
 import { CreatorService } from './creator.service';
+import { CreatorPayoutLifecycleService } from '../wallet/creator-payout-lifecycle.service';
 import { CreatorController } from './creator.controller';
 import { CreatorPlan } from '../users/entities/creator-plan.entity';
 import { CreatorSubscription } from '../users/entities/creator-subscription.entity';
@@ -82,6 +83,10 @@ describe('Phase 2D Creator Economy Business APIs', () => {
     get: jest.fn((key: string, defaultVal: any) => defaultVal),
   };
 
+  const mockCreatorPayoutLifecycleService = {
+    reserve: jest.fn(),
+  };
+
   const mockAdminSettingsService = {
     getStreamingInfrastructureSettings: jest.fn().mockResolvedValue({
       provider: 'mediamtx',
@@ -106,6 +111,10 @@ describe('Phase 2D Creator Economy Business APIs', () => {
       controllers: [CreatorController],
       providers: [
         CreatorService,
+        {
+          provide: CreatorPayoutLifecycleService,
+          useValue: mockCreatorPayoutLifecycleService,
+        },
         {
           provide: ConfigService,
           useValue: mockConfigService,
@@ -435,6 +444,9 @@ describe('Phase 2D Creator Economy Business APIs', () => {
 
   describe('CreatorService - Payout Requests', () => {
     it('should throw BadRequestException if requested diamonds < 100', async () => {
+      mockCreatorPayoutLifecycleService.reserve.mockRejectedValueOnce(
+        new BadRequestException('Minimum payout threshold is 100 diamonds'),
+      );
       await expect(
         service.submitPayoutRequest('creator-1', {
           diamondAmount: 50,
@@ -444,10 +456,11 @@ describe('Phase 2D Creator Economy Business APIs', () => {
     });
 
     it('should throw ConflictException if duplicate pending payout exists', async () => {
-      mockPayoutRepository.findOne.mockResolvedValue({
-        id: 'payout-pending',
-        status: PayoutStatus.PENDING,
-      });
+      mockCreatorPayoutLifecycleService.reserve.mockRejectedValueOnce(
+        new ConflictException(
+          'You already have a payout request with reserved funds',
+        ),
+      );
 
       await expect(
         service.submitPayoutRequest('creator-1', {
@@ -458,10 +471,9 @@ describe('Phase 2D Creator Economy Business APIs', () => {
     });
 
     it('should throw BadRequestException if diamond balance is insufficient', async () => {
-      mockPayoutRepository.findOne.mockResolvedValue(null);
-      mockWalletBalanceRepository.findOne.mockResolvedValue({
-        diamondBalance: 500,
-      });
+      mockCreatorPayoutLifecycleService.reserve.mockRejectedValueOnce(
+        new BadRequestException('Insufficient withdrawable diamond balance'),
+      );
 
       await expect(
         service.submitPayoutRequest('creator-1', {
@@ -486,8 +498,9 @@ describe('Phase 2D Creator Economy Business APIs', () => {
         status: PayoutStatus.PENDING,
       };
 
-      mockPayoutRepository.create.mockReturnValue(mockRequest);
-      mockPayoutRepository.save.mockResolvedValue(mockRequest);
+      mockCreatorPayoutLifecycleService.reserve.mockResolvedValueOnce(
+        mockRequest,
+      );
 
       const res = await service.submitPayoutRequest('creator-1', {
         diamondAmount: 1000,
@@ -496,6 +509,10 @@ describe('Phase 2D Creator Economy Business APIs', () => {
 
       expect(res).toEqual(mockRequest);
       expect(res.payoutAmount).toBe(5.0);
+      expect(mockCreatorPayoutLifecycleService.reserve).toHaveBeenCalledWith(
+        'creator-1',
+        expect.objectContaining({ diamondAmount: 1000 }),
+      );
     });
 
     it('should throw ForbiddenException if user views another creator payout details', async () => {

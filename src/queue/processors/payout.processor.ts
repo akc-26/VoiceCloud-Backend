@@ -1,12 +1,10 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { QUEUE_NAMES, JOB_TYPES } from '../queue.constants';
-import { CreatorPayoutRequest } from '../../modules/users/entities/creator-payout-request.entity';
 import { PayoutStatus } from '../../common/enums';
 import { NotificationsService } from '../../modules/notifications/notifications.service';
+import { CreatorPayoutLifecycleService } from '../../modules/wallet/creator-payout-lifecycle.service';
 import { NotificationType } from '../../modules/notifications/entities/notification.entity';
 
 export interface PayoutJobData {
@@ -22,8 +20,7 @@ export class PayoutProcessor extends WorkerHost {
   private readonly logger = new Logger(PayoutProcessor.name);
 
   constructor(
-    @InjectRepository(CreatorPayoutRequest)
-    private readonly payoutRepository: Repository<CreatorPayoutRequest>,
+    private readonly payoutLifecycleService: CreatorPayoutLifecycleService,
     private readonly notificationsService: NotificationsService,
   ) {
     super();
@@ -31,61 +28,64 @@ export class PayoutProcessor extends WorkerHost {
 
   async process(job: Job<PayoutJobData, any, string>): Promise<any> {
     const startTime = Date.now();
+    const { payoutRequestId, targetStatus, reviewedBy, notes } = job.data;
     this.logger.log(
-      `[PayoutProcessor] Processing job ${job.id} (${job.name}) - Payout ID: ${job.data.payoutRequestId}`,
+      `[PayoutProcessor] Processing job ${job.id} (${job.name}) - Payout ID: ${payoutRequestId}`,
     );
 
     try {
-      const { payoutRequestId, targetStatus, reviewedBy } = job.data;
-      const payout = await this.payoutRepository.findOne({
-        where: { id: payoutRequestId },
-        relations: { creator: true },
-      });
-
-      if (!payout) {
-        this.logger.warn(
-          `[PayoutProcessor] Payout request ${payoutRequestId} not found. Skipping.`,
-        );
-        return { success: false, reason: 'PAYOUT_NOT_FOUND' };
-      }
-
+      let result;
       const nextStatus = targetStatus || PayoutStatus.PROCESSED;
-      payout.status = nextStatus;
-      payout.reviewedAt = new Date();
-      if (reviewedBy) {
-        payout.reviewedBy = reviewedBy;
+      if (nextStatus === PayoutStatus.APPROVED) {
+        if (!reviewedBy) {
+          throw new Error('reviewedBy is required to approve a payout');
+        }
+        result = await this.payoutLifecycleService.approve(
+          payoutRequestId,
+          reviewedBy,
+        );
+      } else if (nextStatus === PayoutStatus.REJECTED) {
+        if (!reviewedBy) {
+          throw new Error('reviewedBy is required to reject a payout');
+        }
+        result = await this.payoutLifecycleService.reject(
+          payoutRequestId,
+          reviewedBy,
+          notes,
+        );
+      } else if (nextStatus === PayoutStatus.PROCESSED) {
+        result = await this.payoutLifecycleService.settle(
+          payoutRequestId,
+          reviewedBy,
+        );
+      } else {
+        throw new Error(`Unsupported payout target status: ${nextStatus}`);
       }
 
-      await this.payoutRepository.save(payout);
-
-      this.logger.log(
-        `[PayoutProcessor] Payout request ${payoutRequestId} successfully updated to ${nextStatus}`,
-      );
-
-      // Notify creator about payout status change
       try {
         await this.notificationsService.createNotification({
-          userId: payout.creatorId,
-          title: 'Payout Request Processed',
-          message: `Your payout request for ${payout.diamondAmount} diamonds ($${payout.payoutAmount}) has been updated to ${nextStatus}.`,
+          userId: result.payout.creatorId,
+          title: 'Payout Request Updated',
+          message: `Your payout request for ${result.payout.diamondAmount} diamonds ($${result.payout.payoutAmount}) has been updated to ${result.payout.status}.`,
           type: NotificationType.SYSTEM,
           data: {
-            payoutRequestId: payout.id,
-            status: nextStatus,
+            payoutRequestId: result.payout.id,
+            status: result.payout.status,
+            idempotent: result.idempotent,
           },
         });
       } catch (err: any) {
         this.logger.warn(
-          `[PayoutProcessor] Could not send creator payout notification: ${err.message}`,
+          `[PayoutProcessor] Could not persist creator payout notification: ${err.message}`,
         );
       }
 
-      const duration = Date.now() - startTime;
       return {
         success: true,
         payoutRequestId,
-        status: nextStatus,
-        durationMs: duration,
+        status: result.payout.status,
+        idempotent: result.idempotent,
+        durationMs: Date.now() - startTime,
       };
     } catch (error: any) {
       const duration = Date.now() - startTime;

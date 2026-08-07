@@ -14,15 +14,12 @@ import { CreatorPayoutRequest } from './entities/creator-payout-request.entity';
 import { CreatorPlan } from './entities/creator-plan.entity';
 import { StorageService } from '../storage/storage.service';
 import { MediaCategory } from '../storage/enums/media-category.enum';
+import { CreatorPayoutLifecycleService } from '../wallet/creator-payout-lifecycle.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdatePrivacySettingsDto } from './dto/update-privacy-settings.dto';
 import { AddExperienceDto, ExperienceType } from './dto/experience.dto';
 import { SearchUsersDto } from './dto/search-users.dto';
-import {
-  SubscriptionStatus,
-  PayoutStatus,
-  PayoutMethod,
-} from '../../common/enums';
+import { SubscriptionStatus, PayoutMethod } from '../../common/enums';
 
 @Injectable()
 export class UsersService {
@@ -38,6 +35,7 @@ export class UsersService {
     @InjectRepository(CreatorPlan)
     private readonly creatorPlanRepository: Repository<CreatorPlan>,
     private readonly storageService: StorageService,
+    private readonly creatorPayoutLifecycleService: CreatorPayoutLifecycleService,
   ) {}
 
   // =================== CORE USER METHODS ===================
@@ -592,14 +590,11 @@ export class UsersService {
     method: PayoutMethod,
     accountDetails: Record<string, unknown>,
   ): Promise<CreatorPayoutRequest> {
-    const req = this.creatorPayoutRepository.create({
-      creatorId,
-      payoutAmount: amount,
+    return this.creatorPayoutLifecycleService.reserve(creatorId, {
+      diamondAmount: amount,
       payoutMethod: method || PayoutMethod.BANK_TRANSFER,
       accountDetails,
-      status: PayoutStatus.PENDING,
     });
-    return await this.creatorPayoutRepository.save(req);
   }
 
   async getCreatorPayoutRequests(

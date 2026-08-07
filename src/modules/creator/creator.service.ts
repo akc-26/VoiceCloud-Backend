@@ -16,6 +16,7 @@ import { CreatorSubscription } from '../users/entities/creator-subscription.enti
 import { CreatorPayoutRequest } from '../users/entities/creator-payout-request.entity';
 import { User } from '../users/entities/user.entity';
 import { WalletBalance } from '../wallet/entities/wallet-balance.entity';
+import { CreatorPayoutLifecycleService } from '../wallet/creator-payout-lifecycle.service';
 import { CreatorStreamCredential } from './entities/creator-stream-credential.entity';
 import { StreamKeyAuditLog } from './entities/stream-key-audit-log.entity';
 import { CreateCreatorPlanDto } from './dto/create-creator-plan.dto';
@@ -35,6 +36,7 @@ export class CreatorService {
   constructor(
     private readonly configService: ConfigService,
     private readonly adminSettingsService: AdminSettingsService,
+    private readonly creatorPayoutLifecycleService: CreatorPayoutLifecycleService,
     @InjectRepository(CreatorPlan)
     private readonly planRepository: Repository<CreatorPlan>,
     @InjectRepository(CreatorSubscription)
@@ -370,44 +372,7 @@ export class CreatorService {
     creatorId: string,
     dto: CreatePayoutRequestDto,
   ): Promise<CreatorPayoutRequest> {
-    if (dto.diamondAmount < 100) {
-      throw new BadRequestException('Minimum payout threshold is 100 diamonds');
-    }
-
-    const existingPending = await this.payoutRepository.findOne({
-      where: { creatorId, status: PayoutStatus.PENDING },
-    });
-
-    if (existingPending) {
-      throw new ConflictException(
-        'You already have a pending payout request in review',
-      );
-    }
-
-    const wallet = await this.walletBalanceRepository.findOne({
-      where: { userId: creatorId },
-    });
-
-    const currentDiamonds = wallet ? Number(wallet.diamondBalance) || 0 : 0;
-
-    if (currentDiamonds < dto.diamondAmount) {
-      throw new BadRequestException(
-        `Insufficient diamond balance. You have ${currentDiamonds} diamonds available.`,
-      );
-    }
-
-    const payoutAmount = Number((dto.diamondAmount * 0.005).toFixed(2));
-
-    const request = this.payoutRepository.create({
-      creatorId,
-      diamondAmount: dto.diamondAmount,
-      payoutAmount,
-      payoutMethod: dto.payoutMethod,
-      accountDetails: dto.accountDetails || {},
-      status: PayoutStatus.PENDING,
-    });
-
-    return this.payoutRepository.save(request);
+    return this.creatorPayoutLifecycleService.reserve(creatorId, dto);
   }
 
   /**

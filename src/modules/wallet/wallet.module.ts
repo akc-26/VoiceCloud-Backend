@@ -8,9 +8,11 @@ import { Purchase } from './entities/purchase.entity';
 import { Refund } from './entities/refund.entity';
 import { CreatorSettlement } from './entities/creator-settlement.entity';
 import { User } from '../users/entities/user.entity';
+import { CreatorPayoutRequest } from '../users/entities/creator-payout-request.entity';
 
 import { WalletService } from './wallet.service';
 import { WalletMutationService } from './wallet-mutation.service';
+import { CreatorPayoutLifecycleService } from './creator-payout-lifecycle.service';
 import { WalletController } from './wallet.controller';
 import { AdminWalletController } from './admin-wallet.controller';
 
@@ -32,12 +34,14 @@ import { PaymentGatewayFactory } from './providers/payment-gateway.factory';
       Refund,
       CreatorSettlement,
       User,
+      CreatorPayoutRequest,
     ]),
   ],
   controllers: [WalletController, AdminWalletController],
   providers: [
     WalletService,
     WalletMutationService,
+    CreatorPayoutLifecycleService,
     GooglePlayProvider,
     AppleIapProvider,
     StripeProvider,
@@ -45,6 +49,11 @@ import { PaymentGatewayFactory } from './providers/payment-gateway.factory';
     PaypalProvider,
     PaymentGatewayFactory,
   ],
-  exports: [WalletService, WalletMutationService, TypeOrmModule],
+  exports: [
+    WalletService,
+    WalletMutationService,
+    CreatorPayoutLifecycleService,
+    TypeOrmModule,
+  ],
 })
 export class WalletModule {}

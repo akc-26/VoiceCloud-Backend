@@ -34,6 +34,7 @@ import { Badge } from './entities/badge.entity';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { WalletModule } from '../wallet/wallet.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ]),
     StorageModule,
     NotificationsModule,
+    WalletModule,
   ],
   controllers: [
     UsersController,

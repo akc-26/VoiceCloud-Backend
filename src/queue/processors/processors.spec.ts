@@ -4,6 +4,7 @@ import { NotificationProcessor } from './notification.processor';
 import { ReminderProcessor } from './reminder.processor';
 import { SubscriptionProcessor } from './subscription.processor';
 import { PayoutProcessor } from './payout.processor';
+import { CreatorPayoutLifecycleService } from '../../modules/wallet/creator-payout-lifecycle.service';
 import { RTCCleanupProcessor } from './rtc-cleanup.processor';
 import { FirebaseMessagingService } from '../firebase/firebase-messaging.service';
 import { NotificationsService } from '../../modules/notifications/notifications.service';
@@ -11,7 +12,6 @@ import { RedisStateService } from '../../redis/redis-state.service';
 import { UserDevice } from '../../modules/users/entities/user-device.entity';
 import { ScheduledRoom } from '../../modules/rooms/entities/scheduled-room.entity';
 import { CreatorSubscription } from '../../modules/users/entities/creator-subscription.entity';
-import { CreatorPayoutRequest } from '../../modules/users/entities/creator-payout-request.entity';
 import {
   SubscriptionStatus,
   PayoutStatus,
@@ -67,15 +67,10 @@ describe('Phase 3C Queue Processors (Workers)', () => {
     save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
   };
 
-  const mockPayoutRepo = {
-    findOne: jest.fn().mockResolvedValue({
-      id: 'payout-1',
-      creatorId: 'creator-1',
-      diamondAmount: 1000,
-      payoutAmount: 5.0,
-      status: PayoutStatus.PENDING,
-    }),
-    save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
+  const mockPayoutLifecycleService = {
+    approve: jest.fn(),
+    reject: jest.fn(),
+    settle: jest.fn(),
   };
 
   const mockRedisStateService = {
@@ -85,6 +80,16 @@ describe('Phase 3C Queue Processors (Workers)', () => {
   };
 
   beforeEach(async () => {
+    mockPayoutLifecycleService.settle.mockResolvedValue({
+      payout: {
+        id: 'payout-1',
+        creatorId: 'creator-1',
+        diamondAmount: 1000,
+        payoutAmount: 5,
+        status: PayoutStatus.PROCESSED,
+      },
+      idempotent: false,
+    });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationProcessor,
@@ -94,6 +99,10 @@ describe('Phase 3C Queue Processors (Workers)', () => {
         RTCCleanupProcessor,
         { provide: FirebaseMessagingService, useValue: mockFirebaseService },
         { provide: NotificationsService, useValue: mockNotificationsService },
+        {
+          provide: CreatorPayoutLifecycleService,
+          useValue: mockPayoutLifecycleService,
+        },
         { provide: RedisStateService, useValue: mockRedisStateService },
         {
           provide: getRepositoryToken(UserDevice),
@@ -106,10 +115,6 @@ describe('Phase 3C Queue Processors (Workers)', () => {
         {
           provide: getRepositoryToken(CreatorSubscription),
           useValue: mockSubscriptionRepo,
-        },
-        {
-          provide: getRepositoryToken(CreatorPayoutRequest),
-          useValue: mockPayoutRepo,
         },
       ],
     }).compile();
@@ -204,7 +209,10 @@ describe('Phase 3C Queue Processors (Workers)', () => {
       const res = await payoutProcessor.process(job);
       expect(res.success).toBe(true);
       expect(res.status).toBe(PayoutStatus.PROCESSED);
-      expect(mockPayoutRepo.save).toHaveBeenCalled();
+      expect(mockPayoutLifecycleService.settle).toHaveBeenCalledWith(
+        'payout-1',
+        'admin-1',
+      );
     });
   });
 

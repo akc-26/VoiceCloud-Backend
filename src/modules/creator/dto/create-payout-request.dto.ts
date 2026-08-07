@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, Min, IsEnum, IsOptional, IsObject } from 'class-validator';
+import {
+  IsInt,
+  Min,
+  IsEnum,
+  IsOptional,
+  IsObject,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { PayoutMethod } from '../../../common/enums';
 
@@ -21,4 +29,12 @@ export class CreatePayoutRequestDto {
   @IsOptional()
   @IsObject()
   accountDetails?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description: 'Optional idempotency key for safe payout request retries',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  operationKey?: string;
 }

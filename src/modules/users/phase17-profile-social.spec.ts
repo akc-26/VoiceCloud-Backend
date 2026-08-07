@@ -5,6 +5,7 @@ import { User } from './entities/user.entity';
 import { Follow } from './entities/follow.entity';
 import { CreatorSubscription } from './entities/creator-subscription.entity';
 import { CreatorPayoutRequest } from './entities/creator-payout-request.entity';
+import { CreatorPayoutLifecycleService } from '../wallet/creator-payout-lifecycle.service';
 import { CreatorPlan } from './entities/creator-plan.entity';
 import { StorageService } from '../storage/storage.service';
 import { ExperienceType } from './dto/experience.dto';
@@ -45,6 +46,10 @@ describe('Phase 17 - User Profile & Social Identity Platform', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
+        {
+          provide: CreatorPayoutLifecycleService,
+          useValue: { reserve: jest.fn() },
+        },
         { provide: getRepositoryToken(User), useValue: mockUserRepository },
         { provide: getRepositoryToken(Follow), useValue: mockFollowRepository },
         { provide: getRepositoryToken(CreatorSubscription), useValue: {} },

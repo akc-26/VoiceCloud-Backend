@@ -1,3 +1,12 @@
+## VC-PH08-WP08-03-02C — Creator Payout Lifecycle
+
+- Added PostgreSQL-authoritative Creator payout reservation that moves requested diamonds from spendable/withdrawable balance into frozen balance in the same transaction as payout request and ledger persistence.
+- Added strict payout transitions: pending approval, rejection with one-time release, and approved settlement with one-time frozen-balance consumption.
+- Added durable payout operation groups, reservation/settlement/release timestamps, immutable ledger links, and rejection evidence through a reversible Phase08 migration.
+- Refactored BullMQ payout processing to delegate to the same financial lifecycle authority instead of changing payout status directly.
+- Added explicit Admin/Super Admin payout review endpoints while deferring the broader Admin economy RBAC reconciliation to WP08-03-02D.
+- Added product-oriented payout lifecycle and migration regression coverage plus consolidated non-mutating acceptance tooling.
+
 ## VC-PH08-WP08-03-02B — Authoritative Gift Settlement
 
 - Replaced Redis wallet debits/credits in gift sending with one PostgreSQL transactional settlement authority.

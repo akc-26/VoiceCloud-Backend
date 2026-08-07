@@ -72,7 +72,10 @@ requireText(
   'src/modules/gifts/gift-settlement.service.ts',
   'this.walletMutationService.getDeterministicLockOrder',
 );
-requireText('src/modules/gifts/gift-settlement.service.ts', 'room.hostId');
+requireText(
+  'src/modules/gifts/gift-settlement.service.ts',
+  'room.hostId',
+);
 forbidText('src/modules/gifts/gift-settlement.service.ts', 'host_placeholder');
 forbidText('src/modules/gifts/gifting-engine.service.ts', 'wallet:${');
 forbidText('src/modules/gifts/multi-gifting.service.ts', 'wallet:${');
