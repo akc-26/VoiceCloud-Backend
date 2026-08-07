@@ -1,35 +1,37 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
-  BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Gift } from './entities/gift.entity';
-import { GiftTransaction } from './entities/gift-transaction.entity';
-import { GiftQueueItem } from './entities/gift-queue-item.entity';
+import { EventsGateway } from '../../common/events/events.gateway';
+import { RedisService } from '../../redis/redis.service';
 import {
-  SendGiftDto,
   SendComboDto,
+  SendGiftDto,
   SendMultiGiftPhase22Dto,
 } from './dto/send-gift-phase22.dto';
-import { RedisService } from '../../redis/redis.service';
-import { EventsGateway } from '../../common/events/events.gateway';
+import { GiftQueueItem } from './entities/gift-queue-item.entity';
+import { GiftTransaction } from './entities/gift-transaction.entity';
+import {
+  GiftSettlementResult,
+  GiftSettlementService,
+} from './gift-settlement.service';
 
 @Injectable()
 export class GiftingEngineService {
   private readonly logger = new Logger(GiftingEngineService.name);
 
   constructor(
-    @InjectRepository(Gift)
-    private readonly giftRepository: Repository<Gift>,
     @InjectRepository(GiftTransaction)
     private readonly transactionRepository: Repository<GiftTransaction>,
     @InjectRepository(GiftQueueItem)
     private readonly queueRepository: Repository<GiftQueueItem>,
     private readonly redisService: RedisService,
     private readonly eventsGateway: EventsGateway,
+    private readonly giftSettlementService: GiftSettlementService,
   ) {}
 
   async sendGift(senderId: string, dto: SendGiftDto) {
@@ -38,202 +40,63 @@ export class GiftingEngineService {
       context = 'room',
       roomId,
       quantity = 1,
-      comboStep = 1,
+      operationKey,
     } = dto;
 
-    const gift = await this.giftRepository.findOne({ where: { id: giftId } });
-    if (!gift)
-      throw new NotFoundException(`Gift with ID '${giftId}' not found`);
-
-    if (!gift.isActive || gift.isArchived) {
-      throw new BadRequestException(
-        `Gift '${gift.name}' is currently unavailable`,
-      );
-    }
-
-    // Determine target receivers
-    const receivers: string[] = [];
-    if (dto.receiverId) receivers.push(dto.receiverId);
-    if (dto.receiverIds && dto.receiverIds.length > 0) {
-      for (const rId of dto.receiverIds) {
-        if (!receivers.includes(rId)) receivers.push(rId);
-      }
-    }
-    if (receivers.length === 0) {
-      receivers.push('host_placeholder');
-    }
-
-    const recipientCount = receivers.length;
-    const totalUnits = quantity * recipientCount;
-    const totalCoinsRequired = gift.coinPrice * totalUnits;
-
-    // Check limited stock
-    if (gift.isLimitedEdition && gift.remainingStock !== null) {
-      if (gift.remainingStock < totalUnits) {
-        throw new BadRequestException(
-          `Insufficient stock for '${gift.name}'. Requested: ${totalUnits}, Remaining: ${gift.remainingStock}`,
-        );
-      }
-    }
-
-    // Check sender wallet coins
-    const senderCoinsRaw = await this.redisService.get(
-      `wallet:${senderId}:coins`,
-    );
-    const senderCoins = senderCoinsRaw ? parseInt(senderCoinsRaw, 10) : 10000;
-
-    if (senderCoins < totalCoinsRequired) {
-      throw new BadRequestException(
-        `Insufficient coin balance. Required: ${totalCoinsRequired}, Available: ${senderCoins}`,
-      );
-    }
-
-    // Deduct coins
-    const newSenderCoins = senderCoins - totalCoinsRequired;
-    await this.redisService.set(
-      `wallet:${senderId}:coins`,
-      newSenderCoins.toString(),
-    );
-
-    // Deduct stock if limited
-    if (gift.isLimitedEdition && gift.remainingStock !== null) {
-      gift.remainingStock = Math.max(0, gift.remainingStock - totalUnits);
-      await this.giftRepository.save(gift);
-    }
-
-    // Calculate Combo
-    const comboKey = `combo:${roomId || 'global'}:${senderId}:${giftId}`;
-    const currentComboRaw = await this.redisService.get(comboKey);
-    const prevCombo = currentComboRaw ? parseInt(currentComboRaw, 10) : 0;
-    const newComboCount = prevCombo + totalUnits;
-    await this.redisService.set(comboKey, newComboCount.toString(), 10); // 10s combo window
-
-    // Combo Multiplier
-    let comboMultiplier = 1.0;
-    if (newComboCount >= 21) comboMultiplier = 2.0;
-    else if (newComboCount >= 11) comboMultiplier = 1.5;
-    else if (newComboCount >= 6) comboMultiplier = 1.2;
-
-    // Calculate earnings
-    const creatorEarningsPct = gift.creatorEarningsPercentage || 70.0;
-    const totalDiamonds = Math.floor(
-      totalCoinsRequired * (creatorEarningsPct / 100) * comboMultiplier,
-    );
-    const diamondsPerReceiver = Math.floor(totalDiamonds / recipientCount);
-
-    // Save transactions & credit receivers
-    const transactions: GiftTransaction[] = [];
-    for (const rId of receivers) {
-      // Credit receiver diamonds
-      const receiverDiamondsRaw = await this.redisService.get(
-        `wallet:${rId}:diamonds`,
-      );
-      const currentDiamonds = receiverDiamondsRaw
-        ? parseInt(receiverDiamondsRaw, 10)
-        : 0;
-      await this.redisService.set(
-        `wallet:${rId}:diamonds`,
-        (currentDiamonds + diamondsPerReceiver).toString(),
-      );
-
-      const tx = this.transactionRepository.create({
-        senderId,
-        receiverId: rId,
-        giftId: gift.id,
-        giftName: gift.name,
-        giftCategory: gift.category,
-        context,
-        roomId: roomId || null,
-        quantity,
-        totalCoins: gift.coinPrice * quantity,
-        comboCount: newComboCount,
-        multiplier: comboMultiplier,
-        creatorEarnings: diamondsPerReceiver,
-      });
-      transactions.push(await this.transactionRepository.save(tx));
-    }
-
-    // Queue Animation
-    let queueItem: GiftQueueItem | null = null;
-    const isFullscreen =
-      gift.type === 'svga' || gift.type === 'video' || gift.coinPrice >= 1000;
-    const priority = isFullscreen ? 50 : 0;
-
-    if (roomId) {
-      queueItem = this.queueRepository.create({
-        roomId,
-        senderId,
-        receiverId: receivers[0],
-        giftId: gift.id,
-        giftName: gift.name,
-        animationUrl: gift.animationUrl || gift.iconUrl || '',
-        quantity: totalUnits,
-        status: 'queued',
-        priority,
-        isFullscreen,
-      });
-      queueItem = await this.queueRepository.save(queueItem);
-    }
-
-    // Broadcast WebSocket Events
-    const eventPayload = {
-      type: 'GIFT_SENT',
-      txIds: transactions.map((t) => t.id),
+    const receiverIds = this.normalizeReceivers(dto);
+    const expectedRecipientCount = Math.max(receiverIds.length, 1);
+    const totalUnits = quantity * expectedRecipientCount;
+    const combo = await this.readComboState(
+      roomId,
       senderId,
-      receivers,
-      giftId: gift.id,
-      giftName: gift.name,
-      giftType: gift.type,
-      rarity: gift.rarity,
-      quantity: totalUnits,
-      totalCoins: totalCoinsRequired,
-      comboCount: newComboCount,
-      multiplier: comboMultiplier,
+      giftId,
+      totalUnits,
+    );
+
+    const settlement = await this.giftSettlementService.settle({
+      senderId,
+      giftId,
+      receiverIds,
       context,
       roomId,
-      animationUrl: gift.animationUrl || gift.iconUrl,
-      isFullscreen,
-      timestamp: new Date().toISOString(),
-    };
+      quantity,
+      comboCount: combo.count,
+      multiplier: combo.multiplier,
+      operationKey,
+    });
 
-    this.eventsGateway.broadcastGiftSent(eventPayload, roomId);
-
-    if (prevCombo === 0) {
-      this.eventsGateway.broadcastComboStarted(
-        { senderId, giftId: gift.id, comboCount: newComboCount, roomId },
+    let queueItem: GiftQueueItem | null = null;
+    if (!settlement.idempotent) {
+      await this.persistComboState(
         roomId,
+        senderId,
+        giftId,
+        settlement.comboCount,
       );
-    } else {
-      this.eventsGateway.broadcastComboUpdated(
-        {
-          senderId,
-          giftId: gift.id,
-          comboCount: newComboCount,
-          multiplier: comboMultiplier,
-          roomId,
-        },
+      queueItem = await this.enqueueAnimation(settlement, senderId, roomId);
+      this.broadcastSettlement(
+        settlement,
+        senderId,
+        context,
         roomId,
+        combo.wasNew,
       );
-    }
-
-    if (isFullscreen) {
-      this.eventsGateway.broadcastFullscreenGift(eventPayload, roomId);
-    } else if (roomId) {
-      this.eventsGateway.broadcastRoomGiftAnimation(eventPayload, roomId);
     }
 
     return {
       success: true,
-      message: `Successfully sent '${gift.name}' to ${recipientCount} recipient(s)`,
+      message: `Successfully sent '${settlement.gift.name}' to ${settlement.receiverIds.length} recipient(s)`,
       data: {
-        gift,
-        totalCoinsDeducted: totalCoinsRequired,
-        remainingSenderCoins: newSenderCoins,
-        comboCount: newComboCount,
-        multiplier: comboMultiplier,
-        recipients: receivers,
-        transactions,
+        gift: settlement.gift,
+        operationGroupId: settlement.operationGroupId,
+        totalCoinsDeducted: settlement.totalCoinsDeducted,
+        remainingSenderCoins: settlement.remainingSenderCoins,
+        comboCount: settlement.comboCount,
+        multiplier: settlement.multiplier,
+        recipients: settlement.receiverIds,
+        transactions: settlement.transactions,
         queueItem,
+        idempotent: settlement.idempotent,
       },
     };
   }
@@ -245,6 +108,7 @@ export class GiftingEngineService {
       roomId: dto.roomId,
       quantity: dto.count || 1,
       context: 'room',
+      operationKey: dto.operationKey,
     });
   }
 
@@ -255,6 +119,7 @@ export class GiftingEngineService {
       roomId: dto.roomId,
       quantity: dto.quantity || 1,
       context: 'room',
+      operationKey: dto.operationKey,
     });
   }
 
@@ -303,5 +168,178 @@ export class GiftingEngineService {
       order: { createdAt: 'DESC' },
       take: limit,
     });
+  }
+
+  private normalizeReceivers(dto: SendGiftDto): string[] {
+    const receivers: string[] = [];
+    if (dto.receiverId?.trim()) receivers.push(dto.receiverId.trim());
+    for (const receiverId of dto.receiverIds || []) {
+      const normalized = receiverId.trim();
+      if (normalized && !receivers.includes(normalized)) {
+        receivers.push(normalized);
+      }
+    }
+    return receivers;
+  }
+
+  private async readComboState(
+    roomId: string | undefined,
+    senderId: string,
+    giftId: string,
+    totalUnits: number,
+  ): Promise<{ count: number; multiplier: number; wasNew: boolean }> {
+    const comboKey = `combo:${roomId || 'global'}:${senderId}:${giftId}`;
+    let previousCount = 0;
+
+    try {
+      const currentComboRaw = await this.redisService.get(comboKey);
+      previousCount = currentComboRaw ? parseInt(currentComboRaw, 10) : 0;
+      if (!Number.isFinite(previousCount) || previousCount < 0) {
+        previousCount = 0;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Gift combo cache read failed; continuing without cached combo state: ${this.errorMessage(error)}`,
+      );
+    }
+
+    const count = previousCount + totalUnits;
+    let multiplier = 1;
+    if (count >= 21) multiplier = 2;
+    else if (count >= 11) multiplier = 1.5;
+    else if (count >= 6) multiplier = 1.2;
+
+    return { count, multiplier, wasNew: previousCount === 0 };
+  }
+
+  private async persistComboState(
+    roomId: string | undefined,
+    senderId: string,
+    giftId: string,
+    comboCount: number,
+  ): Promise<void> {
+    const comboKey = `combo:${roomId || 'global'}:${senderId}:${giftId}`;
+    try {
+      await this.redisService.set(comboKey, comboCount.toString(), 10);
+    } catch (error) {
+      this.logger.warn(
+        `Gift combo cache update failed after committed settlement: ${this.errorMessage(error)}`,
+      );
+    }
+  }
+
+  private async enqueueAnimation(
+    settlement: GiftSettlementResult,
+    senderId: string,
+    roomId?: string,
+  ): Promise<GiftQueueItem | null> {
+    if (!roomId) return null;
+
+    const gift = settlement.gift;
+    const isFullscreen =
+      gift.type === 'svga' || gift.type === 'video' || gift.coinPrice >= 1000;
+    const priority = isFullscreen ? 50 : 0;
+    const quantity = settlement.transactions.reduce(
+      (total, transaction) => total + transaction.quantity,
+      0,
+    );
+
+    try {
+      let queueItem = this.queueRepository.create({
+        roomId,
+        senderId,
+        receiverId: settlement.receiverIds[0],
+        giftId: gift.id,
+        giftName: gift.name,
+        animationUrl: gift.animationUrl || gift.iconUrl || '',
+        quantity,
+        status: 'queued',
+        priority,
+        isFullscreen,
+      });
+      queueItem = await this.queueRepository.save(queueItem);
+      return queueItem;
+    } catch (error) {
+      this.logger.warn(
+        `Gift animation queue failed after committed settlement ${settlement.operationGroupId}: ${this.errorMessage(error)}`,
+      );
+      return null;
+    }
+  }
+
+  private broadcastSettlement(
+    settlement: GiftSettlementResult,
+    senderId: string,
+    context: string,
+    roomId: string | undefined,
+    comboWasNew: boolean,
+  ): void {
+    const gift = settlement.gift;
+    const isFullscreen =
+      gift.type === 'svga' || gift.type === 'video' || gift.coinPrice >= 1000;
+    const totalQuantity = settlement.transactions.reduce(
+      (total, transaction) => total + transaction.quantity,
+      0,
+    );
+    const eventPayload = {
+      type: 'GIFT_SENT',
+      txIds: settlement.transactions.map((transaction) => transaction.id),
+      operationGroupId: settlement.operationGroupId,
+      senderId,
+      receivers: settlement.receiverIds,
+      giftId: gift.id,
+      giftName: gift.name,
+      giftType: gift.type,
+      rarity: gift.rarity,
+      quantity: totalQuantity,
+      totalCoins: settlement.totalCoinsDeducted,
+      comboCount: settlement.comboCount,
+      multiplier: settlement.multiplier,
+      context,
+      roomId,
+      animationUrl: gift.animationUrl || gift.iconUrl,
+      isFullscreen,
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      this.eventsGateway.broadcastGiftSent(eventPayload, roomId);
+      if (comboWasNew) {
+        this.eventsGateway.broadcastComboStarted(
+          {
+            senderId,
+            giftId: gift.id,
+            comboCount: settlement.comboCount,
+            roomId,
+          },
+          roomId,
+        );
+      } else {
+        this.eventsGateway.broadcastComboUpdated(
+          {
+            senderId,
+            giftId: gift.id,
+            comboCount: settlement.comboCount,
+            multiplier: settlement.multiplier,
+            roomId,
+          },
+          roomId,
+        );
+      }
+
+      if (isFullscreen) {
+        this.eventsGateway.broadcastFullscreenGift(eventPayload, roomId);
+      } else if (roomId) {
+        this.eventsGateway.broadcastRoomGiftAnimation(eventPayload, roomId);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Gift realtime presentation failed after committed settlement ${settlement.operationGroupId}: ${this.errorMessage(error)}`,
+      );
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 }

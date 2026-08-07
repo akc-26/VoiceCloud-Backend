@@ -14,6 +14,8 @@ import { LuckyBoxService } from './lucky-box.service';
 import { StorageModule } from '../storage/storage.module';
 import { EventsModule } from '../../common/events/events.module';
 import { RedisModule } from '../../redis/redis.module';
+import { WalletModule } from '../wallet/wallet.module';
+import { GiftSettlementService } from './gift-settlement.service';
 
 @Module({
   imports: [
@@ -26,11 +28,13 @@ import { RedisModule } from '../../redis/redis.module';
     StorageModule,
     EventsModule,
     RedisModule,
+    WalletModule,
   ],
   controllers: [GiftsPhase18Controller, GiftsController],
   providers: [
     GiftsService,
     GiftingEngineService,
+    GiftSettlementService,
     GiftAnalyticsService,
     MultiGiftingService,
     LuckyBoxService,
@@ -38,6 +42,7 @@ import { RedisModule } from '../../redis/redis.module';
   exports: [
     GiftsService,
     GiftingEngineService,
+    GiftSettlementService,
     GiftAnalyticsService,
     MultiGiftingService,
     LuckyBoxService,

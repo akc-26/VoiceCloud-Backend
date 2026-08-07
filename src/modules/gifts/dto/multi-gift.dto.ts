@@ -6,7 +6,6 @@ import {
   Min,
   ArrayNotEmpty,
   IsOptional,
-  IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -47,7 +46,8 @@ export class SendMultiRecipientGiftDto {
   quantity?: number = 1;
 
   @ApiPropertyOptional({
-    description: 'Coin price per gift unit',
+    description:
+      'Legacy client hint; authoritative price comes from the Gift catalog',
     default: 100,
     example: 100,
   })
@@ -55,4 +55,11 @@ export class SendMultiRecipientGiftDto {
   @Min(1)
   @IsOptional()
   pricePerUnit?: number = 100;
+
+  @ApiPropertyOptional({
+    description: 'Optional idempotency key for safe multi-gift retries',
+  })
+  @IsString()
+  @IsOptional()
+  operationKey?: string;
 }

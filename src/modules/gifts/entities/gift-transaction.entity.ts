@@ -51,6 +51,26 @@ export class GiftTransaction {
   @Column({ type: 'float', default: 0 })
   creatorEarnings: number;
 
+  @Index('UQ_gift_transactions_operationKey', {
+    unique: true,
+    where: '"operationKey" IS NOT NULL',
+  })
+  @Column({ type: 'varchar', nullable: true })
+  operationKey: string | null;
+
+  @Index('IDX_gift_transactions_operationGroupId')
+  @Column({ type: 'varchar', nullable: true })
+  operationGroupId: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  senderWalletTransactionId: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  receiverWalletTransactionId: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  settledAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

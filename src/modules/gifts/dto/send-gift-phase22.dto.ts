@@ -53,6 +53,13 @@ export class SendGiftDto {
   @IsNumber()
   @Min(1)
   comboStep?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'Optional idempotency key for safe gift-send retries',
+  })
+  @IsOptional()
+  @IsString()
+  operationKey?: string;
 }
 
 export class SendComboDto {
@@ -74,6 +81,13 @@ export class SendComboDto {
   @IsNumber()
   @Min(1)
   count?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'Optional idempotency key for safe combo-send retries',
+  })
+  @IsOptional()
+  @IsString()
+  operationKey?: string;
 }
 
 export class SendMultiGiftPhase22Dto {
@@ -96,4 +110,11 @@ export class SendMultiGiftPhase22Dto {
   @IsNumber()
   @Min(1)
   quantity?: number = 1;
+
+  @ApiPropertyOptional({
+    description: 'Optional idempotency key for safe multi-gift retries',
+  })
+  @IsOptional()
+  @IsString()
+  operationKey?: string;
 }
