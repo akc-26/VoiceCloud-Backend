@@ -5,7 +5,9 @@ import { HealthService } from './health.service';
 @ApiTags('Health Check')
 @Controller('health')
 export class HealthController {
-  constructor(@Inject(HealthService) private readonly healthService: HealthService) {}
+  constructor(
+    @Inject(HealthService) private readonly healthService: HealthService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Retrieve modular monolith health diagnostics' })
@@ -18,10 +20,31 @@ export class HealthController {
         status: { type: 'string', example: 'ok' },
         database: { type: 'string', example: 'connected' },
         redis: { type: 'string', example: 'connected' },
+        infrastructure: {
+          type: 'object',
+          properties: {
+            mode: { type: 'string', example: 'real' },
+            databaseEngine: { type: 'string', example: 'postgres' },
+            redisEngine: { type: 'string', example: 'redis' },
+            realInfrastructure: { type: 'boolean', example: true },
+          },
+        },
       },
     },
   })
   async getHealth() {
     return this.healthService.checkHealth();
+  }
+
+  @Get('metrics')
+  @ApiOperation({
+    summary: 'Retrieve system operational metrics & resource diagnostics',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Operational system metrics retrieved successfully',
+  })
+  async getMetrics() {
+    return this.healthService.getOperationalMetrics();
   }
 }

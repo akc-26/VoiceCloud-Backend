@@ -1,12 +1,37 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { BRAND_CONFIG } from '../shared/branding';
 
+@ApiTags('API Info')
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  @Get('api')
+  @ApiOperation({
+    summary: `${BRAND_CONFIG.products.backend.apiName} Information Endpoint`,
+  })
+  getRoot() {
+    return {
+      name: BRAND_CONFIG.products.backend.apiName,
+      version: '1.0.0',
+      status: 'online',
+      documentation: '/api/docs',
+      health: '/health',
+      api: '/api',
+    };
+  }
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @Get('api/info')
+  @ApiOperation({
+    summary: `${BRAND_CONFIG.products.backend.apiName} Information Detail Endpoint`,
+  })
+  getHello() {
+    return {
+      name: BRAND_CONFIG.products.backend.apiName,
+      version: '1.0.0',
+      status: 'online',
+      documentation: '/api/docs',
+      health: '/health',
+      api: '/api',
+    };
   }
 }

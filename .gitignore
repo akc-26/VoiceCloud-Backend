@@ -51,6 +51,36 @@ pids
 *.pid
 *.seed
 *.pid.lock
+bun.lock
+bun.lockb
+
+/private_uploads/
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# WP08 local acceptance artifacts
+.wp08-private-*/
+.wp08-server-*.out.log
+.wp08-server-*.err.log
+.wp08-acceptance-*.out.log
+.wp08-acceptance-*.err.log
+
+# Runtime-generated public media
+/uploads/
+
+# Build caches and local TypeScript state
+.cache/
+*.tsbuildinfo
+
+# Local diagnostic/export files
+*_tsc_errors.txt
+*.zip
+
+# External generated wrapper/scaffold files (not part of the product source)
+/index.html
+/metadata.json
+/vite.config.ts
+/src/App.tsx
+/src/main.tsx
+/src/index.css

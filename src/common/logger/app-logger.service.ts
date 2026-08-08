@@ -8,37 +8,49 @@ export class AppLogger implements LoggerService {
     this.context = context;
   }
 
-  log(message: any, context?: string) {
+  log(message: unknown, context?: string) {
     this.print('info', message, context);
   }
 
-  error(message: any, trace?: string, context?: string) {
+  error(message: unknown, trace?: string, context?: string) {
     this.print('error', message, context, trace);
   }
 
-  warn(message: any, context?: string) {
+  warn(message: unknown, context?: string) {
     this.print('warn', message, context);
   }
 
-  debug?(message: any, context?: string) {
+  debug?(message: unknown, context?: string) {
     this.print('debug', message, context);
   }
 
-  verbose?(message: any, context?: string) {
+  verbose?(message: unknown, context?: string) {
     this.print('verbose', message, context);
   }
 
-  private print(level: string, message: any, context?: string, trace?: string) {
+  private print(
+    level: string,
+    message: unknown,
+    context?: string,
+    trace?: string,
+  ) {
     const outputContext = context || this.context;
-    let formattedMessage = message;
-    
+    let formattedMessage = '';
+
     if (message instanceof Error) {
       formattedMessage = message.message;
       if (!trace) {
         trace = message.stack;
       }
     } else if (typeof message === 'object' && message !== null) {
-      formattedMessage = message.message || message.msg || (message.constructor && message.constructor.name === 'Error' ? message.message : JSON.stringify(message));
+      const msgObj = message as Record<string, unknown>;
+      if (typeof msgObj.message === 'string') {
+        formattedMessage = msgObj.message;
+      } else if (typeof msgObj.msg === 'string') {
+        formattedMessage = msgObj.msg;
+      } else {
+        formattedMessage = JSON.stringify(message);
+      }
     } else {
       formattedMessage = String(message);
     }
