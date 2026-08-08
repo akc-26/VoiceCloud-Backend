@@ -60,6 +60,8 @@ export const BRAND_CONFIG = {
   typography: {
     fontFamily:
       '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    adminFontFamily:
+      'Inter, "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
   colors: {
     common: {
@@ -77,15 +79,31 @@ export const BRAND_CONFIG = {
       info: '#3b82f6',
     },
     admin: {
-      primary: '#1d4ed8',
-      primaryLight: '#3b82f6',
-      primaryDark: '#1e40af',
-      secondary: '#0284c7',
+      primary: '#2563eb',
+      primaryLight: '#60a5fa',
+      primaryDark: '#1d4ed8',
+      secondary: '#0f4c81',
       secondaryLight: '#38bdf8',
-      secondaryDark: '#0369a1',
-      lightBackground: '#f8fafc',
-      darkBackground: '#0b1120',
-      darkSurface: '#1e293b',
+      secondaryDark: '#0b3b66',
+      accent: '#38bdf8',
+      success: '#16a34a',
+      warning: '#d97706',
+      error: '#dc2626',
+      info: '#0284c7',
+      lightBackground: '#f4f8fc',
+      lightSurface: '#ffffff',
+      elevatedSurface: '#ffffff',
+      navigationBackground: '#0f5ea8',
+      navigationSelected: '#dcebff',
+      textPrimary: '#10233f',
+      textSecondary: '#64748b',
+      border: '#dce5ef',
+      darkBackground: '#0b1424',
+      darkSurface: '#12233a',
+      darkElevatedSurface: '#182c46',
+      darkBorder: '#2a4564',
+      darkTextPrimary: '#f3f7fb',
+      darkTextSecondary: '#a9b8ca',
     },
     creator: {
       primary: '#7c3aed',

@@ -1,6 +1,14 @@
 import React from 'react';
-import { Box, FormControl, InputLabel, Select, MenuItem, Button, SelectChangeEvent } from '@mui/material';
-import FilterListIcon from '@mui/icons-material/FilterList';
+import {
+  Box,
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+} from '@mui/material';
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 
 export interface FilterOption {
@@ -22,37 +30,52 @@ export const Filters: React.FC<FiltersProps> = ({
   onChange,
   onReset,
 }) => {
+  const hasActiveFilters = Object.values(values).some(Boolean);
+
   return (
-    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-      <FilterListIcon color="action" fontSize="small" />
-      {filters.map((f) => (
-        <FormControl key={f.key} size="small" sx={{ minWidth: 140 }}>
-          <InputLabel>{f.label}</InputLabel>
+    <Box
+      sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}
+    >
+      <Box
+        sx={{
+          width: 32,
+          height: 32,
+          display: { xs: 'none', sm: 'grid' },
+          placeItems: 'center',
+          borderRadius: 2,
+          color: 'primary.main',
+          bgcolor: 'action.hover',
+        }}
+      >
+        <FilterAltOutlinedIcon sx={{ fontSize: 17 }} />
+      </Box>
+      {filters.map((filter) => (
+        <FormControl key={filter.key} size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>{filter.label}</InputLabel>
           <Select
-            value={values[f.key] || ''}
-            label={f.label}
-            onChange={(e: SelectChangeEvent) => onChange(f.key, e.target.value)}
-            sx={{ borderRadius: 2 }}
+            value={values[filter.key] || ''}
+            label={filter.label}
+            onChange={(event: SelectChangeEvent) =>
+              onChange(filter.key, event.target.value)
+            }
           >
             <MenuItem value="">
               <em>All</em>
             </MenuItem>
-            {f.options.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
+            {filter.options.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
       ))}
-      {Object.values(values).some((v) => Boolean(v)) && (
+      {hasActiveFilters && (
         <Button
           size="small"
           variant="outlined"
-          color="inherit"
           startIcon={<RestartAltIcon />}
           onClick={onReset}
-          sx={{ borderRadius: 2 }}
         >
           Reset
         </Button>

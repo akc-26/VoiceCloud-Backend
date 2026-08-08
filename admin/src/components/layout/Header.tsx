@@ -1,134 +1,121 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   AppBar,
-  Toolbar,
-  IconButton,
   Box,
-  Badge,
-  Popover,
-  Typography,
-  List,
-  ListItem,
-  ListItemText,
   Divider,
-  Button,
+  IconButton,
+  Toolbar,
+  Tooltip,
+  Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
+import { useLocation, useNavigate } from 'react-router-dom';
 import MenuIcon from '@mui/icons-material/Menu';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
-import NotificationsIcon from '@mui/icons-material/Notifications';
+import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
 
+import { BRAND_CONFIG } from '@shared/branding';
 import { useThemeStore } from '../../store/theme.store';
-import { useNotificationsStore } from '../../store/notifications.store';
 import { UserDropdown } from './UserDropdown';
-import { SearchBar } from '../common/SearchBar';
+import { navItems } from './Sidebar';
 
 export const Header: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const toggleSidebar = useThemeStore((state) => state.toggleSidebar);
+  const toggleMobileSidebar = useThemeStore(
+    (state) => state.toggleMobileSidebar,
+  );
   const mode = useThemeStore((state) => state.mode);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
 
-  const unreadCount = useNotificationsStore((state) => state.unreadCount);
-  const setUnreadCount = useNotificationsStore((state) => state.setUnreadCount);
-
-  const [notifAnchor, setNotifAnchor] = useState<null | HTMLElement>(null);
-
-  const handleOpenNotif = (e: React.MouseEvent<HTMLElement>) => {
-    setNotifAnchor(e.currentTarget);
-  };
-
-  const handleCloseNotif = () => {
-    setNotifAnchor(null);
-  };
-
-  const handleClearNotif = () => {
-    setUnreadCount(0);
-    handleCloseNotif();
-  };
+  const currentItem = navItems.find((item) => item.path === location.pathname);
+  const pageTitle = currentItem?.title || BRAND_CONFIG.products.admin.shortName;
 
   return (
     <AppBar
       position="sticky"
-      color="default"
+      color="transparent"
       elevation={0}
       sx={{
-        backgroundColor: 'background.paper',
+        backgroundColor: (muiTheme) =>
+          muiTheme.palette.mode === 'dark'
+            ? 'rgba(18, 35, 58, 0.92)'
+            : 'rgba(255, 255, 255, 0.92)',
+        backdropFilter: 'blur(14px)',
         borderBottom: '1px solid',
         borderColor: 'divider',
-        zIndex: (theme) => theme.zIndex.drawer - 1,
+        zIndex: (muiTheme) => muiTheme.zIndex.drawer - 1,
       }}
     >
-      <Toolbar sx={{ justifyContent: 'space-between', minHeight: '64px !important', px: { xs: 2, sm: 3 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton edge="start" color="inherit" onClick={toggleSidebar}>
-            <MenuIcon />
-          </IconButton>
-          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-            <SearchBar placeholder="Global search users, rooms, reports..." onChange={() => {}} />
+      <Toolbar
+        sx={{ minHeight: '68px !important', px: { xs: 1.5, sm: 2.5, lg: 3 } }}
+      >
+        <Box
+          sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}
+        >
+          <Tooltip title={isMobile ? 'Open navigation' : 'Toggle navigation'}>
+            <IconButton
+              edge="start"
+              onClick={isMobile ? toggleMobileSidebar : toggleSidebar}
+              aria-label={isMobile ? 'Open navigation' : 'Toggle navigation'}
+            >
+              <MenuIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: 700, lineHeight: 1.25 }}
+              noWrap
+            >
+              {pageTitle}
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: { xs: 'none', sm: 'block' }, lineHeight: 1.2 }}
+            >
+              {BRAND_CONFIG.products.admin.workspaceLabel}
+            </Typography>
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          {/* Theme Switcher */}
-          <IconButton onClick={toggleTheme} color="inherit" size="medium">
-            {mode === 'dark' ? <LightModeIcon sx={{ color: 'warning.light' }} /> : <DarkModeIcon />}
-          </IconButton>
+        <Box sx={{ flexGrow: 1 }} />
 
-          {/* Notifications Bell */}
-          <IconButton color="inherit" size="medium" onClick={handleOpenNotif}>
-            <Badge badgeContent={unreadCount} color="error">
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
-
-          {/* Notifications Popover */}
-          <Popover
-            open={Boolean(notifAnchor)}
-            anchorEl={notifAnchor}
-            onClose={handleCloseNotif}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            slotProps={{ paper: { sx: { width: 320, p: 0, borderRadius: 2.5 } } }}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Tooltip
+            title={mode === 'dark' ? 'Use light theme' : 'Use dark theme'}
           >
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Notifications
-              </Typography>
-              {unreadCount > 0 && (
-                <Button size="small" onClick={handleClearNotif}>
-                  Mark all as read
-                </Button>
+            <IconButton
+              onClick={toggleTheme}
+              aria-label={
+                mode === 'dark' ? 'Use light theme' : 'Use dark theme'
+              }
+            >
+              {mode === 'dark' ? (
+                <LightModeIcon fontSize="small" />
+              ) : (
+                <DarkModeIcon fontSize="small" />
               )}
-            </Box>
-            <Divider />
-            <List sx={{ maxH: 280, overflowY: 'auto', p: 0 }}>
-              <ListItem sx={{ py: 1.5 }}>
-                <ListItemText
-                  primary="New Host Verification Application"
-                  secondary="User @alex_pro submitted host verification documents."
-                  slotProps={{
-                    primary: { sx: { fontSize: '0.85rem', fontWeight: 600 } },
-                    secondary: { sx: { fontSize: '0.75rem' } },
-                  }}
-                />
-              </ListItem>
-              <Divider component="li" />
-              <ListItem sx={{ py: 1.5 }}>
-                <ListItemText
-                  primary="System Security Alert"
-                  secondary="Multiple failed login attempts detected on Moderator account."
-                  slotProps={{
-                    primary: { sx: { fontSize: '0.85rem', fontWeight: 600 } },
-                    secondary: { sx: { fontSize: '0.75rem' } },
-                  }}
-                />
-              </ListItem>
-            </List>
-          </Popover>
+            </IconButton>
+          </Tooltip>
 
-          <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+          <Tooltip title="Notification delivery console">
+            <IconButton
+              onClick={() => navigate('/notifications')}
+              aria-label="Open notification delivery console"
+            >
+              <NotificationsNoneOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
 
-          {/* User Profile Menu */}
+          <Divider orientation="vertical" flexItem sx={{ mx: 0.75, my: 1.1 }} />
           <UserDropdown />
         </Box>
       </Toolbar>

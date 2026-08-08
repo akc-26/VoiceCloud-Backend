@@ -1,20 +1,22 @@
 import React from 'react';
 import {
+  Avatar,
+  Box,
+  Chip,
+  Divider,
   Drawer,
+  IconButton,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Box,
+  Tooltip,
   Typography,
-  Divider,
-  Chip,
-  IconButton,
-  useTheme,
   useMediaQuery,
+  useTheme,
 } from '@mui/material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
@@ -40,6 +42,7 @@ import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import BackupIcon from '@mui/icons-material/Backup';
 import SecurityIcon from '@mui/icons-material/Security';
 import ChatIcon from '@mui/icons-material/Chat';
@@ -74,12 +77,7 @@ export const navItems: NavItem[] = [
   },
   { title: 'Store & Mall', path: '/store', icon: <ShoppingBagIcon /> },
   { title: 'Referral System', path: '/referrals', icon: <ShareIcon /> },
-  {
-    title: 'Reports',
-    path: '/reports',
-    icon: <ReportProblemIcon />,
-    badge: '5',
-  },
+  { title: 'Reports', path: '/reports', icon: <ReportProblemIcon /> },
   { title: 'Moderation', path: '/moderation', icon: <GavelIcon /> },
   { title: 'Announcements', path: '/announcements', icon: <CampaignIcon /> },
   {
@@ -114,8 +112,56 @@ export const navItems: NavItem[] = [
   { title: 'My Profile', path: '/profile', icon: <PersonIcon /> },
 ];
 
-const DRAWER_WIDTH = 260;
-const COLLAPSED_WIDTH = 72;
+interface NavSection {
+  label: string;
+  paths: string[];
+}
+
+const navSections: NavSection[] = [
+  { label: 'Overview', paths: ['/dashboard', '/rooms'] },
+  { label: 'User Management', paths: ['/users', '/hosts', '/auth-management'] },
+  {
+    label: 'Economy',
+    paths: [
+      '/wallet',
+      '/gifts',
+      '/vip',
+      '/tasks-achievements',
+      '/rankings',
+      '/referrals',
+      '/store',
+    ],
+  },
+  {
+    label: 'Operations',
+    paths: [
+      '/reports',
+      '/moderation',
+      '/notifications',
+      '/messaging',
+      '/announcements',
+      '/rtc',
+      '/analytics',
+    ],
+  },
+  {
+    label: 'Platform',
+    paths: [
+      '/cms',
+      '/feature-flags',
+      '/provider-configs',
+      '/backups',
+      '/app-versions',
+    ],
+  },
+  {
+    label: 'System',
+    paths: ['/system-settings', '/audit-logs', '/support', '/profile'],
+  },
+];
+
+const DRAWER_WIDTH = 272;
+const COLLAPSED_WIDTH = 76;
 
 export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -128,187 +174,338 @@ export const Sidebar: React.FC = () => {
   const logout = useAuthStore((state) => state.logout);
 
   const sidebarCollapsed = useThemeStore((state) => state.sidebarCollapsed);
+  const mobileSidebarOpen = useThemeStore((state) => state.mobileSidebarOpen);
   const toggleSidebar = useThemeStore((state) => state.toggleSidebar);
+  const setMobileSidebarOpen = useThemeStore(
+    (state) => state.setMobileSidebarOpen,
+  );
 
   const handleNavClick = (path: string) => {
     navigate(path);
+    if (isMobile) setMobileSidebarOpen(false);
   };
 
   const handleLogout = () => {
     logout();
+    setMobileSidebarOpen(false);
     navigate('/login');
   };
 
-  const currentWidth =
-    sidebarCollapsed && !isMobile ? COLLAPSED_WIDTH : DRAWER_WIDTH;
+  const collapsed = sidebarCollapsed && !isMobile;
+  const currentWidth = collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
+  const itemByPath = new Map(navItems.map((item) => [item.path, item]));
+
+  const renderItem = (item: NavItem) => {
+    if (item.roles && !hasRole(item.roles)) return null;
+    const isSelected = location.pathname === item.path;
+
+    const button = (
+      <ListItemButton
+        selected={isSelected}
+        onClick={() => handleNavClick(item.path)}
+        aria-current={isSelected ? 'page' : undefined}
+        sx={{
+          mx: collapsed ? 0.75 : 1.25,
+          mb: 0.25,
+          minHeight: 40,
+          px: collapsed ? 1 : 1.4,
+          borderRadius: 2.25,
+          justifyContent: collapsed ? 'center' : 'initial',
+          color: isSelected ? 'primary.dark' : 'text.secondary',
+          '& .MuiListItemIcon-root': {
+            color: 'inherit',
+          },
+          '&.Mui-selected': {
+            color: 'primary.dark',
+            backgroundColor: (muiTheme) =>
+              muiTheme.palette.mode === 'dark'
+                ? 'rgba(37, 99, 235, 0.18)'
+                : BRAND_CONFIG.colors.admin.navigationSelected,
+            boxShadow: (muiTheme) =>
+              muiTheme.palette.mode === 'dark'
+                ? 'inset 3px 0 0 rgba(96, 165, 250, 0.9)'
+                : `inset 3px 0 0 ${BRAND_CONFIG.colors.admin.primary}`,
+            '&:hover': {
+              backgroundColor: (muiTheme) =>
+                muiTheme.palette.mode === 'dark'
+                  ? 'rgba(37, 99, 235, 0.24)'
+                  : 'rgba(37, 99, 235, 0.12)',
+            },
+          },
+        }}
+      >
+        <ListItemIcon
+          sx={{
+            minWidth: collapsed ? 0 : 34,
+            justifyContent: 'center',
+            '& .MuiSvgIcon-root': { fontSize: 19 },
+          }}
+        >
+          {item.icon}
+        </ListItemIcon>
+        {!collapsed && (
+          <ListItemText
+            primary={item.title}
+            slotProps={{
+              primary: {
+                sx: {
+                  fontSize: '0.79rem',
+                  fontWeight: isSelected ? 650 : 500,
+                  whiteSpace: 'nowrap',
+                },
+              },
+            }}
+          />
+        )}
+        {!collapsed && item.badge && (
+          <Chip
+            label={item.badge}
+            size="small"
+            color="error"
+            sx={{ height: 20, minWidth: 22, fontSize: '0.66rem' }}
+          />
+        )}
+      </ListItemButton>
+    );
+
+    return (
+      <ListItem key={item.path} disablePadding>
+        {collapsed ? (
+          <Tooltip title={item.title} placement="right">
+            {button}
+          </Tooltip>
+        ) : (
+          button
+        )}
+      </ListItem>
+    );
+  };
 
   return (
     <Drawer
       variant={isMobile ? 'temporary' : 'permanent'}
-      open={isMobile ? !sidebarCollapsed : true}
-      onClose={toggleSidebar}
+      open={isMobile ? mobileSidebarOpen : true}
+      onClose={() => setMobileSidebarOpen(false)}
+      ModalProps={{ keepMounted: true }}
       sx={{
-        width: currentWidth,
+        width: isMobile ? 0 : currentWidth,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
           width: currentWidth,
           boxSizing: 'border-box',
           transition: theme.transitions.create('width', {
             easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
+            duration: theme.transitions.duration.shorter,
           }),
           backgroundColor: 'background.paper',
           borderRight: '1px solid',
           borderColor: 'divider',
           overflowX: 'hidden',
+          boxShadow:
+            theme.palette.mode === 'dark'
+              ? '8px 0 32px rgba(0,0,0,0.12)'
+              : '8px 0 30px rgba(16,35,63,0.025)',
         },
       }}
     >
-      {/* Brand Logo & Header */}
       <Box
         sx={{
-          height: 64,
+          minHeight: 68,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-          px: sidebarCollapsed ? 1 : 2.5,
+          justifyContent: collapsed ? 'center' : 'space-between',
+          px: collapsed ? 1 : 2,
           borderBottom: '1px solid',
           borderColor: 'divider',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box
+          sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}
+        >
           <Box
             component="img"
             src={getBrandAssetUrl('admin', 'logoMark')}
-            alt=""
-            sx={{ width: 28, height: 28 }}
+            alt={`${BRAND_CONFIG.identity.name} logo`}
+            sx={{ width: 34, height: 34, flexShrink: 0 }}
           />
-          {!sidebarCollapsed && (
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 800, letterSpacing: '-0.5px' }}
-              color="primary.main"
-            >
-              {BRAND_CONFIG.identity.name}
-            </Typography>
+          {!collapsed && (
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                variant="subtitle1"
+                sx={{ fontWeight: 750, lineHeight: 1.2 }}
+                noWrap
+              >
+                {BRAND_CONFIG.identity.name}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ lineHeight: 1.2 }}
+                noWrap
+              >
+                {BRAND_CONFIG.products.admin.shortName}
+              </Typography>
+            </Box>
           )}
         </Box>
-        {!isMobile && !sidebarCollapsed && (
-          <IconButton size="small" onClick={toggleSidebar}>
-            <ChevronLeftIcon />
-          </IconButton>
+        {!isMobile && !collapsed && (
+          <Tooltip title="Collapse navigation">
+            <IconButton
+              size="small"
+              onClick={toggleSidebar}
+              aria-label="Collapse navigation"
+            >
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         )}
       </Box>
 
-      {/* Navigation List */}
-      <Box sx={{ overflowY: 'auto', flexGrow: 1, py: 1.5, px: 1 }}>
-        <List disablePadding>
-          {navItems.map((item) => {
-            if (item.roles && !hasRole(item.roles)) return null;
-            const isSelected = location.pathname === item.path;
+      <Box sx={{ overflowY: 'auto', flexGrow: 1, py: 1.1 }}>
+        {navSections.map((section, sectionIndex) => {
+          const sectionItems = section.paths
+            .map((path) => itemByPath.get(path))
+            .filter(Boolean) as NavItem[];
+          const permittedItems = sectionItems.filter(
+            (item) => !item.roles || hasRole(item.roles),
+          );
+          if (permittedItems.length === 0) return null;
 
-            return (
-              <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
-                <ListItemButton
-                  selected={isSelected}
-                  onClick={() => handleNavClick(item.path)}
+          return (
+            <Box key={section.label} sx={{ mb: 0.8 }}>
+              {!collapsed && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
                   sx={{
-                    borderRadius: 2,
-                    minHeight: 44,
-                    px: sidebarCollapsed ? 1.5 : 2,
-                    justifyContent: sidebarCollapsed ? 'center' : 'initial',
-                    '&.Mui-selected': {
-                      backgroundColor: 'primary.main',
-                      color: 'primary.contrastText',
-                      '& .MuiListItemIcon-root': {
-                        color: 'primary.contrastText',
-                      },
-                      '&:hover': {
-                        backgroundColor: 'primary.dark',
-                      },
-                    },
+                    display: 'block',
+                    px: 2.75,
+                    pt: sectionIndex === 0 ? 0.5 : 1,
+                    pb: 0.55,
+                    fontSize: '0.64rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.075em',
+                    textTransform: 'uppercase',
                   }}
                 >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: sidebarCollapsed ? 0 : 36,
-                      mr: sidebarCollapsed ? 'auto' : 0,
-                      justifyContent: 'center',
-                      color: isSelected ? 'inherit' : 'text.secondary',
-                    }}
-                  >
-                    {item.icon}
-                  </ListItemIcon>
-                  {!sidebarCollapsed && (
-                    <ListItemText
-                      primary={item.title}
-                      slotProps={{
-                        primary: {
-                          sx: {
-                            fontSize: '0.875rem',
-                            fontWeight: isSelected ? 700 : 500,
-                          },
-                        },
-                      }}
-                    />
-                  )}
-                  {!sidebarCollapsed && item.badge && (
-                    <Chip
-                      label={item.badge}
-                      size="small"
-                      color={isSelected ? 'secondary' : 'error'}
-                      sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
-                    />
-                  )}
-                </ListItemButton>
-              </ListItem>
-            );
-          })}
-        </List>
+                  {section.label}
+                </Typography>
+              )}
+              {collapsed && sectionIndex > 0 && (
+                <Divider sx={{ mx: 2, my: 0.75 }} />
+              )}
+              <List disablePadding>{permittedItems.map(renderItem)}</List>
+            </Box>
+          );
+        })}
       </Box>
 
       <Divider />
-
-      {/* User Info & Logout Button */}
-      <Box sx={{ p: sidebarCollapsed ? 1 : 2 }}>
-        {!sidebarCollapsed && user && (
-          <Box sx={{ mb: 1.5, px: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
-              {user.displayName || user.username}
-            </Typography>
-            <Chip
-              label={user.role}
-              size="small"
-              color="primary"
-              variant="outlined"
-              sx={{ height: 18, fontSize: '0.65rem', mt: 0.5 }}
-            />
+      <Box sx={{ p: collapsed ? 1 : 1.4 }}>
+        {user && !collapsed ? (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.15,
+              p: 1,
+              borderRadius: 2.5,
+              backgroundColor: (muiTheme) =>
+                muiTheme.palette.mode === 'dark'
+                  ? 'rgba(255,255,255,0.035)'
+                  : 'rgba(37,99,235,0.035)',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Avatar
+              src={user.avatarUrl}
+              sx={{
+                width: 34,
+                height: 34,
+                bgcolor: 'primary.main',
+                fontSize: '0.8rem',
+              }}
+            >
+              {(user.displayName || user.username || 'A')
+                .charAt(0)
+                .toUpperCase()}
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="subtitle2" noWrap>
+                {user.displayName || user.username}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                noWrap
+                sx={{ display: 'block', fontSize: '0.66rem' }}
+              >
+                {user.role.replaceAll('_', ' ')}
+              </Typography>
+            </Box>
+            <Tooltip title="Sign out">
+              <IconButton
+                size="small"
+                onClick={handleLogout}
+                aria-label="Sign out"
+              >
+                <LogoutIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 0.75,
+            }}
+          >
+            {user && (
+              <Tooltip
+                title={user.displayName || user.username}
+                placement="right"
+              >
+                <Avatar
+                  src={user.avatarUrl}
+                  sx={{
+                    width: 34,
+                    height: 34,
+                    bgcolor: 'primary.main',
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  {(user.displayName || user.username || 'A')
+                    .charAt(0)
+                    .toUpperCase()}
+                </Avatar>
+              </Tooltip>
+            )}
+            <Tooltip title="Sign out" placement="right">
+              <IconButton
+                size="small"
+                onClick={handleLogout}
+                aria-label="Sign out"
+              >
+                <LogoutIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
         )}
-        <ListItemButton
-          onClick={handleLogout}
-          sx={{
-            borderRadius: 2,
-            minHeight: 40,
-            color: 'error.main',
-            justifyContent: sidebarCollapsed ? 'center' : 'initial',
-            px: sidebarCollapsed ? 1.5 : 2,
-          }}
-        >
-          <ListItemIcon
-            sx={{ minWidth: sidebarCollapsed ? 0 : 36, color: 'error.main' }}
-          >
-            <LogoutIcon />
-          </ListItemIcon>
-          {!sidebarCollapsed && (
-            <ListItemText
-              primary="Logout"
-              slotProps={{
-                primary: { sx: { fontSize: '0.875rem', fontWeight: 600 } },
-              }}
-            />
-          )}
-        </ListItemButton>
+        {!isMobile && collapsed && (
+          <Tooltip title="Expand navigation" placement="right">
+            <IconButton
+              size="small"
+              onClick={toggleSidebar}
+              aria-label="Expand navigation"
+              sx={{ mt: 0.75 }}
+            >
+              <ChevronRightIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
     </Drawer>
   );

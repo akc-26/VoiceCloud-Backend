@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { TextField, InputAdornment, IconButton } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { IconButton, InputAdornment, TextField } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 
@@ -19,11 +19,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const [searchTerm, setSearchTerm] = useState(initialValue);
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      onChange(searchTerm);
-    }, debounceMs);
+    setSearchTerm(initialValue);
+  }, [initialValue]);
 
-    return () => clearTimeout(handler);
+  useEffect(() => {
+    const handler = window.setTimeout(() => onChange(searchTerm), debounceMs);
+    return () => window.clearTimeout(handler);
   }, [searchTerm, onChange, debounceMs]);
 
   const handleClear = () => {
@@ -33,28 +34,26 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <TextField
-      size="small"
       value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
+      onChange={(event) => setSearchTerm(event.target.value)}
       placeholder={placeholder}
-      sx={{
-        width: { xs: '100%', sm: 280 },
-        '& .MuiOutlinedInput-root': {
-          borderRadius: 2,
-          backgroundColor: 'background.paper',
-        },
-      }}
+      aria-label={placeholder}
+      sx={{ width: { xs: '100%', sm: 300 } }}
       slotProps={{
         input: {
           startAdornment: (
             <InputAdornment position="start">
-              <SearchIcon fontSize="small" color="action" />
+              <SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
             </InputAdornment>
           ),
           endAdornment: searchTerm ? (
             <InputAdornment position="end">
-              <IconButton size="small" onClick={handleClear}>
-                <ClearIcon fontSize="small" />
+              <IconButton
+                size="small"
+                onClick={handleClear}
+                aria-label="Clear search"
+              >
+                <ClearIcon sx={{ fontSize: 17 }} />
               </IconButton>
             </InputAdornment>
           ) : null,

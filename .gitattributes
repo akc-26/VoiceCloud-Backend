@@ -1,0 +1,4 @@
+# VoiceCloud cross-platform repository normalization.
+# package-lock.json has an exact historical SHA-256 acceptance contract and must
+# therefore have identical bytes on Windows, Linux, Git archives, and CI.
+package-lock.json text eol=lf

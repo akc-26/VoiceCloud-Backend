@@ -86,10 +86,7 @@ export const RtcPage: React.FC = () => {
       {/* Monitoring Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            elevation={0}
-            sx={{ border: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}
-          >
+          <Card elevation={0} sx={{ bgcolor: 'background.paper' }}>
             <CardContent>
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
@@ -113,10 +110,7 @@ export const RtcPage: React.FC = () => {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            elevation={0}
-            sx={{ border: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}
-          >
+          <Card elevation={0} sx={{ bgcolor: 'background.paper' }}>
             <CardContent>
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
@@ -137,10 +131,7 @@ export const RtcPage: React.FC = () => {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            elevation={0}
-            sx={{ border: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}
-          >
+          <Card elevation={0} sx={{ bgcolor: 'background.paper' }}>
             <CardContent>
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
@@ -161,10 +152,7 @@ export const RtcPage: React.FC = () => {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Card
-            elevation={0}
-            sx={{ border: '1px solid #e2e8f0', bgcolor: '#f8fafc' }}
-          >
+          <Card elevation={0} sx={{ bgcolor: 'background.paper' }}>
             <CardContent>
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
@@ -197,10 +185,9 @@ export const RtcPage: React.FC = () => {
           <Card
             elevation={0}
             sx={{
-              border:
-                activeProvider === 'agora'
-                  ? '2px solid #1d4ed8'
-                  : '1px solid #e2e8f0',
+              borderWidth: activeProvider === 'agora' ? 2 : 1,
+              borderColor:
+                activeProvider === 'agora' ? 'primary.main' : 'divider',
             }}
           >
             <CardContent>
@@ -233,10 +220,9 @@ export const RtcPage: React.FC = () => {
           <Card
             elevation={0}
             sx={{
-              border:
-                activeProvider === 'livekit'
-                  ? '2px solid #1d4ed8'
-                  : '1px solid #e2e8f0',
+              borderWidth: activeProvider === 'livekit' ? 2 : 1,
+              borderColor:
+                activeProvider === 'livekit' ? 'primary.main' : 'divider',
             }}
           >
             <CardContent>
@@ -274,10 +260,9 @@ export const RtcPage: React.FC = () => {
           <Card
             elevation={0}
             sx={{
-              border:
-                activeProvider === 'zegocloud'
-                  ? '2px solid #1d4ed8'
-                  : '1px solid #e2e8f0',
+              borderWidth: activeProvider === 'zegocloud' ? 2 : 1,
+              borderColor:
+                activeProvider === 'zegocloud' ? 'primary.main' : 'divider',
             }}
           >
             <CardContent>
@@ -312,14 +297,14 @@ export const RtcPage: React.FC = () => {
       {/* Active Channels & Recording Status Table */}
       <Paper
         elevation={0}
-        sx={{ p: 3, border: '1px solid #e2e8f0', borderRadius: 2 }}
+        sx={{ p: 2.5, border: '1px solid', borderColor: 'divider' }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
           Active Voice Channels & Quality Health
         </Typography>
         <TableContainer>
           <Table>
-            <TableHead sx={{ bgcolor: '#f8fafc' }}>
+            <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 700 }}>
                   Room / Channel ID

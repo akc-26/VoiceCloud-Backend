@@ -9,14 +9,17 @@ export interface ToastNotification {
 interface NotificationsState {
   toasts: ToastNotification[];
   unreadCount: number;
-  addToast: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
+  addToast: (
+    type: 'success' | 'error' | 'warning' | 'info',
+    message: string,
+  ) => void;
   removeToast: (id: string) => void;
   setUnreadCount: (count: number) => void;
 }
 
 export const useNotificationsStore = create<NotificationsState>((set) => ({
   toasts: [],
-  unreadCount: 3,
+  unreadCount: 0,
 
   addToast: (type, message) => {
     const id = Math.random().toString(36).substring(2, 9);

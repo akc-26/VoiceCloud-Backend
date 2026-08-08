@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 import {
-  Box,
   Avatar,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  Typography,
+  Box,
+  Chip,
   Divider,
   IconButton,
-  Chip,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Typography,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import PersonIcon from '@mui/icons-material/Person';
-import SettingsIcon from '@mui/icons-material/Settings';
-import LogoutIcon from '@mui/icons-material/Logout';
-import SecurityIcon from '@mui/icons-material/Security';
+import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
+import SecurityOutlinedIcon from '@mui/icons-material/SecurityOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useAuthStore } from '../../store/auth.store';
 
 export const UserDropdown: React.FC = () => {
@@ -26,13 +27,7 @@ export const UserDropdown: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
-  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
+  const handleClose = () => setAnchorEl(null);
 
   const handleNavigate = (path: string) => {
     handleClose();
@@ -47,66 +42,131 @@ export const UserDropdown: React.FC = () => {
 
   if (!user) return null;
 
+  const displayName = user.displayName || user.username;
+  const initials = displayName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join('')
+    .toUpperCase();
+
   return (
     <Box>
-      <IconButton onClick={handleClick} size="small" sx={{ p: 0.5 }}>
-        <Avatar src={user.avatarUrl} alt={user.displayName} sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>
-          {user.username?.charAt(0).toUpperCase()}
+      <Box
+        component="button"
+        type="button"
+        onClick={(event: React.MouseEvent<HTMLButtonElement>) =>
+          setAnchorEl(event.currentTarget)
+        }
+        aria-haspopup="menu"
+        aria-expanded={open ? 'true' : undefined}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.9,
+          border: 0,
+          background: 'transparent',
+          color: 'inherit',
+          cursor: 'pointer',
+          p: 0.35,
+          borderRadius: 2,
+          font: 'inherit',
+          '&:hover': { backgroundColor: 'action.hover' },
+        }}
+      >
+        <Avatar
+          src={user.avatarUrl}
+          alt={displayName}
+          sx={{
+            width: 34,
+            height: 34,
+            bgcolor: 'primary.main',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+          }}
+        >
+          {initials || 'A'}
         </Avatar>
-      </IconButton>
+        <Box
+          sx={{
+            display: { xs: 'none', lg: 'block' },
+            textAlign: 'left',
+            maxWidth: 140,
+          }}
+        >
+          <Typography variant="subtitle2" noWrap sx={{ lineHeight: 1.2 }}>
+            {displayName}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            noWrap
+            sx={{ display: 'block', lineHeight: 1.2, mt: 0.25 }}
+          >
+            {user.role.replaceAll('_', ' ')}
+          </Typography>
+        </Box>
+        <ExpandMoreIcon
+          sx={{
+            display: { xs: 'none', lg: 'block' },
+            fontSize: 17,
+            color: 'text.secondary',
+          }}
+        />
+      </Box>
+
       <Menu
         anchorEl={anchorEl}
         open={open}
         onClose={handleClose}
-        onClick={handleClose}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        slotProps={{
-          paper: {
-            elevation: 3,
-            sx: { width: 220, mt: 1.5, borderRadius: 2.5, p: 0.5 },
-          },
-        }}
+        slotProps={{ paper: { sx: { width: 250, mt: 1 } } }}
       >
         <Box sx={{ px: 2, py: 1.5 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
-            {user.displayName || user.username}
+          <Typography variant="subtitle2" noWrap>
+            {displayName}
           </Typography>
-          <Typography variant="caption" color="text.secondary" noWrap gutterBottom sx={{ display: 'block' }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            noWrap
+            sx={{ display: 'block', mt: 0.35 }}
+          >
             {user.email}
           </Typography>
           <Chip
-            label={user.role}
+            label={user.role.replaceAll('_', ' ')}
             size="small"
             color="primary"
-            sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }}
+            sx={{ mt: 1 }}
           />
         </Box>
-        <Divider sx={{ my: 1 }} />
+        <Divider sx={{ my: 0.75 }} />
         <MenuItem onClick={() => handleNavigate('/profile')}>
           <ListItemIcon>
-            <PersonIcon fontSize="small" />
+            <PersonOutlinedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText primary="My Profile" />
         </MenuItem>
         <MenuItem onClick={() => handleNavigate('/system-settings')}>
           <ListItemIcon>
-            <SettingsIcon fontSize="small" />
+            <SettingsOutlinedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText primary="System Settings" />
         </MenuItem>
         <MenuItem onClick={() => handleNavigate('/audit-logs')}>
           <ListItemIcon>
-            <SecurityIcon fontSize="small" />
+            <SecurityOutlinedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText primary="Audit Logs" />
         </MenuItem>
-        <Divider sx={{ my: 1 }} />
+        <Divider sx={{ my: 0.75 }} />
         <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
           <ListItemIcon>
-            <LogoutIcon fontSize="small" color="error" />
+            <LogoutOutlinedIcon fontSize="small" color="error" />
           </ListItemIcon>
-          <ListItemText primary="Logout" />
+          <ListItemText primary="Sign out" />
         </MenuItem>
       </Menu>
     </Box>

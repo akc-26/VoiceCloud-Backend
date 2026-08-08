@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Typography, Button, Paper } from '@mui/material';
-import ErrorOutlinedIcon from '@mui/icons-material/ErrorOutlined';
+import { alpha, Box, Button, Paper, Typography, useTheme } from '@mui/material';
+import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 interface ErrorStateProps {
@@ -11,20 +11,23 @@ interface ErrorStateProps {
 
 export const ErrorState: React.FC<ErrorStateProps> = ({
   title = 'Failed to load data',
-  message = 'An error occurred while connecting to the backend server. Please check your network connection and try again.',
+  message = 'The requested data could not be loaded. Check the connection and try again.',
   onRetry,
 }) => {
+  const theme = useTheme();
+
   return (
     <Paper
       elevation={0}
       sx={{
-        p: 5,
+        p: { xs: 4, md: 5 },
         textAlign: 'center',
-        borderRadius: 3,
         border: '1px solid',
-        borderColor: 'error.light',
-        backgroundColor: (theme) =>
-          theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.08)' : '#fef2f2',
+        borderColor: alpha(theme.palette.error.main, 0.2),
+        backgroundColor: alpha(
+          theme.palette.error.main,
+          theme.palette.mode === 'dark' ? 0.08 : 0.035,
+        ),
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -32,11 +35,28 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
         justifyContent: 'center',
       }}
     >
-      <ErrorOutlinedIcon color="error" sx={{ fontSize: 52, mb: 1.5 }} />
-      <Typography variant="h6" sx={{ fontWeight: 700 }} color="error.dark" gutterBottom>
+      <Box
+        sx={{
+          width: 54,
+          height: 54,
+          display: 'grid',
+          placeItems: 'center',
+          borderRadius: 3,
+          bgcolor: alpha(theme.palette.error.main, 0.1),
+          color: 'error.main',
+          mb: 1.5,
+        }}
+      >
+        <ErrorOutlineRoundedIcon sx={{ fontSize: 29 }} />
+      </Box>
+      <Typography variant="h6" color="error.main" gutterBottom>
         {title}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 450, mb: 3 }}>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ maxWidth: 460, mb: onRetry ? 2.5 : 0 }}
+      >
         {message}
       </Typography>
       {onRetry && (
@@ -45,9 +65,8 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
           color="error"
           startIcon={<RefreshIcon />}
           onClick={onRetry}
-          sx={{ borderRadius: 2 }}
         >
-          Retry Connection
+          Retry
         </Button>
       )}
     </Paper>

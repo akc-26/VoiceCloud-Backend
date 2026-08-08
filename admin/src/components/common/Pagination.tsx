@@ -1,5 +1,9 @@
 import React from 'react';
-import { Box, TablePagination, Pagination as MuiPagination } from '@mui/material';
+import {
+  Box,
+  Pagination as MuiPagination,
+  TablePagination,
+} from '@mui/material';
 
 interface PaginationProps {
   page: number;
@@ -25,31 +29,44 @@ export const Pagination: React.FC<PaginationProps> = ({
       sx={{
         display: 'flex',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: 2,
-        mt: 2,
-        px: 1,
+        gap: 1.5,
+        mt: 1.5,
+        px: 0.5,
       }}
     >
       <MuiPagination
         count={pageCount}
         page={page}
-        onChange={(_, p) => onPageChange(p)}
+        onChange={(_, nextPage) => onPageChange(nextPage)}
         color="primary"
         shape="rounded"
-        size="medium"
+        size="small"
       />
       {onLimitChange && (
         <TablePagination
           component="div"
           count={total}
           page={page - 1}
-          onPageChange={(_, p) => onPageChange(p + 1)}
+          onPageChange={(_, nextPage) => onPageChange(nextPage + 1)}
           rowsPerPage={limit}
-          onRowsPerPageChange={(e) => onLimitChange(parseInt(e.target.value, 10))}
+          onRowsPerPageChange={(event) =>
+            onLimitChange(Number.parseInt(event.target.value, 10))
+          }
           rowsPerPageOptions={rowsPerPageOptions}
-          sx={{ border: 'none' }}
+          sx={{
+            border: 0,
+            '& .MuiTablePagination-toolbar': { minHeight: 36, p: 0 },
+            '& .MuiTablePagination-displayedRows': {
+              fontSize: '0.75rem',
+              color: 'text.secondary',
+            },
+            '& .MuiTablePagination-selectLabel': {
+              fontSize: '0.75rem',
+              color: 'text.secondary',
+            },
+          }}
         />
       )}
     </Box>

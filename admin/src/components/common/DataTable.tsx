@@ -1,14 +1,14 @@
 import React from 'react';
 import {
+  Box,
+  Paper,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
-  Box,
-  Skeleton,
 } from '@mui/material';
 import { EmptyState } from './EmptyState';
 
@@ -30,6 +30,13 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
+const tableShellSx = {
+  border: '1px solid',
+  borderColor: 'divider',
+  backgroundColor: 'background.paper',
+  overflowX: 'auto',
+} as const;
+
 export function DataTable<T extends { id?: string | number }>({
   columns,
   rows,
@@ -40,25 +47,30 @@ export function DataTable<T extends { id?: string | number }>({
   onRowClick,
 }: DataTableProps<T>) {
   const showLoading = isLoading || loading;
+
   if (showLoading) {
     return (
-      <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-        <Table sx={{ minWidth: 650 }}>
+      <TableContainer component={Paper} elevation={0} sx={tableShellSx}>
+        <Table sx={{ minWidth: 680 }} aria-busy="true">
           <TableHead>
             <TableRow>
-              {columns.map((col) => (
-                <TableCell key={col.id} align={col.align} style={{ minWidth: col.minWidth }}>
-                  {col.label}
+              {columns.map((column) => (
+                <TableCell
+                  key={column.id}
+                  align={column.align}
+                  style={{ minWidth: column.minWidth }}
+                >
+                  {column.label}
                 </TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {[...Array(5)].map((_, i) => (
-              <TableRow key={i}>
-                {columns.map((col) => (
-                  <TableCell key={col.id}>
-                    <Skeleton variant="text" width="80%" height={24} />
+            {Array.from({ length: 6 }).map((_, index) => (
+              <TableRow key={index}>
+                {columns.map((column) => (
+                  <TableCell key={column.id}>
+                    <Skeleton variant="text" width="78%" height={22} />
                   </TableCell>
                 ))}
               </TableRow>
@@ -74,33 +86,49 @@ export function DataTable<T extends { id?: string | number }>({
   }
 
   return (
-    <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-      <Table sx={{ minWidth: 650 }}>
+    <TableContainer component={Paper} elevation={0} sx={tableShellSx}>
+      <Table sx={{ minWidth: 680 }}>
         <TableHead>
           <TableRow>
-            {columns.map((col) => (
-              <TableCell key={col.id} align={col.align} style={{ minWidth: col.minWidth }}>
-                {col.label}
+            {columns.map((column) => (
+              <TableCell
+                key={column.id}
+                align={column.align}
+                style={{ minWidth: column.minWidth }}
+              >
+                {column.label}
               </TableCell>
             ))}
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((row, index) => {
-            const key = row.id ? String(row.id) : `row-${index}`;
+            const key = row.id !== undefined ? String(row.id) : `row-${index}`;
             return (
               <TableRow
                 key={key}
                 hover
-                onClick={() => onRowClick && onRowClick(row)}
+                onClick={() => onRowClick?.(row)}
+                tabIndex={onRowClick ? 0 : undefined}
+                onKeyDown={(event) => {
+                  if (
+                    onRowClick &&
+                    (event.key === 'Enter' || event.key === ' ')
+                  ) {
+                    event.preventDefault();
+                    onRowClick(row);
+                  }
+                }}
                 sx={{
                   cursor: onRowClick ? 'pointer' : 'default',
-                  '&:last-child td, &:last-child th': { border: 0 },
+                  '&:last-child td, &:last-child th': { borderBottom: 0 },
                 }}
               >
-                {columns.map((col) => (
-                  <TableCell key={col.id} align={col.align}>
-                    {col.render ? col.render(row) : (row as any)[col.id]}
+                {columns.map((column) => (
+                  <TableCell key={column.id} align={column.align}>
+                    {column.render
+                      ? column.render(row)
+                      : (row as Record<string, React.ReactNode>)[column.id]}
                   </TableCell>
                 ))}
               </TableRow>
@@ -108,6 +136,7 @@ export function DataTable<T extends { id?: string | number }>({
           })}
         </TableBody>
       </Table>
+      <Box sx={{ height: 1 }} />
     </TableContainer>
   );
 }

@@ -1,12 +1,12 @@
 import React from 'react';
 import {
+  Button,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   Typography,
-  Button,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -30,30 +30,35 @@ export const ModalForms: React.FC<ModalFormsProps> = ({
   isLoading = false,
   children,
   maxWidth = 'sm',
-}) => {
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth={maxWidth} fullWidth>
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          {title}
-        </Typography>
-        <IconButton size="small" onClick={onClose}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers sx={{ py: 3 }}>
-        {children}
-      </DialogContent>
-      {onSubmit && (
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button variant="outlined" color="inherit" onClick={onClose} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button variant="contained" color="primary" onClick={onSubmit} disabled={isLoading}>
-            {submitText}
-          </Button>
-        </DialogActions>
-      )}
-    </Dialog>
-  );
-};
+}) => (
+  <Dialog open={open} onClose={onClose} maxWidth={maxWidth} fullWidth>
+    <DialogTitle
+      sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 2,
+      }}
+    >
+      <Typography component="span" variant="h6">
+        {title}
+      </Typography>
+      <IconButton size="small" onClick={onClose} aria-label="Close dialog">
+        <CloseIcon fontSize="small" />
+      </IconButton>
+    </DialogTitle>
+    <DialogContent dividers sx={{ py: 2.5 }}>
+      {children}
+    </DialogContent>
+    {onSubmit && (
+      <DialogActions>
+        <Button variant="outlined" onClick={onClose} disabled={isLoading}>
+          Cancel
+        </Button>
+        <Button variant="contained" onClick={onSubmit} disabled={isLoading}>
+          {submitText}
+        </Button>
+      </DialogActions>
+    )}
+  </Dialog>
+);

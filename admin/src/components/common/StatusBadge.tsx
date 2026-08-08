@@ -1,5 +1,5 @@
 import React from 'react';
-import { Chip, ChipProps } from '@mui/material';
+import { alpha, Chip, ChipProps, useTheme } from '@mui/material';
 
 export type StatusType =
   | 'active'
@@ -27,11 +27,11 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   label,
   size = 'small',
 }) => {
+  const theme = useTheme();
   const normalized = String(status).toLowerCase();
-  const displayLabel = label || status;
+  const displayLabel = label || String(status).replaceAll('_', ' ');
 
-  let color: ChipProps['color'] = 'default';
-  let variant: ChipProps['variant'] = 'filled';
+  let semantic: 'success' | 'warning' | 'error' | 'info' | 'default' = 'info';
 
   switch (normalized) {
     case 'active':
@@ -40,13 +40,16 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     case 'live':
     case 'published':
     case 'enabled':
-      color = 'success';
+    case 'connected':
+    case 'healthy':
+      semantic = 'success';
       break;
     case 'pending':
     case 'warning':
     case 'in_progress':
     case 'review':
-      color = 'warning';
+    case 'degraded':
+      semantic = 'warning';
       break;
     case 'banned':
     case 'suspended':
@@ -55,28 +58,47 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     case 'error':
     case 'closed':
     case 'disabled':
-      color = 'error';
+    case 'disconnected':
+    case 'unhealthy':
+      semantic = 'error';
       break;
     case 'inactive':
     case 'offline':
     case 'draft':
-      color = 'default';
+    case 'not_tested':
+      semantic = 'default';
       break;
     default:
-      color = 'info';
-      break;
+      semantic = 'info';
   }
+
+  const paletteColor =
+    semantic === 'default'
+      ? theme.palette.text.secondary
+      : theme.palette[semantic].main;
 
   return (
     <Chip
       label={displayLabel}
-      color={color}
       size={size}
-      variant={variant}
+      variant="outlined"
       sx={{
         textTransform: 'capitalize',
-        fontWeight: 600,
-        fontSize: '0.75rem',
+        color: paletteColor,
+        borderColor: alpha(paletteColor, 0.22),
+        backgroundColor: alpha(
+          paletteColor,
+          theme.palette.mode === 'dark' ? 0.13 : 0.075,
+        ),
+        '&::before': {
+          content: '""',
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          bgcolor: paletteColor,
+          ml: 0.2,
+          mr: -0.2,
+        },
       }}
     />
   );
