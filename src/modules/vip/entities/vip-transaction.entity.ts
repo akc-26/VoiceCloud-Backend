@@ -42,10 +42,7 @@ export class VipTransaction {
   @Column({ type: 'varchar', default: 'SUCCESS' })
   status: string; // SUCCESS | FAILED
 
-  @Index('UQ_vip_transactions_operationKey', {
-    unique: true,
-    where: '"operationKey" IS NOT NULL',
-  })
+  @Index('UQ_vip_transactions_operationKey', { unique: true, where: '"operationKey" IS NOT NULL' })
   @Column({ type: 'varchar', nullable: true })
   operationKey: string | null;
 

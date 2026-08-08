@@ -307,8 +307,7 @@ export class CreatorPayoutLifecycleService {
       const frozenBefore = wallet.frozenBalance;
       const totalWithdrawnBefore = wallet.totalDiamondsWithdrawn || 0;
       wallet.frozenBalance -= payout.diamondAmount;
-      wallet.totalDiamondsWithdrawn =
-        totalWithdrawnBefore + payout.diamondAmount;
+      wallet.totalDiamondsWithdrawn = totalWithdrawnBefore + payout.diamondAmount;
       await manager.getRepository(WalletBalance).save(wallet);
 
       const transaction = await this.writeLedger(manager, wallet, {

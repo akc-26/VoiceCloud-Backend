@@ -118,8 +118,7 @@ export class RewardEngineService {
         [RewardType.BADGE, payload.badge, 'badge'],
       ];
       for (const [type, value, suffix] of itemRewards) {
-        if (value)
-          nonFinancial.push({ type, amount: 1, metadata: value, suffix });
+        if (value) nonFinancial.push({ type, amount: 1, metadata: value, suffix });
       }
 
       for (const reward of nonFinancial) {

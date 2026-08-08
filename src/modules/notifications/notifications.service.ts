@@ -224,6 +224,34 @@ export class NotificationsService {
     };
   }
 
+  async getAdminNotifications(query: QueryNotificationDto): Promise<{
+    data: Notification[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit = query.limit && query.limit > 0 ? query.limit : 20;
+    const skip = (page - 1) * limit;
+    const where: FindOptionsWhere<Notification> = {};
+    if (query.type) where.type = query.type;
+    if (query.isRead !== undefined) where.isRead = query.isRead;
+    const [data, total] = await this.notificationRepository.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
   async getUnreadCount(userId: string): Promise<{ unreadCount: number }> {
     const count = await this.notificationRepository.count({
       where: { userId, isRead: false },

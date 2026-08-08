@@ -8,7 +8,10 @@ import { useEffect, useMemo } from 'react';
 import { creatorApi } from '../services/creator-api.service';
 import { useCreatorProfileStore } from '../store/creator-profile.store';
 import { useNotificationStore } from '../store/notification.store';
-import { RecentActivityItem, CreatorNotification } from '../types/creator.types';
+import {
+  RecentActivityItem,
+  CreatorNotification,
+} from '../types/creator.types';
 
 export const CREATOR_QUERY_KEYS = {
   dashboard: ['creator', 'dashboard'] as const,
@@ -51,7 +54,9 @@ export function useCreatorProfile() {
         id: query.data.id || 'creator-studio-001',
         userId: query.data.id || 'user-vc-creator-001',
         displayName: query.data.displayName || 'VoiceCloud Official Host',
-        handle: query.data.username ? `@${query.data.username}` : '@voicecloud_official',
+        handle: query.data.username
+          ? `@${query.data.username}`
+          : '@voicecloud_official',
         avatarUrl:
           query.data.avatarUrl ||
           'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
@@ -100,7 +105,9 @@ export function useCreatorWallet() {
  * Creator Notifications Query (Optional service)
  */
 export function useCreatorNotifications() {
-  const setNotifications = useNotificationStore((state) => state.setNotifications);
+  const setNotifications = useNotificationStore(
+    (state) => state.setNotifications,
+  );
 
   const query = useQuery({
     queryKey: CREATOR_QUERY_KEYS.notifications,
@@ -118,7 +125,7 @@ export function useCreatorNotifications() {
         id: n.id,
         title: n.title,
         message: n.message,
-        type: (n.type as any) || 'system',
+        type: (n.type as CreatorNotification['type']) || 'SYSTEM',
         read: n.isRead ?? n.read ?? false,
         createdAt: n.createdAt,
         link: n.link,
@@ -147,7 +154,9 @@ export function useCreatorRecentActivity() {
           id: `sub-${sub.id}`,
           title: `New Subscriber: ${sub.subscriber?.displayName || sub.subscriber?.username || 'Supporter'}`,
           subtitle: `Subscribed to ${sub.plan?.title || 'VIP Supporter Plan'}`,
-          value: sub.plan?.monthlyPrice ? `+${sub.plan.monthlyPrice} Coins` : '+500 Coins',
+          value: sub.plan?.monthlyPrice
+            ? `+${sub.plan.monthlyPrice} Coins`
+            : '+500 Coins',
           time: formatRelativeTime(sub.startedAt),
           type: 'subscription',
           color: '#6366f1',
@@ -166,7 +175,10 @@ export function useCreatorRecentActivity() {
           value: `$${payout.payoutAmount || payout.diamondAmount / 100} USD`,
           time: formatRelativeTime(payout.createdAt),
           type: 'payout',
-          color: payout.status === 'PROCESSED' || payout.status === 'APPROVED' ? '#10b981' : '#f59e0b',
+          color:
+            payout.status === 'PROCESSED' || payout.status === 'APPROVED'
+              ? '#10b981'
+              : '#f59e0b',
           timestamp: payout.createdAt,
         });
       });
@@ -175,7 +187,8 @@ export function useCreatorRecentActivity() {
     // Sort by timestamp descending
     return items.sort(
       (a, b) =>
-        new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+        new Date(b.timestamp || 0).getTime() -
+        new Date(a.timestamp || 0).getTime(),
     );
   }, [dashboardQuery.data]);
 

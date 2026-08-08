@@ -6,11 +6,7 @@ import { CreatorSubscription } from '../../modules/users/entities/creator-subscr
 import { ScheduledRoom } from '../../modules/rooms/entities/scheduled-room.entity';
 import { Notification } from '../../modules/notifications/entities/notification.entity';
 import { CreatorPayoutRequest } from '../../modules/users/entities/creator-payout-request.entity';
-import {
-  SubscriptionStatus,
-  ScheduledRoomStatus,
-  PayoutStatus,
-} from '../../common/enums';
+import { SubscriptionStatus, ScheduledRoomStatus, PayoutStatus } from '../../common/enums';
 
 describe('QueueSchedulerService', () => {
   let schedulerService: QueueSchedulerService;

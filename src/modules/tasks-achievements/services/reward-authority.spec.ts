@@ -4,11 +4,9 @@ import { RewardAuditLog } from '../entities/reward-audit-log.entity';
 function createAuditRepository() {
   const rows = new Map<string, any>();
   return {
-    findOne: jest
-      .fn()
-      .mockImplementation(async ({ where }) =>
-        where.operationKey ? rows.get(where.operationKey) || null : null,
-      ),
+    findOne: jest.fn().mockImplementation(async ({ where }) =>
+      where.operationKey ? rows.get(where.operationKey) || null : null,
+    ),
     create: jest.fn().mockImplementation((value) => ({
       id: `audit-${rows.size + 1}`,
       ...value,
@@ -31,9 +29,7 @@ describe('RewardEngineService financial authority', () => {
       }),
     };
     const dataSource = {
-      transaction: jest
-        .fn()
-        .mockImplementation((callback) => callback(manager)),
+      transaction: jest.fn().mockImplementation((callback) => callback(manager)),
     } as any;
     const walletMutationService = {
       creditInTransaction: jest.fn().mockResolvedValue({

@@ -117,9 +117,7 @@ export class QueueSchedulerService {
 
   @Cron(CronExpression.EVERY_5_MINUTES)
   async handlePayoutReservationVerificationScan() {
-    this.logger.log(
-      '[Scheduler] Running payout reservation verification scan...',
-    );
+    this.logger.log('[Scheduler] Running payout reservation verification scan...');
     try {
       const payouts = await this.payoutRepository.find({
         where: { status: In([PayoutStatus.PENDING, PayoutStatus.APPROVED]) },
@@ -168,7 +166,10 @@ export class QueueSchedulerService {
         QUEUE_NAMES.RTC_CLEANUP,
       ];
       for (const queueName of queues) {
-        await this.queueService.cleanQueue(queueName, 24 * 60 * 60 * 1000);
+        await this.queueService.cleanQueue(
+          queueName,
+          24 * 60 * 60 * 1000,
+        );
       }
     } catch (error: any) {
       this.logger.error(

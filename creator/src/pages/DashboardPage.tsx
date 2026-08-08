@@ -95,7 +95,7 @@ export const DashboardPage: React.FC = () => {
     {
       title: 'Diamonds Earned',
       value: `💎 ${(
-        walletData?.balance?.diamondBalance ??
+        walletData?.wallet?.totalDiamondsEarned ??
         profile.walletDiamonds ??
         84300
       ).toLocaleString()}`,
@@ -107,9 +107,7 @@ export const DashboardPage: React.FC = () => {
     {
       title: 'Monthly Earnings (Est.)',
       value: `$${(
-        dashboardData?.earningsSummary?.estimatedRecurringRevenue ??
-        walletData?.currentBalanceUsd ??
-        1140.0
+        dashboardData?.earningsSummary?.estimatedRecurringRevenue ?? 0
       ).toFixed(2)}`,
       change: '+18.5% growth',
       icon: DollarSign,
@@ -142,7 +140,8 @@ export const DashboardPage: React.FC = () => {
           <AlertTitle sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
             Creator Studio Critical Service Error
           </AlertTitle>
-          Unable to load critical creator profile or studio dashboard data. Please verify your connection and click Retry to reload.
+          Unable to load critical creator profile or studio dashboard data.
+          Please verify your connection and click Retry to reload.
         </Alert>
       </Box>
     );
@@ -483,7 +482,10 @@ export const DashboardPage: React.FC = () => {
 
         {/* Creator Wallet Summary Widget (Optional Service - Isolated Error Boundary) */}
         <Grid xs={12} md={5} lg={4}>
-          <WidgetErrorBoundary title="Wallet" onRetry={() => walletQuery.refetch()}>
+          <WidgetErrorBoundary
+            title="Wallet"
+            onRetry={() => walletQuery.refetch()}
+          >
             <Card sx={{ height: '100%' }}>
               <CardContent sx={{ p: 3 }}>
                 <Box
@@ -500,10 +502,7 @@ export const DashboardPage: React.FC = () => {
                       Wallet Summary
                     </Typography>
                   </Box>
-                  <IconButton
-                    size="small"
-                    onClick={() => navigate('/wallet')}
-                  >
+                  <IconButton size="small" onClick={() => navigate('/wallet')}>
                     <ChevronRight size={18} />
                   </IconButton>
                 </Box>
@@ -527,11 +526,22 @@ export const DashboardPage: React.FC = () => {
                       borderColor: 'divider',
                     }}
                   >
-                    <AlertCircle size={32} color="#f59e0b" style={{ marginBottom: 8 }} />
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                    <AlertCircle
+                      size={32}
+                      color="#f59e0b"
+                      style={{ marginBottom: 8 }}
+                    />
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontWeight: 700, mb: 0.5 }}
+                    >
                       Wallet unavailable
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', mb: 2 }}
+                    >
                       Unable to retrieve current balance.
                     </Typography>
                     <Button
@@ -564,7 +574,7 @@ export const DashboardPage: React.FC = () => {
                       >
                         💎{' '}
                         {(
-                          walletData?.balance?.diamondBalance ??
+                          walletData?.wallet?.diamondBalance ??
                           profile.walletDiamonds ??
                           84300
                         ).toLocaleString()}
@@ -574,8 +584,9 @@ export const DashboardPage: React.FC = () => {
                         <strong>
                           $
                           {(
-                            walletData?.availableBalanceUsd ??
-                            (profile.walletDiamonds ?? 84300) / 100
+                            Number(
+                              walletData?.wallet?.withdrawableBalance ?? 0,
+                            ) * 0.005
                           ).toFixed(2)}{' '}
                           USD
                         </strong>
@@ -601,10 +612,13 @@ export const DashboardPage: React.FC = () => {
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           Coins Balance:
                         </Typography>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 700 }}
+                        >
                           🪙{' '}
                           {(
-                            walletData?.balance?.coinBalance ??
+                            walletData?.wallet?.coinBalance ??
                             profile.walletCoins ??
                             12500
                           ).toLocaleString()}
@@ -628,7 +642,7 @@ export const DashboardPage: React.FC = () => {
                         >
                           $
                           {(
-                            walletData?.pendingPayoutsUsd ?? 500.0
+                            dashboardData?.earningsSummary?.pendingPayouts ?? 0
                           ).toFixed(2)}{' '}
                           USD
                         </Typography>
@@ -650,7 +664,8 @@ export const DashboardPage: React.FC = () => {
                         >
                           $
                           {(
-                            walletData?.lifetimeEarningsUsd ?? 2840.5
+                            dashboardData?.earningsSummary?.lifetimeEarnings ??
+                            0
                           ).toFixed(2)}{' '}
                           USD
                         </Typography>
@@ -679,7 +694,10 @@ export const DashboardPage: React.FC = () => {
       <Grid container spacing={3}>
         {/* Recent Activity Stream (Optional Service - Isolated Error Boundary) */}
         <Grid xs={12} md={7} lg={8}>
-          <WidgetErrorBoundary title="Recent Activity" onRetry={() => activityQuery.refetch()}>
+          <WidgetErrorBoundary
+            title="Recent Activity"
+            onRetry={() => activityQuery.refetch()}
+          >
             <Card>
               <CardContent sx={{ p: 3 }}>
                 <Box
@@ -718,7 +736,9 @@ export const DashboardPage: React.FC = () => {
                       />
                     ))}
                   </Stack>
-                ) : activityQuery.isError || !activityQuery.data || activityQuery.data.length === 0 ? (
+                ) : activityQuery.isError ||
+                  !activityQuery.data ||
+                  activityQuery.data.length === 0 ? (
                   <Box
                     sx={{
                       py: 6,
@@ -784,7 +804,10 @@ export const DashboardPage: React.FC = () => {
                             >
                               {act.title}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {act.subtitle}
                             </Typography>
                           </Box>
@@ -876,7 +899,10 @@ export const DashboardPage: React.FC = () => {
             </Card>
 
             {/* Notifications Widget (Optional Service - Isolated Error Boundary) */}
-            <WidgetErrorBoundary title="Notifications" onRetry={() => notificationsQuery.refetch()}>
+            <WidgetErrorBoundary
+              title="Notifications"
+              onRetry={() => notificationsQuery.refetch()}
+            >
               <Card>
                 <CardContent sx={{ p: 3 }}>
                   <Box
@@ -907,7 +933,9 @@ export const DashboardPage: React.FC = () => {
                       <Skeleton variant="rectangular" height={48} />
                       <Skeleton variant="rectangular" height={48} />
                     </Stack>
-                  ) : notificationsQuery.isError || !notificationsQuery.data?.data || notificationsQuery.data.data.length === 0 ? (
+                  ) : notificationsQuery.isError ||
+                    !notificationsQuery.data?.data ||
+                    notificationsQuery.data.data.length === 0 ? (
                     <Typography
                       variant="caption"
                       color="text.secondary"
@@ -920,7 +948,11 @@ export const DashboardPage: React.FC = () => {
                       {notificationsQuery.data.data.slice(0, 3).map((notif) => (
                         <Box
                           key={notif.id}
-                          sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 2,
+                            bgcolor: 'action.hover',
+                          }}
                         >
                           <Typography
                             variant="subtitle2"
@@ -948,5 +980,3 @@ export const DashboardPage: React.FC = () => {
     </Box>
   );
 };
-
-

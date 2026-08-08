@@ -58,9 +58,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleDisconnect(client: Socket) {
     const user = client.data?.user as { userId?: string } | undefined;
-    const joinedRoomIds = client.data?.joinedRoomIds as
-      | Set<string>
-      | undefined;
+    const joinedRoomIds = client.data?.joinedRoomIds as Set<string> | undefined;
 
     if (user?.userId && joinedRoomIds) {
       await Promise.all(
@@ -102,7 +100,22 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   broadcastNotificationEvent(event: string, payload: unknown) {
-    this.logger.log(`Broadcasting Notification event: ${event}`);
+    const userId =
+      payload && typeof payload === 'object' && 'userId' in payload
+        ? (payload as { userId?: unknown }).userId
+        : undefined;
+
+    if (typeof userId === 'string' && userId.length > 0) {
+      this.logger.log(
+        `Broadcasting Notification event: ${event} to user ${userId}`,
+      );
+      this.server?.to(`user:${userId}`).emit(event, payload);
+      return;
+    }
+
+    this.logger.warn(
+      `Broadcasting Notification event without user scope: ${event}`,
+    );
     this.server?.emit(event, payload);
   }
 

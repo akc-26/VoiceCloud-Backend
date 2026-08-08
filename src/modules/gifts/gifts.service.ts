@@ -193,6 +193,18 @@ export class GiftsService {
     return { success: true };
   }
 
+  async getAdminCatalog(): Promise<Gift[]> {
+    return this.giftRepository.find({
+      order: { sortOrder: 'ASC', coinPrice: 'ASC' },
+    });
+  }
+
+  async getAdminCategories(): Promise<GiftCategory[]> {
+    return this.categoryRepository.find({
+      order: { sortOrder: 'ASC' },
+    });
+  }
+
   async getCatalog(
     countryCode?: string,
     seasonTag?: string,

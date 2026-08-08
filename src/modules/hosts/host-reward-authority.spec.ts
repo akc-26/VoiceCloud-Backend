@@ -49,9 +49,7 @@ describe('HostRewardAuthorityService', () => {
       }),
     };
     const dataSource = {
-      transaction: jest
-        .fn()
-        .mockImplementation((callback) => callback(manager)),
+      transaction: jest.fn().mockImplementation((callback) => callback(manager)),
     } as any;
     const walletMutation = {
       creditInTransaction: jest.fn().mockResolvedValue({

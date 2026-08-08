@@ -9,9 +9,7 @@ import { JOB_TYPES } from '../queue.constants';
 
 describe('Financial recovery queue processors', () => {
   it('delegates queued reward settlement to persistent reward authority', async () => {
-    const rewards = {
-      distributeReward: jest.fn().mockResolvedValue([{ id: 'audit-1' }]),
-    };
+    const rewards = { distributeReward: jest.fn().mockResolvedValue([{ id: 'audit-1' }]) };
     const processor = new TasksProcessor(
       { manualReset: jest.fn() } as any,
       { triggerSeasonRollover: jest.fn() } as any,
@@ -44,10 +42,7 @@ describe('Financial recovery queue processors', () => {
       { recordStreakActivity: jest.fn() } as any,
     );
     await expect(
-      processor.process({
-        id: 'job-2',
-        data: { action: 'xp_calculation' },
-      } as any),
+      processor.process({ id: 'job-2', data: { action: 'xp_calculation' } } as any),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -74,10 +69,7 @@ describe('Financial recovery queue processors', () => {
         reservationTransaction: { id: 'reserve-1' },
       }),
     };
-    const processor = new PayoutProcessor(
-      lifecycle as any,
-      { createNotification: jest.fn() } as any,
-    );
+    const processor = new PayoutProcessor(lifecycle as any, { createNotification: jest.fn() } as any);
     const result = await processor.process({
       id: 'payout-job',
       data: { payoutRequestId: 'payout-1', action: 'verify_reservation' },
@@ -87,11 +79,7 @@ describe('Financial recovery queue processors', () => {
   });
 
   it('delegates Host reward and earnings recovery to authoritative services', async () => {
-    const hosts = {
-      claimReward: jest
-        .fn()
-        .mockResolvedValue({ id: 'reward-1', status: 'CLAIMED' }),
-    };
+    const hosts = { claimReward: jest.fn().mockResolvedValue({ id: 'reward-1', status: 'CLAIMED' }) };
     const rewardProcessor = new HostRewardProcessor(hosts as any);
     await rewardProcessor.process({
       id: 'host-reward-job',
@@ -99,9 +87,7 @@ describe('Financial recovery queue processors', () => {
     } as any);
     expect(hosts.claimReward).toHaveBeenCalledWith('user-1', 'reward-1');
 
-    const financial = {
-      getEarnings: jest.fn().mockResolvedValue({ totalEarnings: 100 }),
-    };
+    const financial = { getEarnings: jest.fn().mockResolvedValue({ totalEarnings: 100 }) };
     const earningsProcessor = new HostEarningsProcessor(financial as any);
     await earningsProcessor.process({
       id: 'host-earnings-job',
@@ -115,11 +101,7 @@ describe('Financial recovery queue processors', () => {
     const processor = new VipProcessor(vip as any);
     await processor.process({
       id: 'vip-job',
-      data: {
-        action: 'reward_distribution',
-        userId: 'user-1',
-        rewardId: 'reward-1',
-      },
+      data: { action: 'reward_distribution', userId: 'user-1', rewardId: 'reward-1' },
     } as any);
     expect(vip.claimReward).toHaveBeenCalledWith('user-1', 'reward-1');
   });

@@ -97,17 +97,11 @@ describe('Phase 28 - Daily Tasks, Achievements & Gamification Engine', () => {
   };
 
   const mockWalletMutationService = {
-    creditInTransaction: jest
-      .fn()
-      .mockImplementation(async (_manager, input) => ({
-        wallet: {
-          userId: input.userId,
-          coinBalance: 1000,
-          diamondBalance: 1000,
-        },
-        transaction: { id: `wallet-${input.operationKey}` },
-        idempotent: false,
-      })),
+    creditInTransaction: jest.fn().mockImplementation(async (_manager, input) => ({
+      wallet: { userId: input.userId, coinBalance: 1000, diamondBalance: 1000 },
+      transaction: { id: `wallet-${input.operationKey}` },
+      idempotent: false,
+    })),
   };
 
   const mockDataSource = {
@@ -216,9 +210,7 @@ describe('Phase 28 - Daily Tasks, Achievements & Gamification Engine', () => {
         'test_source',
         'test-id',
       );
-      expect(
-        mockWalletMutationService.creditInTransaction,
-      ).toHaveBeenCalledTimes(2);
+      expect(mockWalletMutationService.creditInTransaction).toHaveBeenCalledTimes(2);
       expect(logs.length).toBe(3);
     });
   });

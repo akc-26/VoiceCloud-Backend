@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
-import { WalletBalanceType, WalletTransactionType } from '../../common/enums';
+import {
+  WalletBalanceType,
+  WalletTransactionType,
+} from '../../common/enums';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { WalletMutationService } from '../wallet/wallet-mutation.service';
 import { OpenLuckyBoxDto, LuckyBoxTier } from './dto/lucky-box.dto';
@@ -33,15 +36,12 @@ export class LuckyBoxService {
   async openLuckyBox(userId: string, dto: OpenLuckyBoxDto) {
     const { tier, count = 1, roomId } = dto;
     if (!Number.isInteger(count) || count < 1) {
-      throw new BadRequestException(
-        'Lucky Box count must be a positive integer',
-      );
+      throw new BadRequestException('Lucky Box count must be a positive integer');
     }
     const pricePerBox = this.TIER_PRICES[tier];
     if (!pricePerBox) throw new BadRequestException('Unknown Lucky Box tier');
     const totalCost = pricePerBox * count;
-    const operationKey =
-      dto.operationKey?.trim() || `lucky-box:${randomUUID()}`;
+    const operationKey = dto.operationKey?.trim() || `lucky-box:${randomUUID()}`;
 
     const result = await this.dataSource.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
@@ -146,58 +146,26 @@ export class LuckyBoxService {
     };
   }
 
-  private rollBoxReward(
-    tier: LuckyBoxTier,
-    pricePerBox: number,
-  ): LuckyBoxReward {
+  private rollBoxReward(tier: LuckyBoxTier, pricePerBox: number): LuckyBoxReward {
     const roll = Math.random() * 100;
     if (roll < 2) {
       const mult = tier === LuckyBoxTier.DIAMOND ? 50 : 10;
       const val = pricePerBox * mult;
-      return {
-        type: 'COIN_CASHBACK',
-        name: `${mult}x Mega Jackpot Cashback`,
-        value: val,
-        multiplier: mult,
-        description: `Jackpot! Won ${val} coins cashback!`,
-      };
+      return { type: 'COIN_CASHBACK', name: `${mult}x Mega Jackpot Cashback`, value: val, multiplier: mult, description: `Jackpot! Won ${val} coins cashback!` };
     }
     if (roll < 15) {
       const mult = 3;
       const val = pricePerBox * mult;
-      return {
-        type: 'COIN_CASHBACK',
-        name: `${mult}x Lucky Cashback`,
-        value: val,
-        multiplier: mult,
-        description: `Lucky win! Earned ${val} coins!`,
-      };
+      return { type: 'COIN_CASHBACK', name: `${mult}x Lucky Cashback`, value: val, multiplier: mult, description: `Lucky win! Earned ${val} coins!` };
     }
     if (roll < 45) {
       const val = Math.floor(pricePerBox * 1.2);
-      return {
-        type: 'COIN_CASHBACK',
-        name: 'Standard Coin Yield',
-        value: val,
-        multiplier: 1.2,
-        description: `Earned ${val} coins!`,
-      };
+      return { type: 'COIN_CASHBACK', name: 'Standard Coin Yield', value: val, multiplier: 1.2, description: `Earned ${val} coins!` };
     }
     if (roll < 75) {
-      return {
-        type: 'ROOM_EFFECT',
-        name: 'Golden Dragon Entrance Visual',
-        value: pricePerBox,
-        description: 'Unlocked 24hr Exclusive Golden Dragon Entrance Animation',
-      };
+      return { type: 'ROOM_EFFECT', name: 'Golden Dragon Entrance Visual', value: pricePerBox, description: 'Unlocked 24hr Exclusive Golden Dragon Entrance Animation' };
     }
     const val = Math.floor(pricePerBox * 0.5);
-    return {
-      type: 'COIN_CASHBACK',
-      name: 'Consolation Cashback',
-      value: val,
-      multiplier: 0.5,
-      description: `Returned ${val} coins.`,
-    };
+    return { type: 'COIN_CASHBACK', name: 'Consolation Cashback', value: val, multiplier: 0.5, description: `Returned ${val} coins.` };
   }
 }

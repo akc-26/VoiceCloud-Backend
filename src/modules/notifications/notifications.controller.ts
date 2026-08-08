@@ -70,6 +70,20 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(userId);
   }
 
+  @Get('admin/delivery-log')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Admin: List persisted notification delivery records',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification delivery records retrieved.',
+  })
+  async getAdminDeliveryLog(@Query() query: QueryNotificationDto) {
+    return this.notificationsService.getAdminNotifications(query);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get full notification details by ID' })
   @ApiParam({ name: 'id', description: 'Notification ID' })

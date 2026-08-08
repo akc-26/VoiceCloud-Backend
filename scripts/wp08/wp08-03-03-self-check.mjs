@@ -13,15 +13,13 @@ const baseline = {
 const failures = [];
 const read = (path) => readFileSync(join(root, path), 'utf8');
 const requireFile = (path) => {
-  if (!existsSync(join(root, path)))
-    failures.push(`Missing required file: ${path}`);
+  if (!existsSync(join(root, path))) failures.push(`Missing required file: ${path}`);
 };
 const requireText = (path, text) => {
   if (!read(path).includes(text)) failures.push(`${path} missing: ${text}`);
 };
 const forbidText = (path, text) => {
-  if (read(path).includes(text))
-    failures.push(`${path} must not contain: ${text}`);
+  if (read(path).includes(text)) failures.push(`${path} must not contain: ${text}`);
 };
 
 for (const path of [
@@ -48,13 +46,10 @@ const lockHash = createHash('sha256')
   .update(readFileSync(join(root, 'package-lock.json')))
   .digest('hex');
 if (lockHash !== baseline.packageLockSha256) {
-  failures.push(
-    `package-lock.json changed from accepted 03-02D baseline: ${lockHash}`,
-  );
+  failures.push(`package-lock.json changed from accepted 03-02D baseline: ${lockHash}`);
 }
 
-const reward =
-  'src/modules/tasks-achievements/services/reward-engine.service.ts';
+const reward = 'src/modules/tasks-achievements/services/reward-engine.service.ts';
 for (const text of [
   'this.dataSource.transaction',
   'SELECT pg_advisory_xact_lock(hashtext($1))',
@@ -62,9 +57,8 @@ for (const text of [
   'creditInTransaction',
   'walletTransactionId',
   'operationKey',
-])
-  requireText(reward, text);
-forbidText(reward, 'this.userRepository.increment');
+]) requireText(reward, text);
+forbidText(reward, "this.userRepository.increment");
 
 const lucky = 'src/modules/gifts/lucky-box.service.ts';
 for (const text of [
@@ -73,8 +67,7 @@ for (const text of [
   'WalletTransactionType.LUCKY_BOX_REWARD',
   'LuckyBoxOpening',
   'resultPayload',
-])
-  requireText(lucky, text);
+]) requireText(lucky, text);
 forbidText(lucky, 'wallet:');
 forbidText(lucky, 'RedisService');
 
@@ -84,8 +77,7 @@ for (const text of [
   'WalletTransactionType.HOST_REWARD',
   'claimOperationKey',
   'walletTransactionId',
-])
-  requireText(hostReward, text);
+]) requireText(hostReward, text);
 
 const vip = 'src/modules/vip/vip-financial-authority.service.ts';
 for (const text of [
@@ -96,19 +88,11 @@ for (const text of [
   'WalletTransactionType.VIP_REWARD',
   'vip-reward:',
   'operationKey',
-])
-  requireText(vip, text);
-requireText(
-  'src/modules/vip/vip.service.ts',
-  'this.financialAuthority.subscribe',
-);
-requireText(
-  'src/modules/vip/vip.service.ts',
-  'this.financialAuthority.claimReward',
-);
+]) requireText(vip, text);
+requireText('src/modules/vip/vip.service.ts', 'this.financialAuthority.subscribe');
+requireText('src/modules/vip/vip.service.ts', 'this.financialAuthority.claimReward');
 
-const notificationEntity =
-  'src/modules/notifications/entities/notification.entity.ts';
+const notificationEntity = 'src/modules/notifications/entities/notification.entity.ts';
 for (const text of [
   'operationKey',
   'deliveryStatus',
@@ -116,50 +100,29 @@ for (const text of [
   'lastDeliveryAttemptAt',
   'deliveredAt',
   'lastDeliveryError',
-])
-  requireText(notificationEntity, text);
+]) requireText(notificationEntity, text);
 const notificationProcessor = 'src/queue/processors/notification.processor.ts';
 for (const text of [
   'getNotificationForDelivery',
   'markDeliveryAttempt',
   'markDeliveryResult',
   "deliveryStatus === 'SENT'",
-])
-  requireText(notificationProcessor, text);
+]) requireText(notificationProcessor, text);
 forbidText(notificationProcessor, 'createNotification({');
 
 const tasksProcessor = 'src/queue/processors/tasks.processor.ts';
 requireText(tasksProcessor, 'reward:queue:');
 requireText(tasksProcessor, 'has no persisted recovery operation');
 forbidText(tasksProcessor, 'processed: true');
-requireText(
-  'src/queue/processors/host-reward.processor.ts',
-  'hostsService.claimReward',
-);
-requireText(
-  'src/queue/processors/host-earnings.processor.ts',
-  'hostFinancialAuthority.getEarnings',
-);
-requireText(
-  'src/queue/processors/gift.processor.ts',
-  'verifyCommittedSettlement',
-);
+requireText('src/queue/processors/host-reward.processor.ts', 'hostsService.claimReward');
+requireText('src/queue/processors/host-earnings.processor.ts', 'hostFinancialAuthority.getEarnings');
+requireText('src/queue/processors/gift.processor.ts', 'verifyCommittedSettlement');
 requireText('src/queue/processors/payout.processor.ts', 'verifyReservedPayout');
-requireText(
-  'src/queue/processors/payout.processor.ts',
-  'payoutLifecycleService.settle',
-);
-requireText(
-  'src/queue/scheduler/queue-scheduler.service.ts',
-  'handlePendingNotificationDeliveryScan',
-);
-requireText(
-  'src/queue/scheduler/queue-scheduler.service.ts',
-  'handlePayoutReservationVerificationScan',
-);
+requireText('src/queue/processors/payout.processor.ts', 'payoutLifecycleService.settle');
+requireText('src/queue/scheduler/queue-scheduler.service.ts', 'handlePendingNotificationDeliveryScan');
+requireText('src/queue/scheduler/queue-scheduler.service.ts', 'handlePayoutReservationVerificationScan');
 
-const migration =
-  'src/database/migrations/1700000000013-Phase08RewardsVipNotificationRecovery.ts';
+const migration = 'src/database/migrations/1700000000013-Phase08RewardsVipNotificationRecovery.ts';
 for (const text of [
   'UQ_reward_audit_logs_operationKey',
   'lucky_box_openings',
@@ -169,27 +132,17 @@ for (const text of [
   'UQ_notifications_operationKey',
   `SET "deliveryStatus" = 'SENT'`,
   `ALTER COLUMN "deliveryStatus" SET DEFAULT 'PENDING'`,
-])
-  requireText(migration, text);
+]) requireText(migration, text);
 forbidText(migration, 'UQ_vip_reward_claims_period');
 
 // Accepted 03-02A/B/C/D authority must remain intact.
 for (const [path, text] of [
   ['src/modules/wallet/wallet-mutation.service.ts', 'pessimistic_write'],
-  [
-    'src/modules/gifts/gift-settlement.service.ts',
-    'WalletTransactionType.GIFT_RECEIVED',
-  ],
-  [
-    'src/modules/wallet/creator-payout-lifecycle.service.ts',
-    "lifecycleAction: 'SETTLE'",
-  ],
-  [
-    'src/modules/hosts/host-financial-authority.service.ts',
-    'WalletTransactionType.HOST_SETTLEMENT',
-  ],
-])
-  requireText(path, text);
+  ['src/modules/gifts/gift-settlement.service.ts', 'WalletTransactionType.GIFT_RECEIVED'],
+  ['src/modules/wallet/creator-payout-lifecycle.service.ts', "lifecycleAction: 'SETTLE'"],
+  ['src/modules/hosts/host-financial-authority.service.ts', 'WalletTransactionType.HOST_SETTLEMENT'],
+]) requireText(path, text);
+
 
 for (const text of [
   'format:wp08:03:03',
@@ -198,8 +151,7 @@ for (const text of [
   'test:wp08:03:03',
   'wp08:03:03:prepare',
   'wp08:03:03:check',
-])
-  requireText('package.json', text);
+]) requireText('package.json', text);
 
 const checker = read('scripts/wp08/wp08-03-03-check.mjs');
 for (const forbidden of [
@@ -209,8 +161,7 @@ for (const forbidden of [
   "'run', 'format:wp08:03:03'",
   "'run', 'lint:fix:wp08:03:03'",
 ]) {
-  if (checker.includes(forbidden))
-    failures.push(`Final checker contains mutating command: ${forbidden}`);
+  if (checker.includes(forbidden)) failures.push(`Final checker contains mutating command: ${forbidden}`);
 }
 
 const revisionSpecificTests = [];
@@ -228,15 +179,11 @@ const walk = (directory) => {
 };
 walk(join(root, 'src'));
 if (revisionSpecificTests.length) {
-  failures.push(
-    `Revision-specific 03-03 test files are forbidden: ${revisionSpecificTests.join(', ')}`,
-  );
+  failures.push(`Revision-specific 03-03 test files are forbidden: ${revisionSpecificTests.join(', ')}`);
 }
 
 if (failures.length) {
-  console.error(
-    'WP08-03-03 consolidated authority/recovery self-check failed:',
-  );
+  console.error('WP08-03-03 consolidated authority/recovery self-check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
@@ -244,12 +191,6 @@ if (failures.length) {
 console.log('WP08-03-03 consolidated authority/recovery self-check passed.');
 console.log(`Baseline branch: ${baseline.branch}`);
 console.log(`Baseline commit: ${baseline.commit}`);
-console.log(
-  'Rewards/Lucky Box, VIP, notifications and recovery queues retain PostgreSQL authority.',
-);
-console.log(
-  'Historical notifications are protected from deployment-time replay.',
-);
-console.log(
-  'package-lock.json remains byte-identical to accepted 03-02D baseline.',
-);
+console.log('Rewards/Lucky Box, VIP, notifications and recovery queues retain PostgreSQL authority.');
+console.log('Historical notifications are protected from deployment-time replay.');
+console.log('package-lock.json remains byte-identical to accepted 03-02D baseline.');

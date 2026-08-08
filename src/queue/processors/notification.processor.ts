@@ -81,8 +81,8 @@ export class NotificationProcessor extends WorkerHost {
         });
         targetTokens = devices
           .map((device) => device.pushToken)
-          .filter((token): token is string =>
-            Boolean(token && token.trim().length),
+          .filter(
+            (token): token is string => Boolean(token && token.trim().length),
           );
       }
 

@@ -19,12 +19,8 @@ describe('Phase08 rewards/VIP/notification recovery migration', () => {
     expect(joined).toContain('UQ_vip_reward_claims_operationKey');
     expect(joined).toContain('UQ_notifications_operationKey');
     expect(joined).toContain('SET "deliveryStatus" = \'SENT\'');
-    expect(joined).toContain(
-      'ALTER COLUMN "deliveryStatus" SET DEFAULT \'PENDING\'',
-    );
-    expect(joined).not.toContain(
-      'CREATE UNIQUE INDEX IF NOT EXISTS "UQ_vip_reward_claims_period"',
-    );
+    expect(joined).toContain('ALTER COLUMN "deliveryStatus" SET DEFAULT \'PENDING\'');
+    expect(joined).not.toContain('CREATE UNIQUE INDEX IF NOT EXISTS "UQ_vip_reward_claims_period"');
   });
 
   it('is reversible without modifying prior Phase08 migrations', async () => {

@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { WalletBalanceType, WalletTransactionType } from '../../common/enums';
+import {
+  WalletBalanceType,
+  WalletTransactionType,
+} from '../../common/enums';
 import { WalletMutationService } from '../wallet/wallet-mutation.service';
 import { WalletTransaction } from '../wallet/entities/wallet-transaction.entity';
 import { HostReward } from './entities/host-reward.entity';
@@ -55,9 +58,7 @@ export class HostRewardAuthorityService {
         return reward;
       }
       if (reward.status !== 'AVAILABLE') {
-        throw new ConflictException(
-          `Reward cannot be claimed from ${reward.status}`,
-        );
+        throw new ConflictException(`Reward cannot be claimed from ${reward.status}`);
       }
 
       const currency = String(reward.currency || '').toUpperCase();
@@ -96,10 +97,7 @@ export class HostRewardAuthorityService {
           description: reward.rewardName,
           operationKey: `${claimOperationKey}:wallet`,
           operationGroupId: claimOperationKey,
-          metadata: {
-            hostProfileId: reward.hostProfileId,
-            rewardType: reward.type,
-          },
+          metadata: { hostProfileId: reward.hostProfileId, rewardType: reward.type },
         },
       );
       reward.status = 'CLAIMED';

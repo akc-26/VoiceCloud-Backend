@@ -1,3 +1,19 @@
+## VC-PH08-WP08-03-04 R03 — Real-Infrastructure Historical Baseline Bootstrap Correction
+
+- Preserves the complete R02 UI reconciliation, notification realtime isolation, TypeORM migration-discovery correction, and all accepted WP08 authority behavior.
+- Corrects Stage 18 so it no longer treats historical incremental migrations 1700000000000-0008 as a fresh-install schema bootstrap. Those migrations were authored against the pre-existing legacy VoiceCloud schema and legitimately reference tables such as `users` and `rooms`.
+- Adds a guarded acceptance-only schema bootstrap that can run only against a `voicecloud_wp08_03_04_<timestamp>` temporary database, creates the current entity schema there, rewinds the WP08 authority delta, records historical migrations 0000-0008, and then replays migrations 0009-0013 through the compiled production TypeORM CLI.
+- Keeps application runtime at `DATABASE_SYNCHRONIZE=false` and continues real PostgreSQL/Redis/BullMQ/Socket.IO verification after the authority migrations complete.
+- Adds self-check SHA-256 locks for all 14 accepted migration source files so WP08-03-04 cannot silently rewrite migration history.
+- No business logic, API/DTO contract, dependency, lockfile, entity, schema migration, financial authority, Creator/Admin UI behavior, or accepted historical migration was changed.
+
+## VC-PH08-WP08-03-04 R02 — Production Migration Discovery Correction
+
+- Preserves the complete R01 Creator/Admin UI reconciliation, notification realtime isolation, and real-infrastructure acceptance scope.
+- Corrects the shared TypeORM CLI migration discovery glob so only timestamp-prefixed migration files are loaded in source and compiled production modes.
+- Prevents compiled Jest `*.spec.js` files from being imported by `migration:run:prod`, eliminating the `describe is not defined` real-infrastructure acceptance failure.
+- Adds a durable migration-discovery regression test and package self-check coverage without changing any existing migration, schema, dependency, API, DTO, or financial authority.
+
 ## VC-PH08-WP08-03-02D — Host Financial Authority / Admin Economy RBAC / Consolidated Settlement
 
 - Added PostgreSQL-authoritative Host financial reconciliation with durable historical anchoring, immutable Host earnings ledger evidence, and backward-compatible aggregate projections.

@@ -49,6 +49,7 @@ export class SubscribeVipDto {
   @IsOptional()
   @IsString()
   operationKey?: string;
+
 }
 
 export { SubscribeVipDto as PurchaseVipDto };

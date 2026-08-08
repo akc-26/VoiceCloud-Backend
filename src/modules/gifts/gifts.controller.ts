@@ -120,6 +120,34 @@ export class GiftsController {
   }
 
   // ================= ADMINISTRATION ENDPOINTS =================
+  @Get('admin/catalog')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'List complete gift catalog including disabled and archived items (Admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Complete Admin gift catalog' })
+  async getAdminCatalog() {
+    return this.giftsService.getAdminCatalog();
+  }
+
+  @Get('admin/categories')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'List persisted gift categories including inactive items (Admin)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Complete persisted gift categories',
+  })
+  async getAdminCategories() {
+    return this.giftsService.getAdminCategories();
+  }
+
   @Post('admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)

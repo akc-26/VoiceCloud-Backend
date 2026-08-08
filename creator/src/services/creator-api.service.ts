@@ -16,6 +16,8 @@ import {
   UserProfileResponse,
   WalletBalanceResponse,
   WalletSummaryResponse,
+  WalletTransactionsResponse,
+  CreatorEarningsResponse,
   NotificationsListResponse,
   RecentActivityItem,
   HostVerificationAsset,
@@ -119,7 +121,9 @@ export class CreatorApiService {
 
       if (!res.ok) {
         if (import.meta.env.DEV) {
-          console.warn(`[AuthDebug] Token refresh API failed with status ${res.status}`);
+          console.warn(
+            `[AuthDebug] Token refresh API failed with status ${res.status}`,
+          );
         }
         this.isRefreshing = false;
         this.onRefreshed(null);
@@ -128,11 +132,13 @@ export class CreatorApiService {
 
       const data = await res.json();
       if (data && data.accessToken) {
-        useAuthStore.getState().setTokens(
-          data.accessToken,
-          data.refreshToken || currentRefreshToken,
-          data.expiresIn
-        );
+        useAuthStore
+          .getState()
+          .setTokens(
+            data.accessToken,
+            data.refreshToken || currentRefreshToken,
+            data.expiresIn,
+          );
 
         if (import.meta.env.DEV) {
           console.log('[AuthDebug] Automatic token refresh successful');
@@ -162,7 +168,7 @@ export class CreatorApiService {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    isRetry = false
+    isRetry = false,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     const headers = {
@@ -184,7 +190,9 @@ export class CreatorApiService {
           !endpoint.includes('/auth/refresh')
         ) {
           if (import.meta.env.DEV) {
-            console.warn(`[AuthDebug] Received 401 for ${endpoint}. Attempting automatic token refresh...`);
+            console.warn(
+              `[AuthDebug] Received 401 for ${endpoint}. Attempting automatic token refresh...`,
+            );
           }
 
           const newAccessToken = await this.triggerTokenRefresh();
@@ -193,7 +201,11 @@ export class CreatorApiService {
               ...headers,
               Authorization: `Bearer ${newAccessToken}`,
             };
-            return this.request<T>(endpoint, { ...options, headers: retryHeaders }, true);
+            return this.request<T>(
+              endpoint,
+              { ...options, headers: retryHeaders },
+              true,
+            );
           } else {
             this.handleUnauthorizedRedirect();
             throw new ApiError('Session expired. Please log in again.', 401);
@@ -229,11 +241,7 @@ export class CreatorApiService {
       if (err.name === 'AbortError') {
         throw new ApiError('Request was cancelled', 0);
       }
-      throw new ApiError(
-        err.message || 'Network request failed',
-        500,
-        err
-      );
+      throw new ApiError(err.message || 'Network request failed', 500, err);
     }
   }
 
@@ -252,7 +260,6 @@ export class CreatorApiService {
     });
   }
 
-
   // ================= TASK 1 & 2 ENDPOINTS =================
 
   /**
@@ -260,12 +267,12 @@ export class CreatorApiService {
    * Endpoint: GET /api/v1/creator/dashboard
    */
   async getDashboardSummary(
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<BackendCreatorDashboardResponse> {
     try {
       return await this.request<BackendCreatorDashboardResponse>(
         '/creator/dashboard',
-        { signal }
+        { signal },
       );
     } catch (err) {
       // Fallback response for unauthenticated / mock session
@@ -337,53 +344,37 @@ export class CreatorApiService {
    * Fetch Wallet Balances
    * Endpoint: GET /api/v1/wallet/balance
    */
-  async getWalletBalance(
-    signal?: AbortSignal
-  ): Promise<WalletBalanceResponse> {
-    try {
-      return await this.request<WalletBalanceResponse>('/wallet/balance', {
-        signal,
-      });
-    } catch {
-      return {
-        userId: 'user-vc-creator-001',
-        coinBalance: 12500,
-        diamondBalance: 84300,
-        frozenCoins: 0,
-        frozenDiamonds: 0,
-        totalEarnedCoins: 250000,
-        totalEarnedDiamonds: 458900,
-        lifetimeEarningsUsd: 2840.5,
-        pendingPayoutsUsd: 500.0,
-      };
-    }
+  async getWalletBalance(signal?: AbortSignal): Promise<WalletBalanceResponse> {
+    return this.request<WalletBalanceResponse>('/wallet/balance', { signal });
   }
 
   /**
    * Fetch Wallet Summary Overview
    * Endpoint: GET /api/v1/wallet/summary
    */
-  async getWalletSummary(
-    signal?: AbortSignal
-  ): Promise<WalletSummaryResponse> {
-    try {
-      return await this.request<WalletSummaryResponse>('/wallet/summary', {
-        signal,
-      });
-    } catch {
-      return {
-        balance: {
-          userId: 'user-vc-creator-001',
-          coinBalance: 12500,
-          diamondBalance: 84300,
-        },
-        currentBalanceUsd: 843.0,
-        availableBalanceUsd: 843.0,
-        pendingPayoutsUsd: 500.0,
-        lifetimeEarningsUsd: 2840.5,
-        latestTransactions: [],
-      };
-    }
+  async getWalletSummary(signal?: AbortSignal): Promise<WalletSummaryResponse> {
+    return this.request<WalletSummaryResponse>('/wallet/summary', { signal });
+  }
+
+  async getWalletTransactions(
+    params: { page?: number; limit?: number } = { page: 1, limit: 20 },
+    signal?: AbortSignal,
+  ): Promise<WalletTransactionsResponse> {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.limit) query.set('limit', String(params.limit));
+    return this.request<WalletTransactionsResponse>(
+      `/wallet/transactions?${query.toString()}`,
+      { signal },
+    );
+  }
+
+  async getCreatorEarnings(
+    signal?: AbortSignal,
+  ): Promise<CreatorEarningsResponse> {
+    return this.request<CreatorEarningsResponse>('/creator/earnings', {
+      signal,
+    });
   }
 
   /**
@@ -392,51 +383,24 @@ export class CreatorApiService {
    */
   async getNotifications(
     params: { limit?: number; page?: number } = { limit: 5 },
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<NotificationsListResponse> {
-    try {
-      const query = new URLSearchParams();
-      if (params.limit) query.append('limit', String(params.limit));
-      if (params.page) query.append('page', String(params.page));
+    const query = new URLSearchParams();
+    if (params.limit) query.append('limit', String(params.limit));
+    if (params.page) query.append('page', String(params.page));
 
-      return await this.request<NotificationsListResponse>(
-        `/notifications?${query.toString()}`,
-        { signal }
-      );
-    } catch {
-      return {
-        data: [
-          {
-            id: 'notif-1',
-            title: 'New VIP Subscription',
-            message: 'User @alex_audionut subscribed to your VIP Tier plan!',
-            type: 'subscription',
-            read: false,
-            createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-          },
-          {
-            id: 'notif-2',
-            title: 'Virtual Gift Received',
-            message:
-              'Received a "Dragon Castle" virtual gift (5,000 coins) in Lounge #102!',
-            type: 'gift',
-            read: false,
-            createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-          },
-          {
-            id: 'notif-3',
-            title: 'Payout Request Approved',
-            message:
-              'Your payout request #PR-8821 for $1,250.00 USD has been approved by Admin.',
-            type: 'payout',
-            read: true,
-            createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-          },
-        ],
-        total: 3,
-        unreadCount: 2,
-      };
-    }
+    const [list, unread] = await Promise.all([
+      this.request<any>(`/notifications?${query.toString()}`, { signal }),
+      this.request<{ unreadCount: number }>('/notifications/unread-count', {
+        signal,
+      }),
+    ]);
+
+    return {
+      data: Array.isArray(list?.data) ? list.data : [],
+      total: Number(list?.total || 0),
+      unreadCount: Number(unread?.unreadCount || 0),
+    };
   }
 
   /**
@@ -445,12 +409,12 @@ export class CreatorApiService {
    */
   async getRecentReceivedGifts(
     limit = 5,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<any[]> {
     try {
       return await this.request<any[]>(
         `/gifts/history?role=receiver&limit=${limit}`,
-        { signal }
+        { signal },
       );
     } catch {
       return [];
@@ -505,14 +469,8 @@ export class CreatorApiService {
    * Endpoint: GET /api/v1/creator/payout-requests
    */
   async getPayoutRequests(signal?: AbortSignal): Promise<PayoutRequest[]> {
-    try {
-      const res = await this.request<any>('/creator/payout-requests', {
-        signal,
-      });
-      return Array.isArray(res) ? res : res.data || [];
-    } catch {
-      return [];
-    }
+    const res = await this.request<any>('/creator/payout-requests', { signal });
+    return Array.isArray(res) ? res : res.data || [];
   }
 
   /**
@@ -523,7 +481,7 @@ export class CreatorApiService {
     diamondAmount: number,
     method: string,
     details: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<PayoutRequest> {
     return this.request<PayoutRequest>('/creator/payout-request', {
       method: 'POST',
@@ -542,10 +500,12 @@ export class CreatorApiService {
    */
   async getAnalytics(
     period: '24h' | '7d' | '30d' | '1y' = '30d',
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<CreatorAnalytics> {
     try {
-      const res = await this.request<any>(`/analytics?period=${period}`, { signal });
+      const res = await this.request<any>(`/analytics?period=${period}`, {
+        signal,
+      });
       if (res && res.dailyMetrics) return res;
       throw new Error('Fallback to analytics format');
     } catch {
@@ -608,13 +568,18 @@ export class CreatorApiService {
           currentListeners: 0,
           peakListeners: 0,
           audioQuality: '256kbps HD Voice',
-          scheduledFor: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+          scheduledFor: new Date(
+            Date.now() + 1000 * 60 * 60 * 24,
+          ).toISOString(),
         },
       ];
     }
   }
 
-  async createRoom(data: Partial<LiveRoomSummary>, signal?: AbortSignal): Promise<LiveRoomSummary> {
+  async createRoom(
+    data: Partial<LiveRoomSummary>,
+    signal?: AbortSignal,
+  ): Promise<LiveRoomSummary> {
     return this.request<LiveRoomSummary>('/rooms', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -622,7 +587,11 @@ export class CreatorApiService {
     });
   }
 
-  async updateRoom(id: string, data: Partial<LiveRoomSummary>, signal?: AbortSignal): Promise<LiveRoomSummary> {
+  async updateRoom(
+    id: string,
+    data: Partial<LiveRoomSummary>,
+    signal?: AbortSignal,
+  ): Promise<LiveRoomSummary> {
     return this.request<LiveRoomSummary>(`/rooms/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -630,7 +599,10 @@ export class CreatorApiService {
     });
   }
 
-  async deleteRoom(id: string, signal?: AbortSignal): Promise<{ success: boolean }> {
+  async deleteRoom(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>(`/rooms/${id}`, {
       method: 'DELETE',
       signal,
@@ -668,7 +640,11 @@ export class CreatorApiService {
   /**
    * Speaker Controls & RTC Actions
    */
-  async inviteSpeaker(roomId: string, targetUserId: string, signal?: AbortSignal): Promise<any> {
+  async inviteSpeaker(
+    roomId: string,
+    targetUserId: string,
+    signal?: AbortSignal,
+  ): Promise<any> {
     return this.request<any>(`/rtc/rooms/${roomId}/invite-speaker`, {
       method: 'POST',
       body: JSON.stringify({ targetUserId }),
@@ -676,7 +652,11 @@ export class CreatorApiService {
     });
   }
 
-  async removeSpeaker(roomId: string, targetUserId: string, signal?: AbortSignal): Promise<any> {
+  async removeSpeaker(
+    roomId: string,
+    targetUserId: string,
+    signal?: AbortSignal,
+  ): Promise<any> {
     return this.request<any>(`/rtc/rooms/${roomId}/remove-speaker`, {
       method: 'POST',
       body: JSON.stringify({ targetUserId }),
@@ -684,7 +664,12 @@ export class CreatorApiService {
     });
   }
 
-  async muteSpeaker(roomId: string, targetUserId: string, isMuted: boolean, signal?: AbortSignal): Promise<any> {
+  async muteSpeaker(
+    roomId: string,
+    targetUserId: string,
+    isMuted: boolean,
+    signal?: AbortSignal,
+  ): Promise<any> {
     return this.request<any>(`/rtc/rooms/${roomId}/mute-user`, {
       method: 'POST',
       body: JSON.stringify({ targetUserId, isMuted }),
@@ -692,7 +677,12 @@ export class CreatorApiService {
     });
   }
 
-  async lockSeat(roomId: string, seatIndex: number, isLocked: boolean, signal?: AbortSignal): Promise<any> {
+  async lockSeat(
+    roomId: string,
+    seatIndex: number,
+    isLocked: boolean,
+    signal?: AbortSignal,
+  ): Promise<any> {
     return this.request<any>(`/rtc/rooms/${roomId}/lock-seat`, {
       method: 'POST',
       body: JSON.stringify({ seatIndex, isLocked }),
@@ -713,7 +703,9 @@ export class CreatorApiService {
         {
           id: 'sch-1',
           title: 'Weekly Creator VIP Broadcast',
-          scheduledStartTime: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+          scheduledStartTime: new Date(
+            Date.now() + 1000 * 60 * 60 * 24,
+          ).toISOString(),
           date: 'Tomorrow, Aug 1, 2026',
           time: '20:00 - 22:00 UTC',
           attendees: 420,
@@ -723,7 +715,9 @@ export class CreatorApiService {
         {
           id: 'sch-2',
           title: 'Live Acoustic Audio Session',
-          scheduledStartTime: new Date(Date.now() + 1000 * 60 * 60 * 72).toISOString(),
+          scheduledStartTime: new Date(
+            Date.now() + 1000 * 60 * 60 * 72,
+          ).toISOString(),
           date: 'Friday, Aug 3, 2026',
           time: '18:00 - 20:00 UTC',
           attendees: 890,
@@ -734,7 +728,10 @@ export class CreatorApiService {
     }
   }
 
-  async createScheduledRoom(data: Record<string, any>, signal?: AbortSignal): Promise<any> {
+  async createScheduledRoom(
+    data: Record<string, any>,
+    signal?: AbortSignal,
+  ): Promise<any> {
     return this.request<any>('/scheduled-rooms', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -742,7 +739,11 @@ export class CreatorApiService {
     });
   }
 
-  async updateScheduledRoom(id: string, data: Record<string, any>, signal?: AbortSignal): Promise<any> {
+  async updateScheduledRoom(
+    id: string,
+    data: Record<string, any>,
+    signal?: AbortSignal,
+  ): Promise<any> {
     return this.request<any>(`/scheduled-rooms/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -767,10 +768,42 @@ export class CreatorApiService {
       return Array.isArray(res) ? res : res.data || [];
     } catch {
       return [
-        { id: 'f-1', name: 'Alex AudioNut', handle: '@alex_audionut', followedAt: '2026-07-29T10:00:00Z', badge: 'Top Supporter', avatarUrl: '', isFollowingBack: true },
-        { id: 'f-2', name: 'Sarah Waves', handle: '@sarah_waves', followedAt: '2026-07-26T14:30:00Z', badge: 'VIP Subscriber', avatarUrl: '', isFollowingBack: true },
-        { id: 'f-3', name: 'David Beats', handle: '@david_beats', followedAt: '2026-07-22T08:15:00Z', badge: 'Regular Listener', avatarUrl: '', isFollowingBack: false },
-        { id: 'f-4', name: 'Elena Vox', handle: '@elena_vox', followedAt: '2026-07-15T19:00:00Z', badge: 'Regular Listener', avatarUrl: '', isFollowingBack: false },
+        {
+          id: 'f-1',
+          name: 'Alex AudioNut',
+          handle: '@alex_audionut',
+          followedAt: '2026-07-29T10:00:00Z',
+          badge: 'Top Supporter',
+          avatarUrl: '',
+          isFollowingBack: true,
+        },
+        {
+          id: 'f-2',
+          name: 'Sarah Waves',
+          handle: '@sarah_waves',
+          followedAt: '2026-07-26T14:30:00Z',
+          badge: 'VIP Subscriber',
+          avatarUrl: '',
+          isFollowingBack: true,
+        },
+        {
+          id: 'f-3',
+          name: 'David Beats',
+          handle: '@david_beats',
+          followedAt: '2026-07-22T08:15:00Z',
+          badge: 'Regular Listener',
+          avatarUrl: '',
+          isFollowingBack: false,
+        },
+        {
+          id: 'f-4',
+          name: 'Elena Vox',
+          handle: '@elena_vox',
+          followedAt: '2026-07-15T19:00:00Z',
+          badge: 'Regular Listener',
+          avatarUrl: '',
+          isFollowingBack: false,
+        },
       ];
     }
   }
@@ -782,21 +815,31 @@ export class CreatorApiService {
     await this.request(`/notifications/${id}/read`, {
       method: 'PATCH',
       signal,
-    }).catch(() => {});
+    });
+  }
+
+  async markAllNotificationsRead(signal?: AbortSignal): Promise<void> {
+    await this.request('/notifications/read-all', {
+      method: 'PATCH',
+      signal,
+    });
   }
 
   async deleteNotification(id: string, signal?: AbortSignal): Promise<void> {
     await this.request(`/notifications/${id}`, {
       method: 'DELETE',
       signal,
-    }).catch(() => {});
+    });
   }
 
   /**
    * Update Profile
    * Endpoint: PATCH /api/v1/users/profile
    */
-  async updateProfile(data: Record<string, any>, signal?: AbortSignal): Promise<UserProfileResponse> {
+  async updateProfile(
+    data: Record<string, any>,
+    signal?: AbortSignal,
+  ): Promise<UserProfileResponse> {
     return this.request<UserProfileResponse>('/users/profile', {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -808,9 +851,15 @@ export class CreatorApiService {
    * Stream Credentials & Key Management
    * Endpoint: GET /api/v1/creator/stream-credentials
    */
-  async getStreamCredentials(signal?: AbortSignal): Promise<{ rtmpUrl: string; streamKey: string; audioBitrate: string }> {
+  async getStreamCredentials(
+    signal?: AbortSignal,
+  ): Promise<{ rtmpUrl: string; streamKey: string; audioBitrate: string }> {
     try {
-      return await this.request<{ rtmpUrl: string; streamKey: string; audioBitrate: string }>('/creator/stream-credentials', { signal });
+      return await this.request<{
+        rtmpUrl: string;
+        streamKey: string;
+        audioBitrate: string;
+      }>('/creator/stream-credentials', { signal });
     } catch {
       return {
         rtmpUrl: 'rtmps://live.voicecloud.app:443/live',
@@ -824,12 +873,17 @@ export class CreatorApiService {
    * Regenerate Stream Key
    * Endpoint: POST /api/v1/creator/stream-credentials/regenerate
    */
-  async regenerateStreamKey(signal?: AbortSignal): Promise<{ streamKey: string }> {
+  async regenerateStreamKey(
+    signal?: AbortSignal,
+  ): Promise<{ streamKey: string }> {
     try {
-      return await this.request<{ streamKey: string }>('/creator/stream-credentials/regenerate', {
-        method: 'POST',
-        signal,
-      });
+      return await this.request<{ streamKey: string }>(
+        '/creator/stream-credentials/regenerate',
+        {
+          method: 'POST',
+          signal,
+        },
+      );
     } catch {
       const randomKey = `live_vc_sk_${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`;
       return { streamKey: randomKey };
@@ -842,7 +896,9 @@ export class CreatorApiService {
    */
   async getStudioSettings(signal?: AbortSignal): Promise<Record<string, any>> {
     try {
-      return await this.request<Record<string, any>>('/users/settings', { signal });
+      return await this.request<Record<string, any>>('/users/settings', {
+        signal,
+      });
     } catch {
       return {
         audioPreset: '324',
@@ -859,7 +915,10 @@ export class CreatorApiService {
    * Update Studio Preferences
    * Endpoint: PATCH /api/v1/users/settings
    */
-  async updateStudioSettings(settings: Record<string, any>, signal?: AbortSignal): Promise<Record<string, any>> {
+  async updateStudioSettings(
+    settings: Record<string, any>,
+    signal?: AbortSignal,
+  ): Promise<Record<string, any>> {
     try {
       return await this.request<Record<string, any>>('/users/settings', {
         method: 'PATCH',

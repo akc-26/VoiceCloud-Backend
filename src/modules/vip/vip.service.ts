@@ -362,8 +362,7 @@ export class VipService implements OnModuleInit {
     userId: string,
     dto: SubscribeVipDto,
   ): Promise<VipMembership> {
-    if (this.financialAuthority)
-      return this.financialAuthority.subscribe(userId, dto);
+    if (this.financialAuthority) return this.financialAuthority.subscribe(userId, dto);
     const targetId = dto.tierId || dto.planId;
     if (!targetId) {
       throw new BadRequestException('tierId or planId is required');
@@ -504,8 +503,7 @@ export class VipService implements OnModuleInit {
   }
 
   async renew(userId: string, dto: RenewVipDto): Promise<VipMembership> {
-    if (this.financialAuthority)
-      return this.financialAuthority.renew(userId, dto);
+    if (this.financialAuthority) return this.financialAuthority.renew(userId, dto);
     const current = await this.membershipRepository.findOne({
       where: { userId },
     });
@@ -635,8 +633,7 @@ export class VipService implements OnModuleInit {
     dto: UpgradeDowngradeVipDto,
     isUpgrade: boolean,
   ): Promise<VipMembership> {
-    if (this.financialAuthority)
-      return this.financialAuthority.changeTier(userId, dto, isUpgrade);
+    if (this.financialAuthority) return this.financialAuthority.changeTier(userId, dto, isUpgrade);
     const targetTier = await this.findTierById(dto.newTierId);
     const current = await this.membershipRepository.findOne({
       where: { userId },
@@ -902,8 +899,7 @@ export class VipService implements OnModuleInit {
   }
 
   async claimReward(userId: string, rewardId: string): Promise<VipRewardClaim> {
-    if (this.financialAuthority)
-      return this.financialAuthority.claimReward(userId, rewardId);
+    if (this.financialAuthority) return this.financialAuthority.claimReward(userId, rewardId);
     const details = await this.getCurrentMembershipDetails(userId);
     if (!details.isVip) {
       throw new BadRequestException(

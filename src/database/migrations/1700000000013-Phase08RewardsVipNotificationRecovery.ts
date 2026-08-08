@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class Phase08RewardsVipNotificationRecovery1700000000013 implements MigrationInterface {
+export class Phase08RewardsVipNotificationRecovery1700000000013
+  implements MigrationInterface
+{
   name = 'Phase08RewardsVipNotificationRecovery1700000000013';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -172,9 +174,7 @@ export class Phase08RewardsVipNotificationRecovery1700000000013 implements Migra
         DROP COLUMN IF EXISTS "claimOperationKey"
     `);
 
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS "IDX_lucky_box_openings_userId"`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_lucky_box_openings_userId"`);
     await queryRunner.query(
       `DROP INDEX IF EXISTS "UQ_lucky_box_openings_operationKey"`,
     );

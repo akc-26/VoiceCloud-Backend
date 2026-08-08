@@ -11,7 +11,7 @@ export const AppDataSource = new DataSource({
   password: process.env.DATABASE_PASSWORD ?? 'postgres',
   database: process.env.DATABASE_NAME ?? 'voicecloud',
   entities: [path.join(__dirname, '../**/*.entity{.ts,.js}')],
-  migrations: [path.join(__dirname, 'migrations/*{.ts,.js}')],
+  migrations: [path.join(__dirname, 'migrations/[0-9]*{.ts,.js}')],
   migrationsRun: false,
   synchronize: false,
   logging: false,

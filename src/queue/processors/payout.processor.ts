@@ -29,15 +29,15 @@ export class PayoutProcessor extends WorkerHost {
 
   async process(job: Job<PayoutJobData, any, string>): Promise<any> {
     const startTime = Date.now();
-    const { payoutRequestId, action, targetStatus, reviewedBy, notes } =
-      job.data;
+    const { payoutRequestId, action, targetStatus, reviewedBy, notes } = job.data;
     if (!payoutRequestId) {
       throw new BadRequestException('payoutRequestId is required');
     }
 
     if (action === 'verify_reservation') {
-      const verified =
-        await this.payoutLifecycleService.verifyReservedPayout(payoutRequestId);
+      const verified = await this.payoutLifecycleService.verifyReservedPayout(
+        payoutRequestId,
+      );
       return {
         success: true,
         payoutRequestId,
@@ -52,9 +52,7 @@ export class PayoutProcessor extends WorkerHost {
     const nextStatus = targetStatus || PayoutStatus.PROCESSED;
     if (nextStatus === PayoutStatus.APPROVED) {
       if (!reviewedBy) {
-        throw new BadRequestException(
-          'reviewedBy is required to approve a payout',
-        );
+        throw new BadRequestException('reviewedBy is required to approve a payout');
       }
       result = await this.payoutLifecycleService.approve(
         payoutRequestId,
@@ -62,9 +60,7 @@ export class PayoutProcessor extends WorkerHost {
       );
     } else if (nextStatus === PayoutStatus.REJECTED) {
       if (!reviewedBy) {
-        throw new BadRequestException(
-          'reviewedBy is required to reject a payout',
-        );
+        throw new BadRequestException('reviewedBy is required to reject a payout');
       }
       result = await this.payoutLifecycleService.reject(
         payoutRequestId,

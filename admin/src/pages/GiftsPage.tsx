@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -14,7 +14,7 @@ import {
   IconButton,
   Switch,
   TextField,
-  MenuItem,
+  CircularProgress,
 } from '@mui/material';
 import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
 import CategoryIcon from '@mui/icons-material/Category';
@@ -27,14 +27,16 @@ import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import AddIcon from '@mui/icons-material/Add';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 
 import { DataTable, Column } from '../components/common/DataTable';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ModalForms } from '../components/common/ModalForms';
 import { FormBuilder, FormField } from '../components/common/FormBuilder';
 import { useNotificationsStore } from '../store/notifications.store';
+import {
+  giftsAdminService,
+  GiftRevenueSummary,
+} from '../services/gifts.service';
 
 interface GiftItem {
   id: string;
@@ -45,7 +47,6 @@ interface GiftItem {
   category: string;
   coinPrice: number;
   creatorEarningsPercentage: number;
-  agencyEarningsPercentage: number;
   isAnimated: boolean;
   status: 'active' | 'disabled' | 'archived';
   isLimitedEdition: boolean;
@@ -69,89 +70,71 @@ export const GiftsPage: React.FC = () => {
   const addToast = useNotificationsStore((state) => state.addToast);
   const [activeTab, setActiveTab] = useState(0);
 
-  // Gifts state
-  const [gifts, setGifts] = useState<GiftItem[]>([
-    {
-      id: 'gift-1',
-      name: 'Golden Microphone',
-      description: 'Classic mic for star hosts',
-      type: 'static',
-      rarity: 'common',
-      category: 'Popular',
-      coinPrice: 100,
-      creatorEarningsPercentage: 70,
-      agencyEarningsPercentage: 10,
-      isAnimated: false,
-      status: 'active',
-      isLimitedEdition: false,
-      isSeasonal: false,
-      sortOrder: 1,
-    },
-    {
-      id: 'gift-2',
-      name: 'Cyber Sports Car',
-      description: 'Fullscreen animated sports car arrival',
-      type: 'svga',
-      rarity: 'epic',
-      category: 'Trending',
-      coinPrice: 5000,
-      creatorEarningsPercentage: 70,
-      agencyEarningsPercentage: 10,
-      isAnimated: true,
-      status: 'active',
-      isLimitedEdition: false,
-      isSeasonal: false,
-      sortOrder: 2,
-    },
-    {
-      id: 'gift-3',
-      name: 'Diamond Voice Crown',
-      description: 'Legendary crown FX for top VIPs',
-      type: 'lottie',
-      rarity: 'legendary',
-      category: 'VIP-only',
-      coinPrice: 10000,
-      creatorEarningsPercentage: 75,
-      agencyEarningsPercentage: 10,
-      isAnimated: true,
-      status: 'active',
-      isLimitedEdition: true,
-      totalStock: 50,
-      remainingStock: 12,
-      isSeasonal: false,
-      sortOrder: 3,
-    },
-    {
-      id: 'gift-4',
-      name: 'Summer Dragon Firework',
-      description: 'Seasonal festival firework celebration',
-      type: 'video',
-      rarity: 'mythic',
-      category: 'Seasonal',
-      coinPrice: 2000,
-      creatorEarningsPercentage: 70,
-      agencyEarningsPercentage: 10,
-      isAnimated: true,
-      status: 'active',
-      isLimitedEdition: false,
-      isSeasonal: true,
-      seasonTag: 'summer_2026',
-      sortOrder: 4,
-    },
-  ]);
+  const [gifts, setGifts] = useState<GiftItem[]>([]);
+  const [categories, setCategories] = useState<GiftCategoryItem[]>([]);
+  const [revenue, setRevenue] = useState<GiftRevenueSummary | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Categories state
-  const [categories, setCategories] = useState<GiftCategoryItem[]>([
-    { id: 'cat-1', name: 'Popular', slug: 'popular', giftCount: 14, sortOrder: 1, status: 'active' },
-    { id: 'cat-2', name: 'Trending', slug: 'trending', giftCount: 8, sortOrder: 2, status: 'active' },
-    { id: 'cat-3', name: 'Premium', slug: 'premium', giftCount: 12, sortOrder: 3, status: 'active' },
-    { id: 'cat-4', name: 'Seasonal', slug: 'seasonal', giftCount: 6, sortOrder: 4, status: 'active' },
-    { id: 'cat-5', name: 'VIP-only', slug: 'vip-only', giftCount: 5, sortOrder: 5, status: 'active' },
-    { id: 'cat-6', name: 'Host-exclusive', slug: 'host-exclusive', giftCount: 3, sortOrder: 6, status: 'active' },
-  ]);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [catalog, categoryList, revenueData] = await Promise.all([
+        giftsAdminService.getCatalog(),
+        giftsAdminService.getCategories(),
+        giftsAdminService.getRevenue('daily'),
+      ]);
+      setGifts(
+        catalog.map((gift) => ({
+          id: gift.id,
+          name: gift.name,
+          description: gift.description || undefined,
+          type: gift.type,
+          rarity: gift.rarity,
+          category: gift.category,
+          coinPrice: Number(gift.coinPrice),
+          creatorEarningsPercentage: Number(gift.creatorEarningsPercentage),
+          isAnimated: gift.type !== 'static',
+          status: gift.isArchived
+            ? 'archived'
+            : gift.isActive
+              ? 'active'
+              : 'disabled',
+          isLimitedEdition: gift.isLimitedEdition,
+          totalStock: gift.totalStock ?? undefined,
+          remainingStock: gift.remainingStock ?? undefined,
+          isSeasonal: gift.isSeasonal,
+          seasonTag: gift.seasonTag || undefined,
+          sortOrder: gift.sortOrder,
+        })),
+      );
+      setCategories(
+        categoryList.map((category) => ({
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+          giftCount: catalog.filter((gift) => gift.category === category.name)
+            .length,
+          sortOrder: category.sortOrder,
+          status: category.isActive ? 'active' : 'disabled',
+        })),
+      );
+      setRevenue(revenueData);
+    } catch (error: any) {
+      addToast(
+        'error',
+        error.message || 'Failed to load gift administration data',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Combo config state
-  const [comboConfig, setComboConfig] = useState({
+  const comboConfig = {
     timeoutSeconds: 10,
     tier1Min: 6,
     tier1Multiplier: 1.2,
@@ -159,14 +142,26 @@ export const GiftsPage: React.FC = () => {
     tier2Multiplier: 1.5,
     tier3Min: 21,
     tier3Multiplier: 2.0,
-  });
+  };
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'gift' | 'category'>('gift');
 
   const giftFormFields: FormField[] = [
-    { name: 'name', label: 'Gift Title', type: 'text', required: true, gridSpan: 6 },
-    { name: 'coinPrice', label: 'Coin Value', type: 'number', required: true, gridSpan: 6 },
+    {
+      name: 'name',
+      label: 'Gift Title',
+      type: 'text',
+      required: true,
+      gridSpan: 6,
+    },
+    {
+      name: 'coinPrice',
+      label: 'Coin Value',
+      type: 'number',
+      required: true,
+      gridSpan: 6,
+    },
     {
       name: 'category',
       label: 'Gift Category',
@@ -199,69 +194,103 @@ export const GiftsPage: React.FC = () => {
       ],
       gridSpan: 6,
     },
-    { name: 'creatorEarningsPercentage', label: 'Creator Earnings %', type: 'number', gridSpan: 3 },
-    { name: 'agencyEarningsPercentage', label: 'Agency Share %', type: 'number', gridSpan: 3 },
+    {
+      name: 'creatorEarningsPercentage',
+      label: 'Creator Earnings %',
+      type: 'number',
+      gridSpan: 6,
+    },
   ];
 
   const categoryFormFields: FormField[] = [
-    { name: 'name', label: 'Category Name', type: 'text', required: true, gridSpan: 6 },
+    {
+      name: 'name',
+      label: 'Category Name',
+      type: 'text',
+      required: true,
+      gridSpan: 6,
+    },
     { name: 'slug', label: 'URL Slug', type: 'text', gridSpan: 6 },
     { name: 'sortOrder', label: 'Display Order', type: 'number', gridSpan: 6 },
   ];
 
-  const handleCreateGift = (data: any) => {
-    const newItem: GiftItem = {
-      id: `gift-${Date.now()}`,
-      name: data.name,
-      coinPrice: Number(data.coinPrice),
-      category: data.category || 'Popular',
-      type: data.type || 'static',
-      rarity: data.rarity || 'common',
-      creatorEarningsPercentage: Number(data.creatorEarningsPercentage) || 70,
-      agencyEarningsPercentage: Number(data.agencyEarningsPercentage) || 10,
-      isAnimated: data.type !== 'static',
-      status: 'active',
-      isLimitedEdition: false,
-      isSeasonal: false,
-      sortOrder: gifts.length + 1,
-    };
-    setGifts((prev) => [newItem, ...prev]);
-    addToast('success', `Created gift "${newItem.name}"`);
-    setModalOpen(false);
+  const handleCreateGift = async (data: any) => {
+    try {
+      const creatorShare =
+        data.creatorEarningsPercentage === '' ||
+        data.creatorEarningsPercentage == null
+          ? 70
+          : Number(data.creatorEarningsPercentage);
+      await giftsAdminService.createGift({
+        name: data.name,
+        coinPrice: Number(data.coinPrice),
+        category: data.category || 'Popular',
+        type: data.type || 'static',
+        rarity: data.rarity || 'common',
+        creatorEarningsPercentage: creatorShare,
+        isActive: true,
+        sortOrder: gifts.length + 1,
+      });
+      addToast('success', `Created gift "${data.name}"`);
+      setModalOpen(false);
+      await fetchData();
+    } catch (error: any) {
+      addToast('error', error.message || 'Failed to create gift');
+    }
   };
 
-  const handleCreateCategory = (data: any) => {
-    const newCat: GiftCategoryItem = {
-      id: `cat-${Date.now()}`,
-      name: data.name,
-      slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'),
-      giftCount: 0,
-      sortOrder: categories.length + 1,
-      status: 'active',
-    };
-    setCategories((prev) => [...prev, newCat]);
-    addToast('success', `Created category "${newCat.name}"`);
-    setModalOpen(false);
+  const handleCreateCategory = async (data: any) => {
+    try {
+      await giftsAdminService.createCategory({
+        name: data.name,
+        slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'),
+        sortOrder:
+          data.sortOrder === '' || data.sortOrder == null
+            ? categories.length + 1
+            : Number(data.sortOrder),
+        isActive: true,
+      });
+      addToast('success', `Created category "${data.name}"`);
+      setModalOpen(false);
+      await fetchData();
+    } catch (error: any) {
+      addToast('error', error.message || 'Failed to create category');
+    }
   };
 
-  const toggleGiftStatus = (id: string) => {
-    setGifts((prev) =>
-      prev.map((g) => {
-        if (g.id === id) {
-          const nextStatus = g.status === 'active' ? 'disabled' : 'active';
-          addToast('info', `Toggled "${g.name}" status to ${nextStatus}`);
-          return { ...g, status: nextStatus };
-        }
-        return g;
-      }),
-    );
+  const toggleGiftStatus = async (id: string) => {
+    const gift = gifts.find((item) => item.id === id);
+    if (!gift || gift.status === 'archived') return;
+    try {
+      if (gift.status === 'active') await giftsAdminService.disableGift(id);
+      else await giftsAdminService.enableGift(id);
+      await fetchData();
+    } catch (error: any) {
+      addToast('error', error.message || 'Failed to update gift status');
+    }
   };
 
-  const archiveGift = (id: string) => {
-    setGifts((prev) =>
-      prev.map((g) => (g.id === id ? { ...g, status: 'archived' } : g)),
-    );
-    addToast('warning', 'Gift item archived');
+  const archiveGift = async (id: string) => {
+    try {
+      const gift = gifts.find((item) => item.id === id);
+      if (gift?.status === 'archived') await giftsAdminService.restoreGift(id);
+      else await giftsAdminService.archiveGift(id);
+      await fetchData();
+    } catch (error: any) {
+      addToast('error', error.message || 'Failed to update gift archive state');
+    }
+  };
+
+  const persistCreatorShare = async (gift: GiftItem) => {
+    try {
+      await giftsAdminService.updateGift(gift.id, {
+        creatorEarningsPercentage: Number(gift.creatorEarningsPercentage),
+      });
+      addToast('success', `Updated creator share for "${gift.name}"`);
+      await fetchData();
+    } catch (error: any) {
+      addToast('error', error.message || 'Failed to update gift pricing');
+    }
   };
 
   const catalogColumns: Column<GiftItem>[] = [
@@ -274,23 +303,54 @@ export const GiftsPage: React.FC = () => {
             <CardGiftcardIcon />
           </Avatar>
           <Box>
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>{row.name}</Typography>
-            <Typography variant="caption" color="text.secondary">{row.category} • {row.type.toUpperCase()}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {row.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {row.category} • {row.type.toUpperCase()}
+            </Typography>
           </Box>
         </Box>
       ),
     },
-    { id: 'coinPrice', label: 'Price', render: (row) => `${row.coinPrice} Coins` },
-    { id: 'rarity', label: 'Rarity', render: (row) => <Chip label={row.rarity.toUpperCase()} size="small" variant="outlined" /> },
-    { id: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+    {
+      id: 'coinPrice',
+      label: 'Price',
+      render: (row) => `${row.coinPrice} Coins`,
+    },
+    {
+      id: 'rarity',
+      label: 'Rarity',
+      render: (row) => (
+        <Chip
+          label={row.rarity.toUpperCase()}
+          size="small"
+          variant="outlined"
+        />
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (row) => <StatusBadge status={row.status} />,
+    },
     {
       id: 'actions',
       label: 'Actions',
       render: (row) => (
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Switch size="small" checked={row.status === 'active'} onChange={() => toggleGiftStatus(row.id)} />
+          <Switch
+            size="small"
+            checked={row.status === 'active'}
+            disabled={row.status === 'archived'}
+            onChange={() => toggleGiftStatus(row.id)}
+          />
           <IconButton size="small" onClick={() => archiveGift(row.id)}>
-            <ArchiveIcon fontSize="small" />
+            {row.status === 'archived' ? (
+              <UnarchiveIcon fontSize="small" />
+            ) : (
+              <ArchiveIcon fontSize="small" />
+            )}
           </IconButton>
         </Box>
       ),
@@ -300,11 +360,21 @@ export const GiftsPage: React.FC = () => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 3,
+        }}
+      >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>Phase 22 – Virtual Gift Management</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800 }}>
+            Phase 22 – Virtual Gift Management
+          </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage Catalog, Categories, Pricing, Limited Inventory, Combos, Seasonal Tagging, and Analytics
+            Manage Catalog, Categories, Pricing, Limited Inventory, Combos,
+            Seasonal Tagging, and Analytics
           </Typography>
         </Box>
         <Button
@@ -319,6 +389,12 @@ export const GiftsPage: React.FC = () => {
           {activeTab === 1 ? 'Create Category' : 'Create Gift Item'}
         </Button>
       </Box>
+
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+          <CircularProgress />
+        </Box>
+      )}
 
       {/* Tabs Bar */}
       <Paper sx={{ mb: 3 }}>
@@ -344,7 +420,9 @@ export const GiftsPage: React.FC = () => {
       {/* TAB 0: GIFT CATALOG */}
       {activeTab === 0 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Active Catalog Items</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            Complete Persisted Catalog
+          </Typography>
           <DataTable columns={catalogColumns} rows={gifts} />
         </Paper>
       )}
@@ -352,14 +430,32 @@ export const GiftsPage: React.FC = () => {
       {/* TAB 1: CATEGORIES */}
       {activeTab === 1 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Gift Categories</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            Gift Categories
+          </Typography>
           <DataTable
             columns={[
-              { id: 'name', label: 'Category Name', render: (row) => <strong>{row.name}</strong> },
+              {
+                id: 'name',
+                label: 'Category Name',
+                render: (row) => <strong>{row.name}</strong>,
+              },
               { id: 'slug', label: 'Slug', render: (row) => row.slug },
-              { id: 'giftCount', label: 'Gifts Count', render: (row) => `${row.giftCount} items` },
-              { id: 'sortOrder', label: 'Display Order', render: (row) => `#${row.sortOrder}` },
-              { id: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+              {
+                id: 'giftCount',
+                label: 'Gifts Count',
+                render: (row) => `${row.giftCount} items`,
+              },
+              {
+                id: 'sortOrder',
+                label: 'Display Order',
+                render: (row) => `#${row.sortOrder}`,
+              },
+              {
+                id: 'status',
+                label: 'Status',
+                render: (row) => <StatusBadge status={row.status} />,
+              },
             ]}
             rows={categories}
           />
@@ -373,9 +469,16 @@ export const GiftsPage: React.FC = () => {
             <Grid size={{ xs: 12, md: 6 }} key={gift.id}>
               <Card variant="outlined">
                 <CardContent>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>{gift.name}</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Category: {gift.category} • Base Price: <strong>{gift.coinPrice} Coins</strong>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {gift.name}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
+                    Category: {gift.category} • Base Price:{' '}
+                    <strong>{gift.coinPrice} Coins</strong>
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <TextField
@@ -385,8 +488,15 @@ export const GiftsPage: React.FC = () => {
                       value={gift.creatorEarningsPercentage}
                       onChange={(e) => {
                         const val = Number(e.target.value);
-                        setGifts((prev) => prev.map((g) => (g.id === gift.id ? { ...g, creatorEarningsPercentage: val } : g)));
+                        setGifts((prev) =>
+                          prev.map((g) =>
+                            g.id === gift.id
+                              ? { ...g, creatorEarningsPercentage: val }
+                              : g,
+                          ),
+                        );
                       }}
+                      onBlur={() => persistCreatorShare(gift)}
                     />
                   </Box>
                 </CardContent>
@@ -399,14 +509,35 @@ export const GiftsPage: React.FC = () => {
       {/* TAB 3: INVENTORY */}
       {activeTab === 3 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Stock & Inventory Monitor</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            Stock & Inventory Monitor
+          </Typography>
           <DataTable
             columns={[
-              { id: 'name', label: 'Gift Name', render: (row) => <strong>{row.name}</strong> },
+              {
+                id: 'name',
+                label: 'Gift Name',
+                render: (row) => <strong>{row.name}</strong>,
+              },
               { id: 'type', label: 'Type', render: (row) => row.type },
-              { id: 'isLimitedEdition', label: 'Limited Edition', render: (row) => (row.isLimitedEdition ? 'Yes' : 'Unlimited') },
-              { id: 'totalStock', label: 'Initial Stock', render: (row) => row.totalStock || 'N/A' },
-              { id: 'remainingStock', label: 'Remaining Stock', render: (row) => (row.remainingStock !== undefined ? `${row.remainingStock} units` : 'Unlimited') },
+              {
+                id: 'isLimitedEdition',
+                label: 'Limited Edition',
+                render: (row) => (row.isLimitedEdition ? 'Yes' : 'Unlimited'),
+              },
+              {
+                id: 'totalStock',
+                label: 'Initial Stock',
+                render: (row) => row.totalStock || 'N/A',
+              },
+              {
+                id: 'remainingStock',
+                label: 'Remaining Stock',
+                render: (row) =>
+                  row.remainingStock !== undefined
+                    ? `${row.remainingStock} units`
+                    : 'Unlimited',
+              },
             ]}
             rows={gifts}
           />
@@ -416,7 +547,9 @@ export const GiftsPage: React.FC = () => {
       {/* TAB 4: COMBOS */}
       {activeTab === 4 && (
         <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Combo Engine Rules</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            Combo Engine Rules
+          </Typography>
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField
@@ -424,7 +557,7 @@ export const GiftsPage: React.FC = () => {
                 label="Combo Reset Timeout (Seconds)"
                 type="number"
                 value={comboConfig.timeoutSeconds}
-                onChange={(e) => setComboConfig({ ...comboConfig, timeoutSeconds: Number(e.target.value) })}
+                disabled
               />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
@@ -433,7 +566,7 @@ export const GiftsPage: React.FC = () => {
                 label="Tier 1 Threshold (1.2x Multiplier)"
                 type="number"
                 value={comboConfig.tier1Min}
-                onChange={(e) => setComboConfig({ ...comboConfig, tier1Min: Number(e.target.value) })}
+                disabled
               />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
@@ -442,13 +575,14 @@ export const GiftsPage: React.FC = () => {
                 label="Tier 2 Threshold (1.5x Multiplier)"
                 type="number"
                 value={comboConfig.tier2Min}
-                onChange={(e) => setComboConfig({ ...comboConfig, tier2Min: Number(e.target.value) })}
+                disabled
               />
             </Grid>
             <Grid size={12}>
-              <Button variant="contained" onClick={() => addToast('success', 'Combo rules updated')}>
-                Save Combo Rules
-              </Button>
+              <Typography variant="body2" color="text.secondary">
+                These thresholds are the accepted Redis-backed runtime policy.
+                WP08-03-04 does not invent a mutable configuration API.
+              </Typography>
             </Grid>
           </Grid>
         </Paper>
@@ -460,32 +594,62 @@ export const GiftsPage: React.FC = () => {
           <Grid size={{ xs: 12, md: 3 }}>
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="caption" color="text.secondary">Total Coins Spent Today</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main' }}>1,248,500</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Gift Coin Volume (24h)
+                </Typography>
+                <Typography
+                  variant="h4"
+                  sx={{ fontWeight: 800, color: 'primary.main' }}
+                >
+                  {Number(revenue?.totalCoinsVolume || 0).toLocaleString()}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="caption" color="text.secondary">Gifts Dispatched</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: 'secondary.main' }}>18,920</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Settled Gift Transactions (24h)
+                </Typography>
+                <Typography
+                  variant="h4"
+                  sx={{ fontWeight: 800, color: 'secondary.main' }}
+                >
+                  {Number(revenue?.totalTransactions || 0).toLocaleString()}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="caption" color="text.secondary">Creator Payouts</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: 'success.main' }}>873,950 💎</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Creator Diamond Credits (24h)
+                </Typography>
+                <Typography
+                  variant="h4"
+                  sx={{ fontWeight: 800, color: 'success.main' }}
+                >
+                  {Number(revenue?.totalCreatorPayouts || 0).toLocaleString()}{' '}
+                  💎
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="caption" color="text.secondary">Active Combos Peak</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: 'warning.main' }}>88x Streak</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Platform Net Coin Revenue (24h)
+                </Typography>
+                <Typography
+                  variant="h4"
+                  sx={{ fontWeight: 800, color: 'warning.main' }}
+                >
+                  {Number(revenue?.platformNetRevenue || 0).toLocaleString()}{' '}
+                  Coins
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -495,13 +659,31 @@ export const GiftsPage: React.FC = () => {
       {/* TAB 6: SEASONAL GIFTS */}
       {activeTab === 6 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Festival & Seasonal Gifts</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            Festival & Seasonal Gifts
+          </Typography>
           <DataTable
             columns={[
-              { id: 'name', label: 'Seasonal Item', render: (row) => <strong>{row.name}</strong> },
-              { id: 'seasonTag', label: 'Season Tag', render: (row) => row.seasonTag || 'General' },
-              { id: 'coinPrice', label: 'Price', render: (row) => `${row.coinPrice} Coins` },
-              { id: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+              {
+                id: 'name',
+                label: 'Seasonal Item',
+                render: (row) => <strong>{row.name}</strong>,
+              },
+              {
+                id: 'seasonTag',
+                label: 'Season Tag',
+                render: (row) => row.seasonTag || 'General',
+              },
+              {
+                id: 'coinPrice',
+                label: 'Price',
+                render: (row) => `${row.coinPrice} Coins`,
+              },
+              {
+                id: 'status',
+                label: 'Status',
+                render: (row) => <StatusBadge status={row.status} />,
+              },
             ]}
             rows={gifts.filter((g) => g.isSeasonal)}
           />
@@ -511,13 +693,31 @@ export const GiftsPage: React.FC = () => {
       {/* TAB 7: LIMITED GIFTS */}
       {activeTab === 7 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Limited Edition Flash Items</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            Limited Edition Flash Items
+          </Typography>
           <DataTable
             columns={[
-              { id: 'name', label: 'Limited Item', render: (row) => <strong>{row.name}</strong> },
-              { id: 'coinPrice', label: 'Price', render: (row) => `${row.coinPrice} Coins` },
-              { id: 'totalStock', label: 'Cap Stock', render: (row) => row.totalStock },
-              { id: 'remainingStock', label: 'Available', render: (row) => `${row.remainingStock} units left` },
+              {
+                id: 'name',
+                label: 'Limited Item',
+                render: (row) => <strong>{row.name}</strong>,
+              },
+              {
+                id: 'coinPrice',
+                label: 'Price',
+                render: (row) => `${row.coinPrice} Coins`,
+              },
+              {
+                id: 'totalStock',
+                label: 'Cap Stock',
+                render: (row) => row.totalStock,
+              },
+              {
+                id: 'remainingStock',
+                label: 'Available',
+                render: (row) => `${row.remainingStock} units left`,
+              },
             ]}
             rows={gifts.filter((g) => g.isLimitedEdition)}
           />
@@ -527,13 +727,23 @@ export const GiftsPage: React.FC = () => {
       {/* Modal Form */}
       <ModalForms
         open={modalOpen}
-        title={modalType === 'category' ? 'Create Gift Category' : 'Create Virtual Gift Item'}
+        title={
+          modalType === 'category'
+            ? 'Create Gift Category'
+            : 'Create Virtual Gift Item'
+        }
         onClose={() => setModalOpen(false)}
       >
         <FormBuilder
-          fields={modalType === 'category' ? categoryFormFields : giftFormFields}
-          onSubmit={modalType === 'category' ? handleCreateCategory : handleCreateGift}
-          submitText={modalType === 'category' ? 'Save Category' : 'Save Gift Item'}
+          fields={
+            modalType === 'category' ? categoryFormFields : giftFormFields
+          }
+          onSubmit={
+            modalType === 'category' ? handleCreateCategory : handleCreateGift
+          }
+          submitText={
+            modalType === 'category' ? 'Save Category' : 'Save Gift Item'
+          }
         />
       </ModalForms>
     </Box>

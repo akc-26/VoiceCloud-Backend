@@ -57,14 +57,10 @@ describe('Phase18 Gifting Engine', () => {
     coinBalance = 2000;
     luckyBoxOpenings = new Map();
     const luckyBoxRepository = {
-      findOne: jest
-        .fn()
-        .mockImplementation(({ where }) =>
-          Promise.resolve(luckyBoxOpenings.get(where.operationKey) || null),
-        ),
-      create: jest
-        .fn()
-        .mockImplementation((value) => ({ id: 'opening-1', ...value })),
+      findOne: jest.fn().mockImplementation(({ where }) =>
+        Promise.resolve(luckyBoxOpenings.get(where.operationKey) || null),
+      ),
+      create: jest.fn().mockImplementation((value) => ({ id: 'opening-1', ...value })),
       save: jest.fn().mockImplementation(async (value) => {
         luckyBoxOpenings.set(value.operationKey, value);
         return value;
@@ -82,28 +78,15 @@ describe('Phase18 Gifting Engine', () => {
       ),
     };
     const walletMutationService = {
-      debitInTransaction: jest
-        .fn()
-        .mockImplementation(async (_manager, input) => {
-          if (coinBalance < input.amount)
-            throw new BadRequestException('Insufficient coin balance');
-          coinBalance -= input.amount;
-          return {
-            wallet: { coinBalance },
-            transaction: { id: 'debit-1' },
-            idempotent: false,
-          };
-        }),
-      creditInTransaction: jest
-        .fn()
-        .mockImplementation(async (_manager, input) => {
-          coinBalance += input.amount;
-          return {
-            wallet: { coinBalance },
-            transaction: { id: 'credit-1' },
-            idempotent: false,
-          };
-        }),
+      debitInTransaction: jest.fn().mockImplementation(async (_manager, input) => {
+        if (coinBalance < input.amount) throw new BadRequestException('Insufficient coin balance');
+        coinBalance -= input.amount;
+        return { wallet: { coinBalance }, transaction: { id: 'debit-1' }, idempotent: false };
+      }),
+      creditInTransaction: jest.fn().mockImplementation(async (_manager, input) => {
+        coinBalance += input.amount;
+        return { wallet: { coinBalance }, transaction: { id: 'credit-1' }, idempotent: false };
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -254,4 +237,5 @@ describe('Phase18 Gifting Engine', () => {
       expect(redisService.set).not.toHaveBeenCalled();
     });
   });
+
 });

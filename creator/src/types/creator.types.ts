@@ -153,21 +153,35 @@ export interface GiftReceived {
 
 export interface PayoutRequest {
   id: string;
-  amountDiamonds: number;
-  estimatedUsd: number;
-  payoutMethod: 'Bank Transfer' | 'PayPal' | 'Crypto (USDT)';
-  accountDetails: string;
+  creatorId: string;
+  diamondAmount: number;
+  payoutAmount: number;
+  payoutMethod: 'BANK_TRANSFER' | 'PAYPAL' | 'STRIPE' | 'CRYPTO' | string;
+  accountDetails?: Record<string, unknown> | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PROCESSED';
-  requestedAt: string;
-  processedAt?: string;
-  adminNote?: string;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reservedAt?: string | null;
+  settledAt?: string | null;
+  releasedAt?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface CreatorNotification {
   id: string;
   title: string;
   message: string;
-  type: 'subscription' | 'gift' | 'system' | 'payout' | 'moderation';
+  type:
+    | 'IN_APP'
+    | 'SYSTEM'
+    | 'ROOM_INVITATION'
+    | 'GIFT'
+    | 'VIP'
+    | 'AGENCY'
+    | 'HOST_APPROVAL'
+    | 'ANNOUNCEMENT';
   read: boolean;
   createdAt: string;
   link?: string;
@@ -263,31 +277,59 @@ export interface UserProfileResponse {
 }
 
 export interface WalletBalanceResponse {
-  userId: string;
   coinBalance: number;
   diamondBalance: number;
-  frozenCoins?: number;
-  frozenDiamonds?: number;
-  totalEarnedCoins?: number;
-  totalEarnedDiamonds?: number;
-  lifetimeEarningsUsd?: number;
-  pendingPayoutsUsd?: number;
+  bonusBalance: number;
+  promotionalBalance: number;
+  frozenBalance: number;
+  withdrawableBalance: number;
+  totalCoinsPurchased: number;
+  totalCoinsSpent: number;
+  totalDiamondsEarned: number;
+  totalDiamondsWithdrawn: number;
+  updatedAt?: string;
+}
+
+export interface WalletTransactionResponse {
+  id: string;
+  transactionType: string;
+  amount: number;
+  currency: string;
+  status: string;
+  description?: string | null;
+  remarks?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  createdAt: string;
 }
 
 export interface WalletSummaryResponse {
-  balance: WalletBalanceResponse;
-  currentBalanceUsd: number;
-  availableBalanceUsd: number;
-  pendingPayoutsUsd: number;
-  lifetimeEarningsUsd: number;
-  latestTransactions: Array<{
-    id: string;
-    type: string;
-    amount: number;
-    currency: 'COINS' | 'DIAMONDS';
-    description: string;
-    createdAt: string;
-  }>;
+  wallet: WalletBalanceResponse;
+  latestTransaction: WalletTransactionResponse | null;
+  activePackageCount: number;
+  statistics: {
+    totalTransactionsCount: number;
+    netCoinBalance: number;
+    netDiamondBalance: number;
+  };
+}
+
+export interface WalletTransactionsResponse {
+  data: WalletTransactionResponse[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CreatorEarningsResponse {
+  totalSubscribers: number;
+  estimatedRecurringRevenue: number;
+  activePlansCount: number;
+  pendingPayoutsAmount: number;
+  completedPayoutsAmount: number;
+  lifetimeEarnings: number;
+  recentSubscriptions: Array<Record<string, unknown>>;
 }
 
 export interface NotificationItem {

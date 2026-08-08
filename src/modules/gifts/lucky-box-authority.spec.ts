@@ -7,14 +7,10 @@ describe('LuckyBoxService PostgreSQL financial authority', () => {
   it('debits through wallet authority and replays a stored opening exactly once', async () => {
     const openings = new Map<string, any>();
     const repository = {
-      findOne: jest
-        .fn()
-        .mockImplementation(
-          async ({ where }) => openings.get(where.operationKey) || null,
-        ),
-      create: jest
-        .fn()
-        .mockImplementation((value) => ({ id: 'opening-1', ...value })),
+      findOne: jest.fn().mockImplementation(async ({ where }) =>
+        openings.get(where.operationKey) || null,
+      ),
+      create: jest.fn().mockImplementation((value) => ({ id: 'opening-1', ...value })),
       save: jest.fn().mockImplementation(async (value) => {
         openings.set(value.operationKey, value);
         return value;
@@ -28,41 +24,22 @@ describe('LuckyBoxService PostgreSQL financial authority', () => {
       }),
     };
     const dataSource = {
-      transaction: jest
-        .fn()
-        .mockImplementation((callback) => callback(manager)),
+      transaction: jest.fn().mockImplementation((callback) => callback(manager)),
     } as any;
     let balance = 1000;
     const walletMutation = {
-      debitInTransaction: jest
-        .fn()
-        .mockImplementation(async (_manager, input) => {
-          if (balance < input.amount)
-            throw new BadRequestException('Insufficient coins');
-          balance -= input.amount;
-          return {
-            wallet: { coinBalance: balance },
-            transaction: { id: 'debit-1' },
-          };
-        }),
-      creditInTransaction: jest
-        .fn()
-        .mockImplementation(async (_manager, input) => {
-          balance += input.amount;
-          return {
-            wallet: { coinBalance: balance },
-            transaction: { id: 'credit-1' },
-          };
-        }),
+      debitInTransaction: jest.fn().mockImplementation(async (_manager, input) => {
+        if (balance < input.amount) throw new BadRequestException('Insufficient coins');
+        balance -= input.amount;
+        return { wallet: { coinBalance: balance }, transaction: { id: 'debit-1' } };
+      }),
+      creditInTransaction: jest.fn().mockImplementation(async (_manager, input) => {
+        balance += input.amount;
+        return { wallet: { coinBalance: balance }, transaction: { id: 'credit-1' } };
+      }),
     } as any;
-    const eventsGateway = {
-      server: { to: jest.fn().mockReturnValue({ emit: jest.fn() }) },
-    } as any;
-    const service = new LuckyBoxService(
-      eventsGateway,
-      dataSource,
-      walletMutation,
-    );
+    const eventsGateway = { server: { to: jest.fn().mockReturnValue({ emit: jest.fn() }) } } as any;
+    const service = new LuckyBoxService(eventsGateway, dataSource, walletMutation);
     const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.5);
 
     const first = await service.openLuckyBox('user-1', {

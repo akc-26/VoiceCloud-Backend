@@ -455,12 +455,10 @@ export class GiftSettlementService {
     transactionCount: number;
     walletTransactionIds: string[];
   }> {
-    const transactions = await this.dataSource
-      .getRepository(GiftTransaction)
-      .find({
-        where: { operationGroupId },
-        order: { createdAt: 'ASC' },
-      });
+    const transactions = await this.dataSource.getRepository(GiftTransaction).find({
+      where: { operationGroupId },
+      order: { createdAt: 'ASC' },
+    });
     if (transactions.length === 0) {
       throw new NotFoundException(
         `Gift settlement '${operationGroupId}' was not found`,
@@ -475,9 +473,7 @@ export class GiftSettlementService {
         'Committed gift settlement is missing sender wallet evidence',
       );
     }
-    const senderLedger = await walletRepository.findOne({
-      where: { id: senderId },
-    });
+    const senderLedger = await walletRepository.findOne({ where: { id: senderId } });
     if (!senderLedger || senderLedger.operationGroupId !== operationGroupId) {
       throw new ConflictException(
         'Committed gift settlement sender ledger evidence is invalid',
@@ -494,10 +490,7 @@ export class GiftSettlementService {
       const receiverLedger = await walletRepository.findOne({
         where: { id: transaction.receiverWalletTransactionId },
       });
-      if (
-        !receiverLedger ||
-        receiverLedger.operationGroupId !== operationGroupId
-      ) {
+      if (!receiverLedger || receiverLedger.operationGroupId !== operationGroupId) {
         throw new ConflictException(
           'Committed gift settlement receiver ledger evidence is invalid',
         );

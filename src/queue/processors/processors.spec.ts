@@ -76,6 +76,8 @@ describe('Phase 3C Queue Processors (Workers)', () => {
     save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
   };
 
+
+
   const mockPayoutLifecycleService = {
     approve: jest.fn(),
     reject: jest.fn(),
@@ -101,11 +103,7 @@ describe('Phase 3C Queue Processors (Workers)', () => {
       idempotent: false,
     });
     mockPayoutLifecycleService.verifyReservedPayout.mockResolvedValue({
-      payout: {
-        id: 'payout-1',
-        creatorId: 'creator-1',
-        status: PayoutStatus.PENDING,
-      },
+      payout: { id: 'payout-1', creatorId: 'creator-1', status: PayoutStatus.PENDING },
       reservationTransaction: { id: 'reserve-tx-1' },
     });
     const module: TestingModule = await Test.createTestingModule({

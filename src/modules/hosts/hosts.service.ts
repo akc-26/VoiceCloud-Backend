@@ -957,9 +957,7 @@ export class HostsService {
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException(
-        'Settlement amount must be greater than zero',
-      );
+      throw new BadRequestException('Settlement amount must be greater than zero');
     }
     const earnings = await this.getEarnings(userId);
     const available =
@@ -1016,16 +1014,15 @@ export class HostsService {
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException(
-        'Settlement amount must be greater than zero',
-      );
+      throw new BadRequestException('Settlement amount must be greater than zero');
     }
     if (amount > Number(earnings.pendingSettlements)) {
       throw new BadRequestException(
         'Settlement amount exceeds reserved pending balance',
       );
     }
-    earnings.pendingSettlements = Number(earnings.pendingSettlements) - amount;
+    earnings.pendingSettlements =
+      Number(earnings.pendingSettlements) - amount;
     earnings.completedSettlements =
       Number(earnings.completedSettlements) + amount;
     const saved = await this.earningsRepository.save(earnings);
@@ -1250,9 +1247,7 @@ export class HostsService {
 
   async claimReward(userId: string, rewardId: string): Promise<HostReward> {
     if (!this.hostRewardAuthorityService) {
-      throw new ConflictException(
-        'Host reward financial authority is unavailable',
-      );
+      throw new ConflictException('Host reward financial authority is unavailable');
     }
     return this.hostRewardAuthorityService.claim(userId, rewardId);
   }
