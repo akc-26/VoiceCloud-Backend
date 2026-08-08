@@ -19,8 +19,7 @@ interface ConfirmationDialogProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  confirmColor?:
-    'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success';
+  confirmColor?: 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success';
   isLoading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -59,9 +58,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         {title}
       </DialogTitle>
       <DialogContent>
-        <DialogContentText sx={{ fontSize: '0.84rem', lineHeight: 1.6 }}>
-          {message}
-        </DialogContentText>
+        <DialogContentText sx={{ fontSize: '0.84rem', lineHeight: 1.6 }}>{message}</DialogContentText>
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel} disabled={isLoading} variant="outlined">
@@ -72,11 +69,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
           disabled={isLoading}
           variant="contained"
           color={confirmColor}
-          startIcon={
-            isLoading ? (
-              <CircularProgress size={17} color="inherit" />
-            ) : undefined
-          }
+          startIcon={isLoading ? <CircularProgress size={17} color="inherit" /> : undefined}
         >
           {confirmText}
         </Button>

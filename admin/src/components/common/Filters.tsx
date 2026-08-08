@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  Box,
-  Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  SelectChangeEvent,
-} from '@mui/material';
+import { Box, Button, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent } from '@mui/material';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 
@@ -24,18 +16,11 @@ interface FiltersProps {
   onReset: () => void;
 }
 
-export const Filters: React.FC<FiltersProps> = ({
-  filters,
-  values,
-  onChange,
-  onReset,
-}) => {
+export const Filters: React.FC<FiltersProps> = ({ filters, values, onChange, onReset }) => {
   const hasActiveFilters = Object.values(values).some(Boolean);
 
   return (
-    <Box
-      sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}
-    >
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
       <Box
         sx={{
           width: 32,
@@ -55,13 +40,9 @@ export const Filters: React.FC<FiltersProps> = ({
           <Select
             value={values[filter.key] || ''}
             label={filter.label}
-            onChange={(event: SelectChangeEvent) =>
-              onChange(filter.key, event.target.value)
-            }
+            onChange={(event: SelectChangeEvent) => onChange(filter.key, event.target.value)}
           >
-            <MenuItem value="">
-              <em>All</em>
-            </MenuItem>
+            <MenuItem value=""><em>All</em></MenuItem>
             {filter.options.map((option) => (
               <MenuItem key={option.value} value={option.value}>
                 {option.label}
@@ -71,12 +52,7 @@ export const Filters: React.FC<FiltersProps> = ({
         </FormControl>
       ))}
       {hasActiveFilters && (
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<RestartAltIcon />}
-          onClick={onReset}
-        >
+        <Button size="small" variant="outlined" startIcon={<RestartAltIcon />} onClick={onReset}>
           Reset
         </Button>
       )}

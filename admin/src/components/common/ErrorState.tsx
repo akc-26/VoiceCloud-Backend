@@ -24,10 +24,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
         textAlign: 'center',
         border: '1px solid',
         borderColor: alpha(theme.palette.error.main, 0.2),
-        backgroundColor: alpha(
-          theme.palette.error.main,
-          theme.palette.mode === 'dark' ? 0.08 : 0.035,
-        ),
+        backgroundColor: alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.08 : 0.035),
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -49,23 +46,12 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       >
         <ErrorOutlineRoundedIcon sx={{ fontSize: 29 }} />
       </Box>
-      <Typography variant="h6" color="error.main" gutterBottom>
-        {title}
-      </Typography>
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        sx={{ maxWidth: 460, mb: onRetry ? 2.5 : 0 }}
-      >
+      <Typography variant="h6" color="error.main" gutterBottom>{title}</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, mb: onRetry ? 2.5 : 0 }}>
         {message}
       </Typography>
       {onRetry && (
-        <Button
-          variant="contained"
-          color="error"
-          startIcon={<RefreshIcon />}
-          onClick={onRetry}
-        >
+        <Button variant="contained" color="error" startIcon={<RefreshIcon />} onClick={onRetry}>
           Retry
         </Button>
       )}

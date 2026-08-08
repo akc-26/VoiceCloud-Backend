@@ -98,7 +98,11 @@ export const HelpPage: React.FC = () => {
         <Grid size={{ xs: 12, sm: 4 }}>
           <Card>
             <CardContent sx={{ p: 2.5, textAlign: 'center' }}>
-              <BookOpen size={32} color="#7c3aed" style={{ marginBottom: 8 }} />
+              <BookOpen
+                size={32}
+                color={BRAND_CONFIG.colors.creator.primary}
+                style={{ marginBottom: 8 }}
+              />
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Creator Handbook
               </Typography>
@@ -120,7 +124,11 @@ export const HelpPage: React.FC = () => {
         <Grid size={{ xs: 12, sm: 4 }}>
           <Card>
             <CardContent sx={{ p: 2.5, textAlign: 'center' }}>
-              <FileText size={32} color="#2563eb" style={{ marginBottom: 8 }} />
+              <FileText
+                size={32}
+                color={BRAND_CONFIG.colors.creator.info}
+                style={{ marginBottom: 8 }}
+              />
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
                 Community Guidelines
               </Typography>
@@ -143,7 +151,7 @@ export const HelpPage: React.FC = () => {
             <CardContent sx={{ p: 2.5, textAlign: 'center' }}>
               <HelpCircle
                 size={32}
-                color="#10b981"
+                color={BRAND_CONFIG.colors.creator.success}
                 style={{ marginBottom: 8 }}
               />
               <Typography variant="h6" sx={{ fontWeight: 700 }}>

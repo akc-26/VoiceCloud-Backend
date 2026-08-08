@@ -81,7 +81,9 @@ export const FollowersPage: React.FC = () => {
           followersQuery.error?.message ||
           'Unable to retrieve follower directory from backend.'
         }
-        onRetry={() => followersQuery.refetch()}
+        onRetry={() => {
+          void followersQuery.refetch();
+        }}
       />
     );
   }
@@ -104,10 +106,8 @@ export const FollowersPage: React.FC = () => {
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Total Followers:{' '}
-            <strong>
-              {(profile.followersCount ?? 14250).toLocaleString()}
-            </strong>{' '}
-            | Engage with listeners and supporters.
+            <strong>{(profile.followersCount ?? 0).toLocaleString()}</strong> |
+            Engage with listeners and supporters.
           </Typography>
         </Box>
 

@@ -1,5 +1,14 @@
 ## VC-PH08-WP08-03-04 R03 — Real-Infrastructure Historical Baseline Bootstrap Correction
 
+- Hardened Creator Studio UI async event handling for MUI/React callbacks: promise-capable navigation, React Query refetch/invalidation, and async actions now use explicit await/void boundaries, with a source-level regression guard.
+
+## WP08-04-04 Creator Studio — Aurora Live / Green
+
+- Redesigned the Creator Studio presentation layer around the approved emerald/teal Aurora Live system while preserving accepted routes, services, authentication, notifications, realtime behavior and financial authority.
+- Added centralized Creator semantic color roles, Inter-first typography, dark graphite-green navigation/header surfaces, responsive shell behavior and reusable MUI component treatment.
+- Reworked Creator Login and Dashboard around real existing Creator queries and removed old Dashboard-level illustrative KPI/live-room fallback values.
+- Added non-mutating Creator redesign source/acceptance checks that protect the accepted Admin, backend, Website, Creator service/route boundaries and the canonical LF package-lock identity.
+
 - Preserves the complete R02 UI reconciliation, notification realtime isolation, TypeORM migration-discovery correction, and all accepted WP08 authority behavior.
 - Corrects Stage 18 so it no longer treats historical incremental migrations 1700000000000-0008 as a fresh-install schema bootstrap. Those migrations were authored against the pre-existing legacy VoiceCloud schema and legitimately reference tables such as `users` and `rooms`.
 - Adds a guarded acceptance-only schema bootstrap that can run only against a `voicecloud_wp08_03_04_<timestamp>` temporary database, creates the current entity schema there, rewinds the WP08 authority delta, records historical migrations 0000-0008, and then replays migrations 0009-0013 through the compiled production TypeORM CLI.

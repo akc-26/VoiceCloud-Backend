@@ -55,11 +55,7 @@ export function DataTable<T extends { id?: string | number }>({
           <TableHead>
             <TableRow>
               {columns.map((column) => (
-                <TableCell
-                  key={column.id}
-                  align={column.align}
-                  style={{ minWidth: column.minWidth }}
-                >
+                <TableCell key={column.id} align={column.align} style={{ minWidth: column.minWidth }}>
                   {column.label}
                 </TableCell>
               ))}
@@ -91,11 +87,7 @@ export function DataTable<T extends { id?: string | number }>({
         <TableHead>
           <TableRow>
             {columns.map((column) => (
-              <TableCell
-                key={column.id}
-                align={column.align}
-                style={{ minWidth: column.minWidth }}
-              >
+              <TableCell key={column.id} align={column.align} style={{ minWidth: column.minWidth }}>
                 {column.label}
               </TableCell>
             ))}
@@ -111,10 +103,7 @@ export function DataTable<T extends { id?: string | number }>({
                 onClick={() => onRowClick?.(row)}
                 tabIndex={onRowClick ? 0 : undefined}
                 onKeyDown={(event) => {
-                  if (
-                    onRowClick &&
-                    (event.key === 'Enter' || event.key === ' ')
-                  ) {
+                  if (onRowClick && (event.key === 'Enter' || event.key === ' ')) {
                     event.preventDefault();
                     onRowClick(row);
                   }
@@ -126,9 +115,7 @@ export function DataTable<T extends { id?: string | number }>({
               >
                 {columns.map((column) => (
                   <TableCell key={column.id} align={column.align}>
-                    {column.render
-                      ? column.render(row)
-                      : (row as Record<string, React.ReactNode>)[column.id]}
+                    {column.render ? column.render(row) : (row as Record<string, React.ReactNode>)[column.id]}
                   </TableCell>
                 ))}
               </TableRow>

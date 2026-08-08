@@ -1,40 +1,40 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
+  Avatar,
+  Box,
+  Chip,
+  Divider,
   Drawer,
+  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Box,
-  Typography,
-  Chip,
-  Divider,
-  Avatar,
-  IconButton,
   Tooltip,
-  useTheme,
+  Typography,
   useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
-  LayoutDashboard,
+  BadgeCheck,
   BarChart3,
-  Radio,
+  Bell,
   Calendar,
-  Users,
-  UserCheck,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
   Crown,
-  Wallet,
   DollarSign,
   Gift,
-  CreditCard,
-  Bell,
-  User,
-  BadgeCheck,
-  Settings,
   HelpCircle,
-  ChevronLeft,
-  Sparkles,
+  LayoutDashboard,
+  Radio,
+  Settings,
+  User,
+  UserCheck,
+  Users,
+  Wallet,
 } from 'lucide-react';
 import { BRAND_CONFIG, getBrandAssetUrl } from '@shared/branding';
 import { useCreatorProfileStore } from '../../store/creator-profile.store';
@@ -71,19 +71,20 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const profile = useCreatorProfileStore((state) => state.profile);
   const unreadCount = useNotificationStore((state) => state.unreadCount);
+  const creatorColors = BRAND_CONFIG.colors.creator;
 
   const navItems: NavItem[] = [
     {
       label: 'Dashboard',
       path: '/dashboard',
       icon: LayoutDashboard,
-      section: 'Core',
+      section: 'Home',
     },
     {
       label: 'Analytics',
       path: '/analytics',
       icon: BarChart3,
-      section: 'Core',
+      section: 'Home',
     },
     {
       label: 'Live Rooms',
@@ -91,10 +92,9 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
       icon: Radio,
       badge: 'LIVE',
       badgeColor: 'error',
-      section: 'Core',
+      section: 'Live',
     },
-    { label: 'Schedule', path: '/schedule', icon: Calendar, section: 'Core' },
-
+    { label: 'Schedule', path: '/schedule', icon: Calendar, section: 'Live' },
     { label: 'Audience', path: '/audience', icon: Users, section: 'Community' },
     {
       label: 'Followers',
@@ -106,126 +106,125 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
       label: 'Subscribers',
       path: '/subscribers',
       icon: Crown,
-      badge: profile.subscribersCount,
+      badge:
+        profile.subscribersCount > 0 ? profile.subscribersCount : undefined,
       badgeColor: 'primary',
       section: 'Community',
     },
-
-    { label: 'Wallet', path: '/wallet', icon: Wallet, section: 'Monetization' },
+    { label: 'Wallet', path: '/wallet', icon: Wallet, section: 'Earnings' },
     {
       label: 'Earnings',
       path: '/earnings',
       icon: DollarSign,
-      section: 'Monetization',
+      section: 'Earnings',
     },
-    { label: 'Gifts', path: '/gifts', icon: Gift, section: 'Monetization' },
+    { label: 'Gifts', path: '/gifts', icon: Gift, section: 'Earnings' },
     {
       label: 'Payout Requests',
       path: '/payout-requests',
       icon: CreditCard,
-      section: 'Monetization',
+      section: 'Earnings',
     },
-
     {
       label: 'Notifications',
       path: '/notifications',
       icon: Bell,
       badge: unreadCount > 0 ? unreadCount : undefined,
       badgeColor: 'error',
-      section: 'Account',
+      section: 'Creator',
     },
-    { label: 'Profile', path: '/profile', icon: User, section: 'Account' },
     {
       label: 'Host Verification',
       path: '/verification',
       icon: BadgeCheck,
-      section: 'Account',
+      section: 'Creator',
     },
+    { label: 'Profile', path: '/profile', icon: User, section: 'Creator' },
     {
       label: 'Settings',
       path: '/settings',
       icon: Settings,
-      section: 'Account',
+      section: 'Creator',
     },
-    { label: 'Help', path: '/help', icon: HelpCircle, section: 'Support' },
+    { label: 'Help', path: '/help', icon: HelpCircle, section: 'System' },
   ];
 
   const isSelected = (path: string) => {
-    if (path === '/dashboard' || path === '/') {
-      return (
-        location.pathname === '/' ||
-        location.pathname === '' ||
-        location.pathname === '/dashboard' ||
-        location.pathname === '/dashboard/' ||
-        location.pathname === '/creator' ||
-        location.pathname === '/creator/dashboard'
-      );
+    if (path === '/dashboard') {
+      return [
+        '/',
+        '',
+        '/dashboard',
+        '/dashboard/',
+        '/creator',
+        '/creator/dashboard',
+      ].includes(location.pathname);
     }
     return (
-      location.pathname === path || location.pathname.startsWith(path + '/')
+      location.pathname === path || location.pathname.startsWith(`${path}/`)
     );
   };
 
   const handleNavClick = (path: string) => {
-    navigate(path);
-    if (isMobile) {
-      onMobileClose();
-    }
+    void navigate(path);
+    if (isMobile) onMobileClose();
   };
 
   const drawerContent = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Sidebar Header / Brand */}
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        bgcolor: creatorColors.navigationBackground,
+        color: '#f3faf6',
+      }}
+    >
       <Box
         sx={{
-          p: 2.5,
+          minHeight: 72,
+          px: open ? 2.5 : 1.5,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
+          justifyContent: open ? 'space-between' : 'center',
+          borderBottom: '1px solid rgba(216, 227, 222, 0.12)',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box
+          sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}
+        >
           <Box
             sx={{
               width: 38,
               height: 38,
-              borderRadius: 2,
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)',
+              borderRadius: 2.5,
+              bgcolor: '#ffffff',
+              display: 'grid',
+              placeItems: 'center',
+              boxShadow: '0 8px 22px rgba(0,0,0,0.16)',
+              flexShrink: 0,
             }}
           >
             <Box
               component="img"
               src={getBrandAssetUrl('creator', 'logoMark')}
               alt=""
-              sx={{ width: 38, height: 38 }}
+              sx={{ width: 34, height: 34 }}
             />
           </Box>
           {open && (
-            <Box>
+            <Box sx={{ minWidth: 0 }}>
               <Typography
                 variant="subtitle1"
-                sx={{
-                  fontWeight: 700,
-                  lineHeight: 1.2,
-                  letterSpacing: '-0.01em',
-                }}
+                sx={{ fontWeight: 700, lineHeight: 1.15, color: '#ffffff' }}
               >
-                {BRAND_CONFIG.products.creator.shortName}
+                {BRAND_CONFIG.identity.name}
               </Typography>
               <Typography
                 variant="caption"
-                color="text.secondary"
-                sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                sx={{ color: 'rgba(243,250,246,0.66)', fontWeight: 500 }}
               >
-                <Sparkles size={11} color={theme.palette.primary.main} />{' '}
-                {BRAND_CONFIG.identity.name} Studio
+                {BRAND_CONFIG.products.creator.shortName}
               </Typography>
             </Box>
           )}
@@ -235,7 +234,7 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
             <IconButton
               onClick={onToggle}
               size="small"
-              sx={{ color: 'text.secondary' }}
+              sx={{ color: 'rgba(243,250,246,0.72)' }}
             >
               <ChevronLeft size={18} />
             </IconButton>
@@ -243,55 +242,42 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
         )}
       </Box>
 
-      {/* Creator Profile Badge inside Sidebar */}
       {open && (
         <Box
           sx={{
-            m: 2,
+            mx: 2,
+            mt: 2,
+            mb: 1,
             p: 1.5,
-            borderRadius: 2,
-            bgcolor:
-              theme.palette.mode === 'dark'
-                ? 'rgba(255,255,255,0.03)'
-                : 'rgba(124, 58, 237, 0.04)',
-            border: '1px solid',
-            borderColor: 'divider',
+            borderRadius: 3,
+            border: '1px solid rgba(94,234,212,0.16)',
+            bgcolor: 'rgba(255,255,255,0.045)',
             display: 'flex',
             alignItems: 'center',
             gap: 1.5,
           }}
         >
           <Avatar
-            src={profile.avatarUrl}
+            src={profile.avatarUrl || undefined}
             alt={profile.displayName}
             sx={{
               width: 40,
               height: 40,
-              border: '2px solid',
-              borderColor: 'primary.main',
+              border: '2px solid rgba(94,234,212,0.74)',
             }}
           />
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography
               variant="body2"
-              sx={{
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
+              sx={{ fontWeight: 700, color: '#ffffff' }}
+              noWrap
             >
               {profile.displayName}
             </Typography>
             <Typography
               variant="caption"
-              color="text.secondary"
-              sx={{
-                display: 'block',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
+              sx={{ color: 'rgba(243,250,246,0.64)' }}
+              noWrap
             >
               {profile.handle}
             </Typography>
@@ -299,14 +285,18 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
           <Chip
             label={profile.tier}
             size="small"
-            color="primary"
-            sx={{ height: 20, fontSize: '0.6875rem', fontWeight: 700 }}
+            sx={{
+              height: 20,
+              bgcolor: 'rgba(34,197,94,0.17)',
+              color: creatorColors.primaryLight,
+              fontSize: '0.65rem',
+              fontWeight: 700,
+            }}
           />
         </Box>
       )}
 
-      {/* Navigation List */}
-      <Box sx={{ flex: 1, overflowY: 'auto', px: open ? 1.5 : 1, py: 1 }}>
+      <Box sx={{ flex: 1, overflowY: 'auto', px: open ? 1.5 : 1, py: 1.25 }}>
         <List disablePadding>
           {navItems.map((item, index) => {
             const active = isSelected(item.path);
@@ -319,15 +309,15 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
                 {showSectionHeader && (
                   <Typography
                     variant="caption"
-                    color="text.secondary"
                     sx={{
                       display: 'block',
-                      px: 2,
-                      pt: index === 0 ? 0.5 : 2,
-                      pb: 0.5,
+                      px: 1.5,
+                      pt: index === 0 ? 0.25 : 2,
+                      pb: 0.75,
+                      color: 'rgba(243,250,246,0.46)',
                       fontWeight: 700,
-                      fontSize: '0.6875rem',
-                      letterSpacing: '0.08em',
+                      fontSize: '0.625rem',
+                      letterSpacing: '0.09em',
                       textTransform: 'uppercase',
                     }}
                   >
@@ -340,29 +330,21 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
                     onClick={() => handleNavClick(item.path)}
                     selected={active}
                     sx={{
-                      borderRadius: 2,
+                      minHeight: 40,
+                      borderRadius: 2.5,
                       mb: 0.5,
-                      py: 1,
                       px: open ? 1.5 : 1.25,
                       justifyContent: open ? 'initial' : 'center',
+                      color: active ? '#ffffff' : 'rgba(243,250,246,0.76)',
                       '&.Mui-selected': {
-                        bgcolor:
-                          theme.palette.mode === 'dark'
-                            ? 'rgba(124, 58, 237, 0.2)'
-                            : 'rgba(124, 58, 237, 0.08)',
-                        color: 'primary.main',
-                        fontWeight: 700,
-                        borderLeft: '3px solid',
-                        borderColor: 'primary.main',
-                        '& .MuiListItemIcon-root': {
-                          color: 'primary.main',
-                        },
+                        bgcolor: 'rgba(34,197,94,0.17)',
+                        color: '#ffffff',
+                        boxShadow: 'inset 3px 0 0 #22c55e',
+                        '&:hover': { bgcolor: 'rgba(34,197,94,0.21)' },
                       },
                       '&:hover': {
-                        bgcolor:
-                          theme.palette.mode === 'dark'
-                            ? 'rgba(255,255,255,0.05)'
-                            : 'rgba(0,0,0,0.03)',
+                        bgcolor: 'rgba(255,255,255,0.055)',
+                        color: '#ffffff',
                       },
                     }}
                   >
@@ -371,10 +353,12 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
                         minWidth: 0,
                         mr: open ? 1.5 : 'auto',
                         justifyContent: 'center',
-                        color: active ? 'primary.main' : 'text.secondary',
+                        color: active
+                          ? creatorColors.primaryLight
+                          : 'rgba(243,250,246,0.68)',
                       }}
                     >
-                      <item.icon size={19} />
+                      <item.icon size={18} />
                     </ListItemIcon>
                     {open && (
                       <ListItemText
@@ -382,7 +366,7 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
                           <Typography
                             variant="body2"
                             sx={{
-                              fontSize: '0.875rem',
+                              fontSize: '0.8125rem',
                               fontWeight: active ? 700 : 500,
                             }}
                           >
@@ -398,9 +382,9 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
                         color={item.badgeColor || 'primary'}
                         sx={{
                           height: 18,
-                          fontSize: '0.6875rem',
+                          minWidth: 28,
+                          fontSize: '0.625rem',
                           fontWeight: 700,
-                          px: 0.5,
                         }}
                       />
                     )}
@@ -412,33 +396,40 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
         </List>
       </Box>
 
-      <Divider sx={{ my: 1 }} />
-
-      {/* Footer Version Info inside Drawer */}
-      {open && (
-        <Box sx={{ p: 2, textAlign: 'center' }}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: 'block', fontSize: '0.75rem' }}
-          >
-            {BRAND_CONFIG.products.creator.workspaceLabel}
-          </Typography>
-          <Typography
-            variant="caption"
-            color="primary.main"
-            sx={{ fontWeight: 600, fontSize: '0.6875rem' }}
-          >
-            Production Workspace
-          </Typography>
-        </Box>
-      )}
+      <Divider sx={{ borderColor: 'rgba(216,227,222,0.10)' }} />
+      <Box sx={{ p: open ? 2 : 1.25, textAlign: 'center' }}>
+        {open ? (
+          <>
+            <Typography
+              variant="caption"
+              sx={{ display: 'block', color: 'rgba(243,250,246,0.58)' }}
+            >
+              {BRAND_CONFIG.products.creator.workspaceLabel}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{ color: creatorColors.primaryLight, fontWeight: 600 }}
+            >
+              Live-ready workspace
+            </Typography>
+          </>
+        ) : (
+          <Tooltip title="Expand sidebar" placement="right">
+            <IconButton
+              onClick={onToggle}
+              size="small"
+              sx={{ color: 'rgba(243,250,246,0.72)' }}
+            >
+              <ChevronRight size={18} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
     </Box>
   );
 
   return (
     <>
-      {/* Desktop Drawer */}
       <Drawer
         variant="permanent"
         sx={{
@@ -452,20 +443,18 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
           '& .MuiDrawer-paper': {
             width: open ? drawerWidth : 72,
             boxSizing: 'border-box',
-            borderRight: '1px solid',
-            borderColor: 'divider',
+            overflowX: 'hidden',
+            borderRight: '1px solid rgba(216,227,222,0.12)',
+            bgcolor: creatorColors.navigationBackground,
             transition: theme.transitions.create('width', {
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.enteringScreen,
             }),
-            overflowX: 'hidden',
           },
         }}
       >
         {drawerContent}
       </Drawer>
-
-      {/* Mobile Temporary Drawer */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -476,6 +465,7 @@ export const CreatorSidebar: React.FC<CreatorSidebarProps> = ({
           '& .MuiDrawer-paper': {
             width: drawerWidth,
             boxSizing: 'border-box',
+            bgcolor: creatorColors.navigationBackground,
           },
         }}
       >

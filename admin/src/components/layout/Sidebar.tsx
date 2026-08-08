@@ -70,41 +70,21 @@ export const navItems: NavItem[] = [
   { title: 'VIP', path: '/vip', icon: <WorkspacePremiumIcon /> },
   { title: 'Hosts', path: '/hosts', icon: <RecordVoiceOverIcon /> },
   { title: 'Rankings', path: '/rankings', icon: <LeaderboardIcon /> },
-  {
-    title: 'Tasks & Achievements',
-    path: '/tasks-achievements',
-    icon: <EmojiEventsIcon />,
-  },
+  { title: 'Tasks & Achievements', path: '/tasks-achievements', icon: <EmojiEventsIcon /> },
   { title: 'Store & Mall', path: '/store', icon: <ShoppingBagIcon /> },
   { title: 'Referral System', path: '/referrals', icon: <ShareIcon /> },
   { title: 'Reports', path: '/reports', icon: <ReportProblemIcon /> },
   { title: 'Moderation', path: '/moderation', icon: <GavelIcon /> },
   { title: 'Announcements', path: '/announcements', icon: <CampaignIcon /> },
-  {
-    title: 'Notifications',
-    path: '/notifications',
-    icon: <NotificationsIcon />,
-  },
+  { title: 'Notifications', path: '/notifications', icon: <NotificationsIcon /> },
   { title: 'Messaging', path: '/messaging', icon: <ChatIcon /> },
   { title: 'RTC Engine', path: '/rtc', icon: <SettingsInputComponentIcon /> },
   { title: 'CMS Pages', path: '/cms', icon: <ArticleIcon /> },
   { title: 'Feature Flags', path: '/feature-flags', icon: <FlagIcon /> },
-  {
-    title: 'Provider Configs',
-    path: '/provider-configs',
-    icon: <ExtensionIcon />,
-  },
+  { title: 'Provider Configs', path: '/provider-configs', icon: <ExtensionIcon /> },
   { title: 'Backup & DR', path: '/backups', icon: <BackupIcon /> },
-  {
-    title: 'Auth & Identity',
-    path: '/auth-management',
-    icon: <SecurityIcon />,
-  },
-  {
-    title: 'System Settings',
-    path: '/system-settings',
-    icon: <SettingsIcon />,
-  },
+  { title: 'Auth & Identity', path: '/auth-management', icon: <SecurityIcon /> },
+  { title: 'System Settings', path: '/system-settings', icon: <SettingsIcon /> },
   { title: 'App Versions', path: '/app-versions', icon: <SystemUpdateIcon /> },
   { title: 'Audit Logs', path: '/audit-logs', icon: <HistoryIcon /> },
   { title: 'Analytics', path: '/analytics', icon: <AssessmentIcon /> },
@@ -122,42 +102,17 @@ const navSections: NavSection[] = [
   { label: 'User Management', paths: ['/users', '/hosts', '/auth-management'] },
   {
     label: 'Economy',
-    paths: [
-      '/wallet',
-      '/gifts',
-      '/vip',
-      '/tasks-achievements',
-      '/rankings',
-      '/referrals',
-      '/store',
-    ],
+    paths: ['/wallet', '/gifts', '/vip', '/tasks-achievements', '/rankings', '/referrals', '/store'],
   },
   {
     label: 'Operations',
-    paths: [
-      '/reports',
-      '/moderation',
-      '/notifications',
-      '/messaging',
-      '/announcements',
-      '/rtc',
-      '/analytics',
-    ],
+    paths: ['/reports', '/moderation', '/notifications', '/messaging', '/announcements', '/rtc', '/analytics'],
   },
   {
     label: 'Platform',
-    paths: [
-      '/cms',
-      '/feature-flags',
-      '/provider-configs',
-      '/backups',
-      '/app-versions',
-    ],
+    paths: ['/cms', '/feature-flags', '/provider-configs', '/backups', '/app-versions'],
   },
-  {
-    label: 'System',
-    paths: ['/system-settings', '/audit-logs', '/support', '/profile'],
-  },
+  { label: 'System', paths: ['/system-settings', '/audit-logs', '/support', '/profile'] },
 ];
 
 const DRAWER_WIDTH = 272;
@@ -176,9 +131,7 @@ export const Sidebar: React.FC = () => {
   const sidebarCollapsed = useThemeStore((state) => state.sidebarCollapsed);
   const mobileSidebarOpen = useThemeStore((state) => state.mobileSidebarOpen);
   const toggleSidebar = useThemeStore((state) => state.toggleSidebar);
-  const setMobileSidebarOpen = useThemeStore(
-    (state) => state.setMobileSidebarOpen,
-  );
+  const setMobileSidebarOpen = useThemeStore((state) => state.setMobileSidebarOpen);
 
   const handleNavClick = (path: string) => {
     navigate(path);
@@ -258,25 +211,14 @@ export const Sidebar: React.FC = () => {
           />
         )}
         {!collapsed && item.badge && (
-          <Chip
-            label={item.badge}
-            size="small"
-            color="error"
-            sx={{ height: 20, minWidth: 22, fontSize: '0.66rem' }}
-          />
+          <Chip label={item.badge} size="small" color="error" sx={{ height: 20, minWidth: 22, fontSize: '0.66rem' }} />
         )}
       </ListItemButton>
     );
 
     return (
       <ListItem key={item.path} disablePadding>
-        {collapsed ? (
-          <Tooltip title={item.title} placement="right">
-            {button}
-          </Tooltip>
-        ) : (
-          button
-        )}
+        {collapsed ? <Tooltip title={item.title} placement="right">{button}</Tooltip> : button}
       </ListItem>
     );
   };
@@ -301,10 +243,7 @@ export const Sidebar: React.FC = () => {
           borderRight: '1px solid',
           borderColor: 'divider',
           overflowX: 'hidden',
-          boxShadow:
-            theme.palette.mode === 'dark'
-              ? '8px 0 32px rgba(0,0,0,0.12)'
-              : '8px 0 30px rgba(16,35,63,0.025)',
+          boxShadow: theme.palette.mode === 'dark' ? '8px 0 32px rgba(0,0,0,0.12)' : '8px 0 30px rgba(16,35,63,0.025)',
         },
       }}
     >
@@ -319,9 +258,7 @@ export const Sidebar: React.FC = () => {
           borderColor: 'divider',
         }}
       >
-        <Box
-          sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}
-        >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
           <Box
             component="img"
             src={getBrandAssetUrl('admin', 'logoMark')}
@@ -330,19 +267,10 @@ export const Sidebar: React.FC = () => {
           />
           {!collapsed && (
             <Box sx={{ minWidth: 0 }}>
-              <Typography
-                variant="subtitle1"
-                sx={{ fontWeight: 750, lineHeight: 1.2 }}
-                noWrap
-              >
+              <Typography variant="subtitle1" sx={{ fontWeight: 750, lineHeight: 1.2 }} noWrap>
                 {BRAND_CONFIG.identity.name}
               </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ lineHeight: 1.2 }}
-                noWrap
-              >
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }} noWrap>
                 {BRAND_CONFIG.products.admin.shortName}
               </Typography>
             </Box>
@@ -350,11 +278,7 @@ export const Sidebar: React.FC = () => {
         </Box>
         {!isMobile && !collapsed && (
           <Tooltip title="Collapse navigation">
-            <IconButton
-              size="small"
-              onClick={toggleSidebar}
-              aria-label="Collapse navigation"
-            >
+            <IconButton size="small" onClick={toggleSidebar} aria-label="Collapse navigation">
               <ChevronLeftIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -363,12 +287,8 @@ export const Sidebar: React.FC = () => {
 
       <Box sx={{ overflowY: 'auto', flexGrow: 1, py: 1.1 }}>
         {navSections.map((section, sectionIndex) => {
-          const sectionItems = section.paths
-            .map((path) => itemByPath.get(path))
-            .filter(Boolean) as NavItem[];
-          const permittedItems = sectionItems.filter(
-            (item) => !item.roles || hasRole(item.roles),
-          );
+          const sectionItems = section.paths.map((path) => itemByPath.get(path)).filter(Boolean) as NavItem[];
+          const permittedItems = sectionItems.filter((item) => !item.roles || hasRole(item.roles));
           if (permittedItems.length === 0) return null;
 
           return (
@@ -391,9 +311,7 @@ export const Sidebar: React.FC = () => {
                   {section.label}
                 </Typography>
               )}
-              {collapsed && sectionIndex > 0 && (
-                <Divider sx={{ mx: 2, my: 0.75 }} />
-              )}
+              {collapsed && sectionIndex > 0 && <Divider sx={{ mx: 2, my: 0.75 }} />}
               <List disablePadding>{permittedItems.map(renderItem)}</List>
             </Box>
           );
@@ -411,84 +329,39 @@ export const Sidebar: React.FC = () => {
               p: 1,
               borderRadius: 2.5,
               backgroundColor: (muiTheme) =>
-                muiTheme.palette.mode === 'dark'
-                  ? 'rgba(255,255,255,0.035)'
-                  : 'rgba(37,99,235,0.035)',
+                muiTheme.palette.mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(37,99,235,0.035)',
               border: '1px solid',
               borderColor: 'divider',
             }}
           >
-            <Avatar
-              src={user.avatarUrl}
-              sx={{
-                width: 34,
-                height: 34,
-                bgcolor: 'primary.main',
-                fontSize: '0.8rem',
-              }}
-            >
-              {(user.displayName || user.username || 'A')
-                .charAt(0)
-                .toUpperCase()}
+            <Avatar src={user.avatarUrl} sx={{ width: 34, height: 34, bgcolor: 'primary.main', fontSize: '0.8rem' }}>
+              {(user.displayName || user.username || 'A').charAt(0).toUpperCase()}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="subtitle2" noWrap>
                 {user.displayName || user.username}
               </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                noWrap
-                sx={{ display: 'block', fontSize: '0.66rem' }}
-              >
+              <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.66rem' }}>
                 {user.role.replaceAll('_', ' ')}
               </Typography>
             </Box>
             <Tooltip title="Sign out">
-              <IconButton
-                size="small"
-                onClick={handleLogout}
-                aria-label="Sign out"
-              >
+              <IconButton size="small" onClick={handleLogout} aria-label="Sign out">
                 <LogoutIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Box>
         ) : (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 0.75,
-            }}
-          >
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
             {user && (
-              <Tooltip
-                title={user.displayName || user.username}
-                placement="right"
-              >
-                <Avatar
-                  src={user.avatarUrl}
-                  sx={{
-                    width: 34,
-                    height: 34,
-                    bgcolor: 'primary.main',
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  {(user.displayName || user.username || 'A')
-                    .charAt(0)
-                    .toUpperCase()}
+              <Tooltip title={user.displayName || user.username} placement="right">
+                <Avatar src={user.avatarUrl} sx={{ width: 34, height: 34, bgcolor: 'primary.main', fontSize: '0.8rem' }}>
+                  {(user.displayName || user.username || 'A').charAt(0).toUpperCase()}
                 </Avatar>
               </Tooltip>
             )}
             <Tooltip title="Sign out" placement="right">
-              <IconButton
-                size="small"
-                onClick={handleLogout}
-                aria-label="Sign out"
-              >
+              <IconButton size="small" onClick={handleLogout} aria-label="Sign out">
                 <LogoutIcon fontSize="small" />
               </IconButton>
             </Tooltip>
@@ -496,12 +369,7 @@ export const Sidebar: React.FC = () => {
         )}
         {!isMobile && collapsed && (
           <Tooltip title="Expand navigation" placement="right">
-            <IconButton
-              size="small"
-              onClick={toggleSidebar}
-              aria-label="Expand navigation"
-              sx={{ mt: 0.75 }}
-            >
+            <IconButton size="small" onClick={toggleSidebar} aria-label="Expand navigation" sx={{ mt: 0.75 }}>
               <ChevronRightIcon fontSize="small" />
             </IconButton>
           </Tooltip>

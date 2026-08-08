@@ -22,11 +22,7 @@ interface StatusBadgeProps {
   size?: ChipProps['size'];
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({
-  status,
-  label,
-  size = 'small',
-}) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, size = 'small' }) => {
   const theme = useTheme();
   const normalized = String(status).toLowerCase();
   const displayLabel = label || String(status).replaceAll('_', ' ');
@@ -72,10 +68,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       semantic = 'info';
   }
 
-  const paletteColor =
-    semantic === 'default'
-      ? theme.palette.text.secondary
-      : theme.palette[semantic].main;
+  const paletteColor = semantic === 'default' ? theme.palette.text.secondary : theme.palette[semantic].main;
 
   return (
     <Chip
@@ -86,10 +79,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         textTransform: 'capitalize',
         color: paletteColor,
         borderColor: alpha(paletteColor, 0.22),
-        backgroundColor: alpha(
-          paletteColor,
-          theme.palette.mode === 'dark' ? 0.13 : 0.075,
-        ),
+        backgroundColor: alpha(paletteColor, theme.palette.mode === 'dark' ? 0.13 : 0.075),
         '&::before': {
           content: '""',
           width: 6,

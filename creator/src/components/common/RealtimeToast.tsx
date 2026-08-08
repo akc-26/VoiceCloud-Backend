@@ -9,6 +9,7 @@ import {
   Snackbar,
   Alert,
   AlertColor,
+  useTheme,
   Box,
   Typography,
   Slide,
@@ -51,6 +52,7 @@ function SlideTransition(props: SlideProps) {
 export const RealtimeToastProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const theme = useTheme();
   const [queue, setQueue] = useState<ToastMessage[]>([]);
   const [currentToast, setCurrentToast] = useState<ToastMessage | null>(null);
   const [open, setOpen] = useState(false);
@@ -89,19 +91,19 @@ export const RealtimeToastProvider: React.FC<{ children: React.ReactNode }> = ({
   const renderIcon = (type?: ToastMessage['iconType']) => {
     switch (type) {
       case 'gift':
-        return <Gift size={20} color="#ec4899" />;
+        return <Gift size={20} color={theme.palette.secondary.light} />;
       case 'follower':
-        return <UserPlus size={20} color="#3b82f6" />;
+        return <UserPlus size={20} color={theme.palette.info.main} />;
       case 'subscriber':
-        return <Star size={20} color="#eab308" />;
+        return <Star size={20} color={theme.palette.warning.main} />;
       case 'room':
-        return <Radio size={20} color="#8b5cf6" />;
+        return <Radio size={20} color={theme.palette.primary.main} />;
       case 'wallet':
-        return <Wallet size={20} color="#10b981" />;
+        return <Wallet size={20} color={theme.palette.success.main} />;
       case 'notification':
-        return <Bell size={20} color="#f97316" />;
+        return <Bell size={20} color={theme.palette.warning.main} />;
       default:
-        return <Sparkles size={20} color="#8b5cf6" />;
+        return <Sparkles size={20} color={theme.palette.primary.main} />;
     }
   };
 

@@ -29,9 +29,7 @@ export const ProfilePage: React.FC = () => {
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [handle, setHandle] = useState(profile.handle);
   const [bio, setBio] = useState(profile.bio);
-  const [category, setCategory] = useState(
-    profile.category || 'Podcast & Audio Lounge',
-  );
+  const [category, setCategory] = useState(profile.category || 'Creator');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
@@ -58,7 +56,7 @@ export const ProfilePage: React.FC = () => {
       });
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
-      queryClient.invalidateQueries({ queryKey: ['creator', 'profile'] });
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'profile'] });
     },
     onError: () => {
       // Fallback local state save if backend offline
@@ -139,10 +137,7 @@ export const ProfilePage: React.FC = () => {
 
               <Stack spacing={1} sx={{ textAlign: 'left' }}>
                 <Typography variant="caption" color="text.secondary">
-                  Category:{' '}
-                  <strong>
-                    {profile.category || 'Podcast & Audio Lounge'}
-                  </strong>
+                  Category: <strong>{profile.category || 'Creator'}</strong>
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Creator Tier: <strong>{profile.tier}</strong>

@@ -28,9 +28,7 @@ export const Header: React.FC = () => {
   const navigate = useNavigate();
 
   const toggleSidebar = useThemeStore((state) => state.toggleSidebar);
-  const toggleMobileSidebar = useThemeStore(
-    (state) => state.toggleMobileSidebar,
-  );
+  const toggleMobileSidebar = useThemeStore((state) => state.toggleMobileSidebar);
   const mode = useThemeStore((state) => state.mode);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
 
@@ -44,21 +42,15 @@ export const Header: React.FC = () => {
       elevation={0}
       sx={{
         backgroundColor: (muiTheme) =>
-          muiTheme.palette.mode === 'dark'
-            ? 'rgba(18, 35, 58, 0.92)'
-            : 'rgba(255, 255, 255, 0.92)',
+          muiTheme.palette.mode === 'dark' ? 'rgba(18, 35, 58, 0.92)' : 'rgba(255, 255, 255, 0.92)',
         backdropFilter: 'blur(14px)',
         borderBottom: '1px solid',
         borderColor: 'divider',
         zIndex: (muiTheme) => muiTheme.zIndex.drawer - 1,
       }}
     >
-      <Toolbar
-        sx={{ minHeight: '68px !important', px: { xs: 1.5, sm: 2.5, lg: 3 } }}
-      >
-        <Box
-          sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}
-        >
+      <Toolbar sx={{ minHeight: '68px !important', px: { xs: 1.5, sm: 2.5, lg: 3 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
           <Tooltip title={isMobile ? 'Open navigation' : 'Toggle navigation'}>
             <IconButton
               edge="start"
@@ -69,18 +61,10 @@ export const Header: React.FC = () => {
             </IconButton>
           </Tooltip>
           <Box sx={{ minWidth: 0 }}>
-            <Typography
-              variant="subtitle1"
-              sx={{ fontWeight: 700, lineHeight: 1.25 }}
-              noWrap
-            >
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.25 }} noWrap>
               {pageTitle}
             </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: { xs: 'none', sm: 'block' }, lineHeight: 1.2 }}
-            >
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' }, lineHeight: 1.2 }}>
               {BRAND_CONFIG.products.admin.workspaceLabel}
             </Typography>
           </Box>
@@ -89,28 +73,14 @@ export const Header: React.FC = () => {
         <Box sx={{ flexGrow: 1 }} />
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Tooltip
-            title={mode === 'dark' ? 'Use light theme' : 'Use dark theme'}
-          >
-            <IconButton
-              onClick={toggleTheme}
-              aria-label={
-                mode === 'dark' ? 'Use light theme' : 'Use dark theme'
-              }
-            >
-              {mode === 'dark' ? (
-                <LightModeIcon fontSize="small" />
-              ) : (
-                <DarkModeIcon fontSize="small" />
-              )}
+          <Tooltip title={mode === 'dark' ? 'Use light theme' : 'Use dark theme'}>
+            <IconButton onClick={toggleTheme} aria-label={mode === 'dark' ? 'Use light theme' : 'Use dark theme'}>
+              {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
             </IconButton>
           </Tooltip>
 
           <Tooltip title="Notification delivery console">
-            <IconButton
-              onClick={() => navigate('/notifications')}
-              aria-label="Open notification delivery console"
-            >
+            <IconButton onClick={() => navigate('/notifications')} aria-label="Open notification delivery console">
               <NotificationsNoneOutlinedIcon fontSize="small" />
             </IconButton>
           </Tooltip>

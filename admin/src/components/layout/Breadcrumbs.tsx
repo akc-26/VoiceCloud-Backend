@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  Box,
-  Breadcrumbs as MuiBreadcrumbs,
-  Link,
-  Typography,
-} from '@mui/material';
+import { Box, Breadcrumbs as MuiBreadcrumbs, Link, Typography } from '@mui/material';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
@@ -18,9 +13,7 @@ export const Breadcrumbs: React.FC = () => {
   return (
     <Box sx={{ minHeight: 26, display: 'flex', alignItems: 'center' }}>
       <MuiBreadcrumbs
-        separator={
-          <NavigateNextIcon sx={{ color: 'text.secondary', fontSize: 14 }} />
-        }
+        separator={<NavigateNextIcon sx={{ color: 'text.secondary', fontSize: 14 }} />}
         aria-label="breadcrumb"
       >
         <Link
@@ -28,12 +21,7 @@ export const Breadcrumbs: React.FC = () => {
           to="/dashboard"
           underline="hover"
           color="text.secondary"
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            fontSize: '0.72rem',
-            fontWeight: 500,
-          }}
+          sx={{ display: 'flex', alignItems: 'center', fontSize: '0.72rem', fontWeight: 500 }}
         >
           <HomeOutlinedIcon sx={{ mr: 0.5, fontSize: 15 }} />
           Dashboard
@@ -47,12 +35,7 @@ export const Breadcrumbs: React.FC = () => {
             .join(' ');
 
           return isLast ? (
-            <Typography
-              key={routeTo}
-              variant="caption"
-              color="text.primary"
-              sx={{ fontWeight: 600 }}
-            >
+            <Typography key={routeTo} variant="caption" color="text.primary" sx={{ fontWeight: 600 }}>
               {formattedName}
             </Typography>
           ) : (

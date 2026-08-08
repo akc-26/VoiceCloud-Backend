@@ -429,8 +429,8 @@ export const HostVerificationPage: React.FC = () => {
             gap: 1.5,
           }}
         >
-          <BadgeCheck size={32} color="#2563eb" /> Host Verification & Creator
-          Program
+          <BadgeCheck size={32} color={BRAND_CONFIG.colors.creator.info} /> Host
+          Verification & Creator Program
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Become an officially verified {BRAND_CONFIG.identity.name} host,
@@ -565,8 +565,11 @@ export const HostVerificationPage: React.FC = () => {
                     gap: 1,
                   }}
                 >
-                  <Award size={22} color="#d97706" /> Verified Host Profile
-                  Information
+                  <Award
+                    size={22}
+                    color={BRAND_CONFIG.colors.creator.warning}
+                  />{' '}
+                  Verified Host Profile Information
                 </Typography>
 
                 <Stack spacing={2}>
@@ -596,7 +599,12 @@ export const HostVerificationPage: React.FC = () => {
                           size="small"
                         />
                         <Chip
-                          icon={<Star size={14} color="#eab308" />}
+                          icon={
+                            <Star
+                              size={14}
+                              color={BRAND_CONFIG.colors.creator.warning}
+                            />
+                          }
                           label={`Rating ⭐ ${hostProfile?.hostRating !== undefined && hostProfile?.hostRating !== null && Number(hostProfile.hostRating) > 0 ? Number(hostProfile.hostRating).toFixed(1) : 'N/A'}`}
                           size="small"
                         />
@@ -694,8 +702,11 @@ export const HostVerificationPage: React.FC = () => {
                     gap: 1,
                   }}
                 >
-                  <UserCheck size={22} color="#2563eb" /> Host Identity
-                  Application Form
+                  <UserCheck
+                    size={22}
+                    color={BRAND_CONFIG.colors.creator.info}
+                  />{' '}
+                  Host Identity Application Form
                 </Typography>
                 <Typography
                   variant="body2"
@@ -1194,8 +1205,11 @@ export const HostVerificationPage: React.FC = () => {
                     gap: 1,
                   }}
                 >
-                  <Sparkles size={20} color="#7c3aed" /> Eligibility
-                  Requirements
+                  <Sparkles
+                    size={20}
+                    color={BRAND_CONFIG.colors.creator.primary}
+                  />{' '}
+                  Eligibility Requirements
                 </Typography>
 
                 <Stack spacing={1.5}>
@@ -1210,7 +1224,10 @@ export const HostVerificationPage: React.FC = () => {
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Users size={18} color="#2563eb" />
+                      <Users
+                        size={18}
+                        color={BRAND_CONFIG.colors.creator.info}
+                      />
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           Active Followers
@@ -1245,7 +1262,10 @@ export const HostVerificationPage: React.FC = () => {
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Radio size={18} color="#dc2626" />
+                      <Radio
+                        size={18}
+                        color={BRAND_CONFIG.colors.creator.error}
+                      />
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           Broadcasting Experience
@@ -1281,7 +1301,10 @@ export const HostVerificationPage: React.FC = () => {
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <ShieldCheck size={18} color="#16a34a" />
+                      <ShieldCheck
+                        size={18}
+                        color={BRAND_CONFIG.colors.creator.success}
+                      />
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           Community Standing
@@ -1331,8 +1354,11 @@ export const HostVerificationPage: React.FC = () => {
                     gap: 1,
                   }}
                 >
-                  <Award size={20} color="#d97706" /> Host Levels & Creator
-                  Perks
+                  <Award
+                    size={20}
+                    color={BRAND_CONFIG.colors.creator.warning}
+                  />{' '}
+                  Host Levels & Creator Perks
                 </Typography>
 
                 <Stack spacing={1.5}>
@@ -1363,7 +1389,10 @@ export const HostVerificationPage: React.FC = () => {
                   <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
                     <Typography
                       variant="subtitle2"
-                      sx={{ fontWeight: 700, color: '#d97706' }}
+                      sx={{
+                        fontWeight: 700,
+                        color: BRAND_CONFIG.colors.creator.warning,
+                      }}
                     >
                       Level 2: Elite Host (5,000 XP)
                     </Typography>
@@ -1380,7 +1409,10 @@ export const HostVerificationPage: React.FC = () => {
                   <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
                     <Typography
                       variant="subtitle2"
-                      sx={{ fontWeight: 700, color: '#7c3aed' }}
+                      sx={{
+                        fontWeight: 700,
+                        color: BRAND_CONFIG.colors.creator.primary,
+                      }}
                     >
                       Level 3: Premium Host (15,000 XP)
                     </Typography>

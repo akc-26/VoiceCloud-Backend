@@ -19,6 +19,7 @@ import {
   CircularProgress,
   Badge,
   Tooltip,
+  useTheme,
 } from '@mui/material';
 import {
   Radio,
@@ -43,6 +44,7 @@ import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { LiveRoomSummary } from '../types/creator.types';
 
 export const LiveRoomsPage: React.FC = () => {
+  const theme = useTheme();
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeStageRoom, setActiveStageRoom] =
@@ -63,7 +65,7 @@ export const LiveRoomsPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: Partial<LiveRoomSummary>) => creatorApi.createRoom(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
       setIsCreateOpen(false);
       setNewTitle('');
     },
@@ -72,35 +74,35 @@ export const LiveRoomsPage: React.FC = () => {
   const startMutation = useMutation({
     mutationFn: (id: string) => creatorApi.startRoom(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
   });
 
   const pauseMutation = useMutation({
     mutationFn: (id: string) => creatorApi.pauseRoom(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
   });
 
   const resumeMutation = useMutation({
     mutationFn: (id: string) => creatorApi.resumeRoom(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
   });
 
   const endMutation = useMutation({
     mutationFn: (id: string) => creatorApi.endRoom(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => creatorApi.deleteRoom(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
   });
 
@@ -109,7 +111,7 @@ export const LiveRoomsPage: React.FC = () => {
       creatorApi.inviteSpeaker(roomId, userId),
     onSuccess: () => {
       setInviteUserId('');
-      queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
   });
 
@@ -141,7 +143,9 @@ export const LiveRoomsPage: React.FC = () => {
           roomsQuery.error?.message ||
           'Failed to fetch live audio rooms from backend.'
         }
-        onRetry={() => roomsQuery.refetch()}
+        onRetry={() => {
+          void roomsQuery.refetch();
+        }}
       />
     );
   }
@@ -203,6 +207,10 @@ export const LiveRoomsPage: React.FC = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
+                    borderColor: isLive ? 'primary.main' : 'divider',
+                    boxShadow: isLive
+                      ? '0 14px 34px rgba(34,197,94,0.12)'
+                      : undefined,
                   }}
                 >
                   <CardContent sx={{ p: 3 }}>
@@ -215,7 +223,9 @@ export const LiveRoomsPage: React.FC = () => {
                       }}
                     >
                       <Chip
-                        icon={<Radio size={14} color="#7c3aed" />}
+                        icon={
+                          <Radio size={14} color={theme.palette.primary.main} />
+                        }
                         label={room.category || 'Audio Lounge'}
                         color="primary"
                         variant="outlined"
@@ -387,7 +397,7 @@ export const LiveRoomsPage: React.FC = () => {
             gap: 1,
           }}
         >
-          <Shield size={20} color="#7c3aed" />
+          <Shield size={20} color={theme.palette.primary.main} />
           Speaker Stage & Host Controls - {activeStageRoom?.title}
         </DialogTitle>
         <DialogContent dividers>
@@ -437,7 +447,7 @@ export const LiveRoomsPage: React.FC = () => {
                     borderRadius: 1,
                     display: 'flex',
                     alignItems: 'center',
-                    justify: 'space-between',
+                    justifyContent: 'space-between',
                   }}
                 >
                   <Stack
@@ -445,7 +455,7 @@ export const LiveRoomsPage: React.FC = () => {
                     spacing={1}
                     sx={{ alignItems: 'center' }}
                   >
-                    <UserCheck size={16} color="#10b981" />
+                    <UserCheck size={16} color={theme.palette.success.main} />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       Host (You)
                     </Typography>

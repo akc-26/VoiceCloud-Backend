@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-  Box,
-  Pagination as MuiPagination,
-  TablePagination,
-} from '@mui/material';
+import { Box, Pagination as MuiPagination, TablePagination } from '@mui/material';
 
 interface PaginationProps {
   page: number;
@@ -51,21 +47,13 @@ export const Pagination: React.FC<PaginationProps> = ({
           page={page - 1}
           onPageChange={(_, nextPage) => onPageChange(nextPage + 1)}
           rowsPerPage={limit}
-          onRowsPerPageChange={(event) =>
-            onLimitChange(Number.parseInt(event.target.value, 10))
-          }
+          onRowsPerPageChange={(event) => onLimitChange(Number.parseInt(event.target.value, 10))}
           rowsPerPageOptions={rowsPerPageOptions}
           sx={{
             border: 0,
             '& .MuiTablePagination-toolbar': { minHeight: 36, p: 0 },
-            '& .MuiTablePagination-displayedRows': {
-              fontSize: '0.75rem',
-              color: 'text.secondary',
-            },
-            '& .MuiTablePagination-selectLabel': {
-              fontSize: '0.75rem',
-              color: 'text.secondary',
-            },
+            '& .MuiTablePagination-displayedRows': { fontSize: '0.75rem', color: 'text.secondary' },
+            '& .MuiTablePagination-selectLabel': { fontSize: '0.75rem', color: 'text.secondary' },
           }}
         />
       )}

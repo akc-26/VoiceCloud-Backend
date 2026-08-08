@@ -55,9 +55,7 @@ export const UserDropdown: React.FC = () => {
       <Box
         component="button"
         type="button"
-        onClick={(event: React.MouseEvent<HTMLButtonElement>) =>
-          setAnchorEl(event.currentTarget)
-        }
+        onClick={(event: React.MouseEvent<HTMLButtonElement>) => setAnchorEl(event.currentTarget)}
         aria-haspopup="menu"
         aria-expanded={open ? 'true' : undefined}
         sx={{
@@ -74,45 +72,18 @@ export const UserDropdown: React.FC = () => {
           '&:hover': { backgroundColor: 'action.hover' },
         }}
       >
-        <Avatar
-          src={user.avatarUrl}
-          alt={displayName}
-          sx={{
-            width: 34,
-            height: 34,
-            bgcolor: 'primary.main',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-          }}
-        >
+        <Avatar src={user.avatarUrl} alt={displayName} sx={{ width: 34, height: 34, bgcolor: 'primary.main', fontSize: '0.75rem', fontWeight: 700 }}>
           {initials || 'A'}
         </Avatar>
-        <Box
-          sx={{
-            display: { xs: 'none', lg: 'block' },
-            textAlign: 'left',
-            maxWidth: 140,
-          }}
-        >
+        <Box sx={{ display: { xs: 'none', lg: 'block' }, textAlign: 'left', maxWidth: 140 }}>
           <Typography variant="subtitle2" noWrap sx={{ lineHeight: 1.2 }}>
             {displayName}
           </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            noWrap
-            sx={{ display: 'block', lineHeight: 1.2, mt: 0.25 }}
-          >
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', lineHeight: 1.2, mt: 0.25 }}>
             {user.role.replaceAll('_', ' ')}
           </Typography>
         </Box>
-        <ExpandMoreIcon
-          sx={{
-            display: { xs: 'none', lg: 'block' },
-            fontSize: 17,
-            color: 'text.secondary',
-          }}
-        />
+        <ExpandMoreIcon sx={{ display: { xs: 'none', lg: 'block' }, fontSize: 17, color: 'text.secondary' }} />
       </Box>
 
       <Menu
@@ -127,45 +98,27 @@ export const UserDropdown: React.FC = () => {
           <Typography variant="subtitle2" noWrap>
             {displayName}
           </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            noWrap
-            sx={{ display: 'block', mt: 0.35 }}
-          >
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mt: 0.35 }}>
             {user.email}
           </Typography>
-          <Chip
-            label={user.role.replaceAll('_', ' ')}
-            size="small"
-            color="primary"
-            sx={{ mt: 1 }}
-          />
+          <Chip label={user.role.replaceAll('_', ' ')} size="small" color="primary" sx={{ mt: 1 }} />
         </Box>
         <Divider sx={{ my: 0.75 }} />
         <MenuItem onClick={() => handleNavigate('/profile')}>
-          <ListItemIcon>
-            <PersonOutlinedIcon fontSize="small" />
-          </ListItemIcon>
+          <ListItemIcon><PersonOutlinedIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="My Profile" />
         </MenuItem>
         <MenuItem onClick={() => handleNavigate('/system-settings')}>
-          <ListItemIcon>
-            <SettingsOutlinedIcon fontSize="small" />
-          </ListItemIcon>
+          <ListItemIcon><SettingsOutlinedIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="System Settings" />
         </MenuItem>
         <MenuItem onClick={() => handleNavigate('/audit-logs')}>
-          <ListItemIcon>
-            <SecurityOutlinedIcon fontSize="small" />
-          </ListItemIcon>
+          <ListItemIcon><SecurityOutlinedIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Audit Logs" />
         </MenuItem>
         <Divider sx={{ my: 0.75 }} />
         <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-          <ListItemIcon>
-            <LogoutOutlinedIcon fontSize="small" color="error" />
-          </ListItemIcon>
+          <ListItemIcon><LogoutOutlinedIcon fontSize="small" color="error" /></ListItemIcon>
           <ListItemText primary="Sign out" />
         </MenuItem>
       </Menu>

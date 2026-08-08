@@ -12,13 +12,7 @@ export const MainLayout: React.FC = () => {
   const removeToast = useNotificationsStore((state) => state.removeToast);
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        minHeight: '100vh',
-        backgroundColor: 'background.default',
-      }}
-    >
+    <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: 'background.default' }}>
       <Sidebar />
       <Box
         component="main"

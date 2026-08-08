@@ -1,3 +1,4 @@
+import { BRAND_CONFIG } from '@shared/branding';
 import React, { useState } from 'react';
 import {
   Box,
@@ -66,8 +67,8 @@ export const SubscribersPage: React.FC = () => {
           'Failed to fetch subscription data.'
         }
         onRetry={() => {
-          plansQuery.refetch();
-          subscribersQuery.refetch();
+          void plansQuery.refetch();
+          void subscribersQuery.refetch();
         }}
       />
     );
@@ -172,7 +173,11 @@ export const SubscribersPage: React.FC = () => {
                         color="text.secondary"
                         sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                       >
-                        <Check size={16} color="#10b981" /> {perk}
+                        <Check
+                          size={16}
+                          color={BRAND_CONFIG.colors.creator.success}
+                        />{' '}
+                        {perk}
                       </Typography>
                     ))}
                   </Stack>

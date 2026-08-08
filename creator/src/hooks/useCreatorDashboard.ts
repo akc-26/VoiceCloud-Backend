@@ -51,30 +51,26 @@ export function useCreatorProfile() {
   useEffect(() => {
     if (query.data) {
       setProfile({
-        id: query.data.id || 'creator-studio-001',
-        userId: query.data.id || 'user-vc-creator-001',
+        id: query.data.id || '',
+        userId: query.data.id || '',
         displayName:
           query.data.displayName ||
           BRAND_CONFIG.defaults.officialCreatorDisplayName,
         handle: query.data.username
           ? `@${query.data.username}`
           : BRAND_CONFIG.defaults.officialCreatorHandle,
-        avatarUrl:
-          query.data.avatarUrl ||
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
-        coverUrl:
-          query.data.coverUrl ||
-          'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80',
+        avatarUrl: query.data.avatarUrl || '',
+        coverUrl: query.data.coverUrl || '',
         bio: query.data.bio || BRAND_CONFIG.defaults.officialCreatorBio,
-        verified: query.data.isVerified ?? true,
-        tier: (query.data.creatorTier as any) || 'Elite',
-        followersCount: query.data.followersCount ?? 14250,
-        subscribersCount: query.data.subscribersCount ?? 840,
-        totalEarningsDiamonds: query.data.walletDiamonds ?? 458900,
-        walletCoins: query.data.walletCoins ?? 12500,
-        walletDiamonds: query.data.walletDiamonds ?? 84300,
-        joinedAt: query.data.joinedAt || '2025-01-15T00:00:00Z',
-        category: 'Podcast & Audio Lounge',
+        verified: query.data.isVerified ?? false,
+        tier: (query.data.creatorTier as any) || 'Standard',
+        followersCount: query.data.followersCount ?? 0,
+        subscribersCount: query.data.subscribersCount ?? 0,
+        totalEarningsDiamonds: query.data.walletDiamonds ?? 0,
+        walletCoins: query.data.walletCoins ?? 0,
+        walletDiamonds: query.data.walletDiamonds ?? 0,
+        joinedAt: query.data.joinedAt || '',
+        category: 'Creator',
       });
     }
   }, [query.data, setProfile]);
@@ -155,13 +151,13 @@ export function useCreatorRecentActivity() {
         items.push({
           id: `sub-${sub.id}`,
           title: `New Subscriber: ${sub.subscriber?.displayName || sub.subscriber?.username || 'Supporter'}`,
-          subtitle: `Subscribed to ${sub.plan?.title || 'VIP Supporter Plan'}`,
+          subtitle: `Subscribed to ${sub.plan?.title || 'subscription plan'}`,
           value: sub.plan?.monthlyPrice
             ? `+${sub.plan.monthlyPrice} Coins`
-            : '+500 Coins',
+            : 'Subscription',
           time: formatRelativeTime(sub.startedAt),
           type: 'subscription',
-          color: '#6366f1',
+          color: BRAND_CONFIG.colors.creator.primary,
           timestamp: sub.startedAt,
         });
       });
@@ -174,13 +170,16 @@ export function useCreatorRecentActivity() {
           id: `payout-${payout.id}`,
           title: `Payout Request: ${payout.status}`,
           subtitle: `Method: ${payout.payoutMethod}`,
-          value: `$${payout.payoutAmount || payout.diamondAmount / 100} USD`,
+          value:
+            payout.payoutAmount !== undefined && payout.payoutAmount !== null
+              ? `$${Number(payout.payoutAmount).toFixed(2)} USD`
+              : 'Payout request',
           time: formatRelativeTime(payout.createdAt),
           type: 'payout',
           color:
             payout.status === 'PROCESSED' || payout.status === 'APPROVED'
-              ? '#10b981'
-              : '#f59e0b',
+              ? BRAND_CONFIG.colors.creator.success
+              : BRAND_CONFIG.colors.creator.warning,
           timestamp: payout.createdAt,
         });
       });
@@ -200,7 +199,7 @@ export function useCreatorRecentActivity() {
     isError: false, // Isolated: activity stream won't crash page or block widgets
     error: null,
     refetch: () => {
-      dashboardQuery.refetch();
+      void dashboardQuery.refetch();
     },
   };
 }

@@ -9,10 +9,7 @@ export interface ToastNotification {
 interface NotificationsState {
   toasts: ToastNotification[];
   unreadCount: number;
-  addToast: (
-    type: 'success' | 'error' | 'warning' | 'info',
-    message: string,
-  ) => void;
+  addToast: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
   removeToast: (id: string) => void;
   setUnreadCount: (count: number) => void;
 }

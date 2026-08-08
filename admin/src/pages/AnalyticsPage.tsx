@@ -1,11 +1,7 @@
 import React from 'react';
 import { Box, Typography, Grid } from '@mui/material';
 
-import {
-  AnalyticsAreaChart,
-  AnalyticsBarChart,
-  AnalyticsPieChart,
-} from '../components/common/Charts';
+import { AnalyticsAreaChart, AnalyticsBarChart, AnalyticsPieChart } from '../components/common/Charts';
 
 export const AnalyticsPage: React.FC = () => {
   const dauData = [
@@ -28,13 +24,8 @@ export const AnalyticsPage: React.FC = () => {
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          Platform Analytics & Intelligence
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Deep dive into daily active users (DAU), voice room retention, gift
-          monetization metrics, and user engagement
-        </Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800 }}>Platform Analytics & Intelligence</Typography>
+        <Typography variant="body2" color="text.secondary">Deep dive into daily active users (DAU), voice room retention, gift monetization metrics, and user engagement</Typography>
       </Box>
 
       <Grid container spacing={3}>

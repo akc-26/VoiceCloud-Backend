@@ -29,10 +29,7 @@ import PollOutlinedIcon from '@mui/icons-material/PollOutlined';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
-import {
-  StatisticsCards,
-  StatItem,
-} from '../components/common/StatisticsCards';
+import { StatisticsCards, StatItem } from '../components/common/StatisticsCards';
 import { ErrorState } from '../components/common/ErrorState';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { adminService } from '../services/admin.service';
@@ -53,11 +50,7 @@ interface DashboardStats {
   infrastructure: {
     database: { status: string; driver: string };
     redis: { status: string };
-    rtcSessions: {
-      active: number;
-      capacityLimit: number;
-      averageQualityScore: number;
-    };
+    rtcSessions: { active: number; capacityLimit: number; averageQualityScore: number };
     storage: { provider: string; usageMb: number };
   };
   timestamp: string;
@@ -78,9 +71,7 @@ export const DashboardPage: React.FC = () => {
       const data = await adminService.getDashboardStats();
       setStatsData(data as DashboardStats);
     } catch (requestError: any) {
-      setError(
-        requestError?.message || 'The dashboard metrics could not be loaded.',
-      );
+      setError(requestError?.message || 'The dashboard metrics could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -156,11 +147,8 @@ export const DashboardPage: React.FC = () => {
 
   const rtcCapacity = statsData?.infrastructure.rtcSessions.capacityLimit || 0;
   const rtcActive = statsData?.infrastructure.rtcSessions.active || 0;
-  const rtcLoad =
-    rtcCapacity > 0 ? Math.min(100, (rtcActive / rtcCapacity) * 100) : 0;
-  const lastUpdated = statsData?.timestamp
-    ? new Date(statsData.timestamp).toLocaleString()
-    : null;
+  const rtcLoad = rtcCapacity > 0 ? Math.min(100, (rtcActive / rtcCapacity) * 100) : 0;
+  const lastUpdated = statsData?.timestamp ? new Date(statsData.timestamp).toLocaleString() : null;
 
   return (
     <Box>
@@ -177,15 +165,10 @@ export const DashboardPage: React.FC = () => {
         <Box>
           <Typography variant="h4">Dashboard Overview</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
-            Real-time overview of the existing VoiceCloud platform and
-            infrastructure.
+            Real-time overview of the existing VoiceCloud platform and infrastructure.
           </Typography>
           {lastUpdated && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mt: 0.5 }}
-            >
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
               Last updated {lastUpdated}
             </Typography>
           )}
@@ -201,30 +184,14 @@ export const DashboardPage: React.FC = () => {
       </Box>
 
       {error && !statsData ? (
-        <ErrorState
-          title="Dashboard unavailable"
-          message={error}
-          onRetry={fetchDashboardStats}
-        />
+        <ErrorState title="Dashboard unavailable" message={error} onRetry={fetchDashboardStats} />
       ) : (
         <>
           <Box sx={{ mb: 2 }}>
             {loading && !statsData ? (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: {
-                    xs: '1fr',
-                    sm: 'repeat(2, 1fr)',
-                    md: 'repeat(4, 1fr)',
-                  },
-                  gap: 1.5,
-                }}
-              >
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
                 {Array.from({ length: 8 }).map((_, index) => (
-                  <Card key={index} sx={{ minHeight: 126 }}>
-                    <CardContent />
-                  </Card>
+                  <Card key={index} sx={{ minHeight: 126 }}><CardContent /></Card>
                 ))}
               </Box>
             ) : (
@@ -237,22 +204,10 @@ export const DashboardPage: React.FC = () => {
               <Grid size={{ xs: 12, lg: 5 }}>
                 <Card sx={{ height: '100%' }}>
                   <CardContent>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        mb: 1.75,
-                      }}
-                    >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.75 }}>
                       <Box>
-                        <Typography variant="subtitle1">
-                          System Health
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Current infrastructure status reported by the
-                          platform.
-                        </Typography>
+                        <Typography variant="subtitle1">System Health</Typography>
+                        <Typography variant="caption" color="text.secondary">Current infrastructure status reported by the platform.</Typography>
                       </Box>
                       <Box
                         sx={{
@@ -261,10 +216,7 @@ export const DashboardPage: React.FC = () => {
                           display: 'grid',
                           placeItems: 'center',
                           borderRadius: 2.25,
-                          bgcolor: alpha(
-                            theme.palette.primary.main,
-                            theme.palette.mode === 'dark' ? 0.14 : 0.07,
-                          ),
+                          bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.14 : 0.07),
                           color: 'primary.main',
                         }}
                       >
@@ -305,69 +257,25 @@ export const DashboardPage: React.FC = () => {
               <Grid size={{ xs: 12, lg: 4 }}>
                 <Card sx={{ height: '100%' }}>
                   <CardContent>
-                    <Typography variant="subtitle1">
-                      Realtime Capacity
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Current RTC utilization from the platform response.
-                    </Typography>
+                    <Typography variant="subtitle1">Realtime Capacity</Typography>
+                    <Typography variant="caption" color="text.secondary">Current RTC utilization from the platform response.</Typography>
                     <Box sx={{ mt: 2.4 }}>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          gap: 2,
-                          mb: 0.75,
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          Active sessions
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: 700,
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {formatNumber(rtcActive)} /{' '}
-                          {formatNumber(rtcCapacity)}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 0.75 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>Active sessions</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                          {formatNumber(rtcActive)} / {formatNumber(rtcCapacity)}
                         </Typography>
                       </Box>
                       <LinearProgress
                         variant="determinate"
                         value={rtcLoad}
-                        sx={{
-                          height: 8,
-                          borderRadius: 999,
-                          bgcolor: 'action.hover',
-                          '& .MuiLinearProgress-bar': { borderRadius: 999 },
-                        }}
+                        sx={{ height: 8, borderRadius: 999, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { borderRadius: 999 } }}
                       />
-                      <Box
-                        sx={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: 1.25,
-                          mt: 2.25,
-                        }}
-                      >
-                        <MetricCell
-                          label="Capacity used"
-                          value={`${rtcLoad.toFixed(1)}%`}
-                        />
-                        <MetricCell
-                          label="Quality score"
-                          value={`${Number(statsData.infrastructure.rtcSessions.averageQualityScore || 0).toFixed(1)}`}
-                        />
-                        <MetricCell
-                          label="Storage usage"
-                          value={`${formatNumber(statsData.infrastructure.storage.usageMb)} MB`}
-                        />
-                        <MetricCell
-                          label="Live rooms"
-                          value={formatNumber(statsData.overview.rooms.liveNow)}
-                        />
+                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.25, mt: 2.25 }}>
+                        <MetricCell label="Capacity used" value={`${rtcLoad.toFixed(1)}%`} />
+                        <MetricCell label="Quality score" value={`${Number(statsData.infrastructure.rtcSessions.averageQualityScore || 0).toFixed(1)}`} />
+                        <MetricCell label="Storage usage" value={`${formatNumber(statsData.infrastructure.storage.usageMb)} MB`} />
+                        <MetricCell label="Live rooms" value={formatNumber(statsData.overview.rooms.liveNow)} />
                       </Box>
                     </Box>
                   </CardContent>
@@ -377,33 +285,13 @@ export const DashboardPage: React.FC = () => {
               <Grid size={{ xs: 12, lg: 3 }}>
                 <Card sx={{ height: '100%' }}>
                   <CardContent>
-                    <Typography variant="subtitle1">
-                      Engagement Snapshot
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Existing aggregate participation data only.
-                    </Typography>
+                    <Typography variant="subtitle1">Engagement Snapshot</Typography>
+                    <Typography variant="caption" color="text.secondary">Existing aggregate participation data only.</Typography>
                     <Stack spacing={1.2} sx={{ mt: 2 }}>
-                      <SnapshotRow
-                        icon={<PollOutlinedIcon />}
-                        label="Active polls"
-                        value={statsData.overview.polls.activeNow}
-                      />
-                      <SnapshotRow
-                        icon={<PollOutlinedIcon />}
-                        label="Poll votes"
-                        value={statsData.overview.polls.totalVotesCast}
-                      />
-                      <SnapshotRow
-                        icon={<QuizOutlinedIcon />}
-                        label="Active quizzes"
-                        value={statsData.overview.quizzes.activeNow}
-                      />
-                      <SnapshotRow
-                        icon={<QuizOutlinedIcon />}
-                        label="Quiz participants"
-                        value={statsData.overview.quizzes.totalParticipants}
-                      />
+                      <SnapshotRow icon={<PollOutlinedIcon />} label="Active polls" value={statsData.overview.polls.activeNow} />
+                      <SnapshotRow icon={<PollOutlinedIcon />} label="Poll votes" value={statsData.overview.polls.totalVotesCast} />
+                      <SnapshotRow icon={<QuizOutlinedIcon />} label="Active quizzes" value={statsData.overview.quizzes.activeNow} />
+                      <SnapshotRow icon={<QuizOutlinedIcon />} label="Quiz participants" value={statsData.overview.quizzes.totalParticipants} />
                     </Stack>
                   </CardContent>
                 </Card>
@@ -416,101 +304,28 @@ export const DashboardPage: React.FC = () => {
   );
 };
 
-const HealthRow: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  detail: string;
-  status: string;
-}> = ({ icon, label, detail, status }) => (
+const HealthRow: React.FC<{ icon: React.ReactNode; label: string; detail: string; status: string }> = ({ icon, label, detail, status }) => (
   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.15, py: 1.25 }}>
-    <Box
-      sx={{
-        color: 'text.secondary',
-        display: 'grid',
-        placeItems: 'center',
-        '& .MuiSvgIcon-root': { fontSize: 18 },
-      }}
-    >
-      {icon}
-    </Box>
+    <Box sx={{ color: 'text.secondary', display: 'grid', placeItems: 'center', '& .MuiSvgIcon-root': { fontSize: 18 } }}>{icon}</Box>
     <Box sx={{ flex: 1, minWidth: 0 }}>
-      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-        {label}
-      </Typography>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        noWrap
-        sx={{ display: 'block' }}
-      >
-        {detail}
-      </Typography>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
+      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>{detail}</Typography>
     </Box>
     <StatusBadge status={status} />
   </Box>
 );
 
-const MetricCell: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
-  <Box
-    sx={{
-      p: 1.25,
-      borderRadius: 2.25,
-      bgcolor: 'action.hover',
-      border: '1px solid',
-      borderColor: 'divider',
-    }}
-  >
-    <Typography
-      variant="caption"
-      color="text.secondary"
-      sx={{ display: 'block', mb: 0.45 }}
-    >
-      {label}
-    </Typography>
-    <Typography variant="subtitle1" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-      {value}
-    </Typography>
+const MetricCell: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <Box sx={{ p: 1.25, borderRadius: 2.25, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
+    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.45 }}>{label}</Typography>
+    <Typography variant="subtitle1" sx={{ fontVariantNumeric: 'tabular-nums' }}>{value}</Typography>
   </Box>
 );
 
-const SnapshotRow: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-}> = ({ icon, label, value }) => (
-  <Box
-    sx={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 1,
-      p: 1.15,
-      borderRadius: 2.25,
-      border: '1px solid',
-      borderColor: 'divider',
-    }}
-  >
-    <Box
-      sx={{
-        width: 30,
-        height: 30,
-        display: 'grid',
-        placeItems: 'center',
-        borderRadius: 2,
-        bgcolor: 'action.hover',
-        color: 'primary.main',
-        '& .MuiSvgIcon-root': { fontSize: 17 },
-      }}
-    >
-      {icon}
-    </Box>
-    <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-      {label}
-    </Typography>
-    <Typography variant="subtitle2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-      {formatNumber(value)}
-    </Typography>
+const SnapshotRow: React.FC<{ icon: React.ReactNode; label: string; value: number }> = ({ icon, label, value }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.15, borderRadius: 2.25, border: '1px solid', borderColor: 'divider' }}>
+    <Box sx={{ width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: 2, bgcolor: 'action.hover', color: 'primary.main', '& .MuiSvgIcon-root': { fontSize: 17 } }}>{icon}</Box>
+    <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>{label}</Typography>
+    <Typography variant="subtitle2" sx={{ fontVariantNumeric: 'tabular-nums' }}>{formatNumber(value)}</Typography>
   </Box>
 );

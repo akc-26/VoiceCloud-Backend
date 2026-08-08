@@ -6,36 +6,11 @@ const common = BRAND_CONFIG.colors.common;
 
 const baseTypography = {
   fontFamily: BRAND_CONFIG.typography.adminFontFamily,
-  h1: {
-    fontWeight: 700,
-    fontSize: '2.5rem',
-    lineHeight: 1.2,
-    letterSpacing: '-0.035em',
-  },
-  h2: {
-    fontWeight: 700,
-    fontSize: '2rem',
-    lineHeight: 1.25,
-    letterSpacing: '-0.025em',
-  },
-  h3: {
-    fontWeight: 650,
-    fontSize: '1.625rem',
-    lineHeight: 1.3,
-    letterSpacing: '-0.02em',
-  },
-  h4: {
-    fontWeight: 700,
-    fontSize: '1.375rem',
-    lineHeight: 1.35,
-    letterSpacing: '-0.02em',
-  },
-  h5: {
-    fontWeight: 650,
-    fontSize: '1.125rem',
-    lineHeight: 1.4,
-    letterSpacing: '-0.015em',
-  },
+  h1: { fontWeight: 700, fontSize: '2.5rem', lineHeight: 1.2, letterSpacing: '-0.035em' },
+  h2: { fontWeight: 700, fontSize: '2rem', lineHeight: 1.25, letterSpacing: '-0.025em' },
+  h3: { fontWeight: 650, fontSize: '1.625rem', lineHeight: 1.3, letterSpacing: '-0.02em' },
+  h4: { fontWeight: 700, fontSize: '1.375rem', lineHeight: 1.35, letterSpacing: '-0.02em' },
+  h5: { fontWeight: 650, fontSize: '1.125rem', lineHeight: 1.4, letterSpacing: '-0.015em' },
   h6: { fontWeight: 650, fontSize: '0.95rem', lineHeight: 1.4 },
   subtitle1: { fontWeight: 600, fontSize: '0.9375rem', lineHeight: 1.5 },
   subtitle2: { fontWeight: 600, fontSize: '0.8125rem', lineHeight: 1.45 },
@@ -47,13 +22,9 @@ const baseTypography = {
 
 export const getAppTheme = (mode: 'light' | 'dark') => {
   const isDark = mode === 'dark';
-  const backgroundDefault = isDark
-    ? admin.darkBackground
-    : admin.lightBackground;
+  const backgroundDefault = isDark ? admin.darkBackground : admin.lightBackground;
   const surface = isDark ? admin.darkSurface : admin.lightSurface;
-  const elevatedSurface = isDark
-    ? admin.darkElevatedSurface
-    : admin.elevatedSurface;
+  const elevatedSurface = isDark ? admin.darkElevatedSurface : admin.elevatedSurface;
   const border = isDark ? admin.darkBorder : admin.border;
   const textPrimary = isDark ? admin.darkTextPrimary : admin.textPrimary;
   const textSecondary = isDark ? admin.darkTextSecondary : admin.textSecondary;
@@ -149,8 +120,7 @@ export const getAppTheme = (mode: 'light' | 'dark') => {
             borderRadius: 10,
             paddingInline: 16,
             boxShadow: 'none',
-            transition:
-              'background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease',
+            transition: 'background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease',
             '&:hover': {
               boxShadow: `0 4px 12px ${alpha(admin.primary, 0.14)}`,
               transform: 'translateY(-1px)',
@@ -355,9 +325,7 @@ export const getAppTheme = (mode: 'light' | 'dark') => {
             borderRadius: 16,
             border: `1px solid ${border}`,
             backgroundColor: elevatedSurface,
-            boxShadow: isDark
-              ? '0 22px 60px rgba(0,0,0,0.42)'
-              : '0 22px 60px rgba(16,35,63,0.16)',
+            boxShadow: isDark ? '0 22px 60px rgba(0,0,0,0.42)' : '0 22px 60px rgba(16,35,63,0.16)',
           },
         },
       },
@@ -390,9 +358,7 @@ export const getAppTheme = (mode: 'light' | 'dark') => {
             marginTop: 6,
             border: `1px solid ${border}`,
             borderRadius: 12,
-            boxShadow: isDark
-              ? '0 16px 42px rgba(0,0,0,0.32)'
-              : '0 16px 42px rgba(16,35,63,0.12)',
+            boxShadow: isDark ? '0 16px 42px rgba(0,0,0,0.32)' : '0 16px 42px rgba(16,35,63,0.12)',
           },
         },
       },
@@ -411,9 +377,7 @@ export const getAppTheme = (mode: 'light' | 'dark') => {
         styleOverrides: {
           tooltip: {
             borderRadius: 8,
-            backgroundColor: isDark
-              ? admin.darkElevatedSurface
-              : admin.textPrimary,
+            backgroundColor: isDark ? admin.darkElevatedSurface : admin.textPrimary,
             fontSize: '0.72rem',
           },
         },

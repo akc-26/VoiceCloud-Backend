@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Box, Container, CssBaseline, useMediaQuery, useTheme } from '@mui/material';
+import {
+  Box,
+  Container,
+  CssBaseline,
+  useMediaQuery,
+  useTheme,
+} from '@mui/material';
 import { CreatorTopBar } from './CreatorTopBar';
 import { CreatorSidebar } from './CreatorSidebar';
 import { CreatorBreadcrumbs } from './CreatorBreadcrumbs';
 import { CreatorFooter } from './CreatorFooter';
 
-const DRAWER_WIDTH = 260;
+const DRAWER_WIDTH = 244;
 
 interface CreatorShellProps {
   children?: React.ReactNode;
@@ -19,28 +25,23 @@ export const CreatorShell: React.FC<CreatorShellProps> = ({ children }) => {
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  const handleDesktopSidebarToggle = () => {
-    setDesktopSidebarOpen(!desktopSidebarOpen);
-  };
-
-  const handleMobileSidebarToggle = () => {
-    setMobileSidebarOpen(!mobileSidebarOpen);
-  };
-
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+      }}
+    >
       <CssBaseline />
-
-      {/* Sidebar Navigation */}
       <CreatorSidebar
         open={desktopSidebarOpen}
-        onToggle={handleDesktopSidebarToggle}
+        onToggle={() => setDesktopSidebarOpen((value) => !value)}
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
         drawerWidth={DRAWER_WIDTH}
       />
 
-      {/* Right Column: TopBar + Page Content + Footer */}
       <Box
         sx={{
           flexGrow: 1,
@@ -52,37 +53,37 @@ export const CreatorShell: React.FC<CreatorShellProps> = ({ children }) => {
             xs: '100%',
             md: `calc(100% - ${desktopSidebarOpen ? DRAWER_WIDTH : 72}px)`,
           },
-          transition: theme.transitions.create(['width', 'margin'], {
+          transition: theme.transitions.create('width', {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
         }}
       >
-        {/* Top Application Bar */}
         <CreatorTopBar
-          onMobileDrawerToggle={handleMobileSidebarToggle}
+          onMobileDrawerToggle={() => setMobileSidebarOpen((value) => !value)}
           drawerWidth={DRAWER_WIDTH}
         />
 
-        {/* Main Content Area */}
         <Box
           component="main"
           sx={{
             flexGrow: 1,
-            p: { xs: 2, sm: 3, md: 4 },
-            bgcolor: 'background.default',
+            px: { xs: 2, sm: 3, lg: 4 },
+            pt: { xs: 2, sm: 2.5, lg: 3 },
+            pb: { xs: 4, md: 5 },
+            bgcolor: 'transparent',
           }}
         >
-          <Container maxWidth="xl" disableGutters>
-            {/* Dynamic Breadcrumbs */}
-            <CreatorBreadcrumbs />
-
-            {/* Page Content */}
+          <Container
+            maxWidth={false}
+            disableGutters
+            sx={{ maxWidth: 1680, mx: 'auto' }}
+          >
+            {!isMobile && <CreatorBreadcrumbs />}
             {children || <Outlet />}
           </Container>
         </Box>
 
-        {/* Studio Footer */}
         <CreatorFooter />
       </Box>
     </Box>

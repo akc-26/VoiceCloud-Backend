@@ -6,7 +6,7 @@ import {
   Typography,
   Grid,
   Chip,
-  Button,
+  useTheme,
   Stack,
 } from '@mui/material';
 import {
@@ -14,7 +14,6 @@ import {
   Users,
   Clock,
   Headphones,
-  Download,
   DollarSign,
   UserPlus,
   BarChart2,
@@ -39,6 +38,7 @@ import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 type AnalyticsPeriod = '24h' | '7d' | '30d' | '1y';
 
 export const AnalyticsPage: React.FC = () => {
+  const theme = useTheme();
   const [period, setPeriod] = useState<AnalyticsPeriod>('30d');
 
   const analyticsQuery = useQuery({
@@ -64,7 +64,9 @@ export const AnalyticsPage: React.FC = () => {
           analyticsQuery.error?.message ||
           'Unable to retrieve performance metrics.'
         }
-        onRetry={() => analyticsQuery.refetch()}
+        onRetry={() => {
+          void analyticsQuery.refetch();
+        }}
       />
     );
   }
@@ -79,7 +81,9 @@ export const AnalyticsPage: React.FC = () => {
           title="No analytics available"
           description="Analytics metrics will populate as listeners join your live rooms and send support."
           actionLabel="Refresh Analytics"
-          onAction={() => analyticsQuery.refetch()}
+          onAction={() => {
+            void analyticsQuery.refetch();
+          }}
         />
       </Box>
     );
@@ -106,9 +110,6 @@ export const AnalyticsPage: React.FC = () => {
             broadcast revenue metrics.
           </Typography>
         </Box>
-        <Button variant="outlined" startIcon={<Download size={18} />}>
-          Export Report
-        </Button>
       </Box>
 
       {/* Metric Cards */}
@@ -119,7 +120,7 @@ export const AnalyticsPage: React.FC = () => {
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
               >
-                <Headphones size={18} color="#7c3aed" />
+                <Headphones size={18} color={theme.palette.primary.main} />
                 <Typography
                   variant="caption"
                   color="text.secondary"
@@ -149,7 +150,7 @@ export const AnalyticsPage: React.FC = () => {
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
               >
-                <Users size={18} color="#2563eb" />
+                <Users size={18} color={theme.palette.info.main} />
                 <Typography
                   variant="caption"
                   color="text.secondary"
@@ -177,7 +178,7 @@ export const AnalyticsPage: React.FC = () => {
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
               >
-                <Clock size={18} color="#d97706" />
+                <Clock size={18} color={theme.palette.warning.main} />
                 <Typography
                   variant="caption"
                   color="text.secondary"
@@ -210,7 +211,7 @@ export const AnalyticsPage: React.FC = () => {
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
               >
-                <DollarSign size={18} color="#059669" />
+                <DollarSign size={18} color={theme.palette.success.main} />
                 <Typography
                   variant="caption"
                   color="text.secondary"
@@ -286,8 +287,16 @@ export const AnalyticsPage: React.FC = () => {
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.0} />
+                    <stop
+                      offset="5%"
+                      stopColor={theme.palette.primary.main}
+                      stopOpacity={0.76}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor={theme.palette.primary.main}
+                      stopOpacity={0.0}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -298,7 +307,7 @@ export const AnalyticsPage: React.FC = () => {
                   type="monotone"
                   dataKey="listeners"
                   name="Listeners"
-                  stroke="#7c3aed"
+                  stroke={theme.palette.primary.main}
                   fillOpacity={1}
                   fill="url(#colorListeners)"
                 />
@@ -316,7 +325,7 @@ export const AnalyticsPage: React.FC = () => {
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}
               >
-                <TrendingUp size={20} color="#059669" />
+                <TrendingUp size={20} color={theme.palette.success.main} />
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   Revenue Trend ($ USD)
                 </Typography>
@@ -331,7 +340,7 @@ export const AnalyticsPage: React.FC = () => {
                     <Bar
                       dataKey="earnings"
                       name="Earnings ($)"
-                      fill="#10b981"
+                      fill={theme.palette.success.main}
                       radius={[4, 4, 0, 0]}
                     />
                   </BarChart>
@@ -347,7 +356,7 @@ export const AnalyticsPage: React.FC = () => {
               <Box
                 sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}
               >
-                <UserPlus size={20} color="#2563eb" />
+                <UserPlus size={20} color={theme.palette.info.main} />
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   Follower & Subscriber Growth
                 </Typography>
@@ -363,8 +372,8 @@ export const AnalyticsPage: React.FC = () => {
                       type="monotone"
                       dataKey="newFollowers"
                       name="New Followers"
-                      stroke="#2563eb"
-                      fill="#3b82f6"
+                      stroke={theme.palette.info.main}
+                      fill={theme.palette.info.light}
                       fillOpacity={0.2}
                     />
                   </AreaChart>

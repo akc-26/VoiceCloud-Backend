@@ -25,9 +25,7 @@ interface AreaChartProps {
 }
 
 const ChartHeading: React.FC<{ title: string }> = ({ title }) => (
-  <Typography variant="subtitle1" sx={{ mb: 1.75 }}>
-    {title}
-  </Typography>
+  <Typography variant="subtitle1" sx={{ mb: 1.75 }}>{title}</Typography>
 );
 
 export const AnalyticsAreaChart: React.FC<AreaChartProps> = ({
@@ -49,63 +47,27 @@ export const AnalyticsAreaChart: React.FC<AreaChartProps> = ({
         <ChartHeading title={title} />
         <Box sx={{ width: '100%', height }}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={data}
-              margin={{ top: 10, right: 8, left: -22, bottom: 0 }}
-            >
+            <AreaChart data={data} margin={{ top: 10, right: 8, left: -22, bottom: 0 }}>
               <defs>
-                <linearGradient
-                  id={`color-${dataKey}`}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
+                <linearGradient id={`color-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={seriesColor} stopOpacity={0.3} />
-                  <stop
-                    offset="95%"
-                    stopColor={seriesColor}
-                    stopOpacity={0.015}
-                  />
+                  <stop offset="95%" stopColor={seriesColor} stopOpacity={0.015} />
                 </linearGradient>
               </defs>
-              <CartesianGrid
-                strokeDasharray="3 5"
-                vertical={false}
-                stroke={gridColor}
-              />
-              <XAxis
-                dataKey={xAxisKey}
-                tick={{ fontSize: 11, fill: axisColor }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: axisColor }}
-                axisLine={false}
-                tickLine={false}
-              />
+              <CartesianGrid strokeDasharray="3 5" vertical={false} stroke={gridColor} />
+              <XAxis dataKey={xAxisKey} tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={{
                   borderRadius: 10,
-                  boxShadow:
-                    theme.palette.mode === 'dark'
-                      ? '0 10px 28px rgba(0,0,0,0.32)'
-                      : '0 10px 28px rgba(16,35,63,0.11)',
+                  boxShadow: theme.palette.mode === 'dark' ? '0 10px 28px rgba(0,0,0,0.32)' : '0 10px 28px rgba(16,35,63,0.11)',
                   border: `1px solid ${gridColor}`,
                   backgroundColor: theme.palette.background.paper,
                   color: theme.palette.text.primary,
                   fontSize: 12,
                 }}
               />
-              <Area
-                type="monotone"
-                dataKey={dataKey}
-                stroke={seriesColor}
-                strokeWidth={2.25}
-                fillOpacity={1}
-                fill={`url(#color-${dataKey})`}
-              />
+              <Area type="monotone" dataKey={dataKey} stroke={seriesColor} strokeWidth={2.25} fillOpacity={1} fill={`url(#color-${dataKey})`} />
             </AreaChart>
           </ResponsiveContainer>
         </Box>
@@ -142,33 +104,14 @@ export const AnalyticsBarChart: React.FC<BarChartProps> = ({
         <ChartHeading title={title} />
         <Box sx={{ width: '100%', height }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 10, right: 8, left: -22, bottom: 0 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 5"
-                vertical={false}
-                stroke={gridColor}
-              />
-              <XAxis
-                dataKey={xAxisKey}
-                tick={{ fontSize: 11, fill: axisColor }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: axisColor }}
-                axisLine={false}
-                tickLine={false}
-              />
+            <BarChart data={data} margin={{ top: 10, right: 8, left: -22, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 5" vertical={false} stroke={gridColor} />
+              <XAxis dataKey={xAxisKey} tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: axisColor }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={{
                   borderRadius: 10,
-                  boxShadow:
-                    theme.palette.mode === 'dark'
-                      ? '0 10px 28px rgba(0,0,0,0.32)'
-                      : '0 10px 28px rgba(16,35,63,0.11)',
+                  boxShadow: theme.palette.mode === 'dark' ? '0 10px 28px rgba(0,0,0,0.32)' : '0 10px 28px rgba(16,35,63,0.11)',
                   border: `1px solid ${gridColor}`,
                   backgroundColor: theme.palette.background.paper,
                   color: theme.palette.text.primary,
@@ -190,11 +133,7 @@ interface PieChartProps {
   height?: number;
 }
 
-export const AnalyticsPieChart: React.FC<PieChartProps> = ({
-  title,
-  data,
-  height = 290,
-}) => {
+export const AnalyticsPieChart: React.FC<PieChartProps> = ({ title, data, height = 290 }) => {
   const theme = useTheme();
   const pieColors = [
     theme.palette.primary.main,
@@ -211,20 +150,9 @@ export const AnalyticsPieChart: React.FC<PieChartProps> = ({
         <Box sx={{ width: '100%', height }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={58}
-                outerRadius={88}
-                paddingAngle={3}
-                dataKey="value"
-              >
+              <Pie data={data} cx="50%" cy="50%" innerRadius={58} outerRadius={88} paddingAngle={3} dataKey="value">
                 {data.map((item, index) => (
-                  <Cell
-                    key={`${item.name}-${index}`}
-                    fill={pieColors[index % pieColors.length]}
-                  />
+                  <Cell key={`${item.name}-${index}`} fill={pieColors[index % pieColors.length]} />
                 ))}
               </Pie>
               <Tooltip

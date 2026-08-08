@@ -96,7 +96,6 @@ npm run admin:ui-redesign:check
 ```
 
 The acceptance checker is non-mutating. A passing run must report 10 passed stages, zero failures and zero skipped stages.
-
 ## Authoritative parent reconstruction note
 
 This candidate is reconstructed from the exact tracked Git archive of `VoiceCloud-Backend-VC-PH08-WP08-04-02-R04` at commit `0d8bb8375b657506f5f6eca74b6a28594e69181a`. Unchanged backend, Creator, Website, Admin route/service, and protected state files retain the exact committed bytes.
@@ -104,6 +103,7 @@ This candidate is reconstructed from the exact tracked Git archive of `VoiceClou
 The frozen Git archive stores CRLF line endings in tracked files, while the repository Prettier policy requires LF. For this Admin-only package, Stage 3 applies Prettier only to the Admin-redesign-owned files. Stage 4 runs the existing foundation ESLint semantic rules with only the `prettier/prettier` rule disabled so that accepted parent files are not rewritten merely to normalize line endings. This does not relax TypeScript, Jest, build, runtime, or functional-boundary acceptance.
 
 Creator and Website semantic branding values remain unchanged during the Admin-only redesign; Ocean Blue status colors are Admin-scoped tokens.
+
 
 ## Cross-platform lockfile byte stability
 

@@ -1,32 +1,34 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Alert,
   Box,
+  Button,
   Card,
   CardContent,
-  Typography,
-  TextField,
-  Button,
-  FormControlLabel,
   Checkbox,
-  Link,
-  InputAdornment,
-  IconButton,
-  Alert,
-  Paper,
   Chip,
   Container,
+  FormControlLabel,
+  IconButton,
+  InputAdornment,
+  Link,
+  Stack,
+  TextField,
+  Typography,
 } from '@mui/material';
 import {
-  Mail,
-  Lock,
+  ArrowRight,
+  CheckCircle2,
   Eye,
   EyeOff,
-  Sparkles,
-  ArrowRight,
-  ShieldCheck,
   Headphones,
-  CheckCircle2,
+  Lock,
+  Mail,
+  Radio,
+  ShieldCheck,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 import { BRAND_CONFIG, getBrandAssetUrl } from '@shared/branding';
 import { useAuthStore } from '../store/auth.store';
@@ -44,8 +46,8 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [accountCreatedInfo, setAccountCreatedInfo] = useState(false);
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignIn = async (event: React.FormEvent) => {
+    event.preventDefault();
     const normalizedEmail = email.trim().toLowerCase();
     const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
 
@@ -53,7 +55,6 @@ export const LoginPage: React.FC = () => {
       setError('Please enter both Creator email and password.');
       return;
     }
-
     if (!isValidEmail) {
       setError('Please enter a valid Creator email address.');
       return;
@@ -61,19 +62,16 @@ export const LoginPage: React.FC = () => {
 
     setError(null);
     setLoading(true);
-
     try {
       const authResponse = await CreatorApiService.getInstance().login({
         email: normalizedEmail,
         password,
       });
-
       if (authResponse.user?.role !== 'CREATOR') {
         throw new Error('This account does not have Creator Studio access.');
       }
-
       setAuthResponse(authResponse);
-      navigate('/dashboard', { replace: true });
+      void navigate('/dashboard', { replace: true });
     } catch (err: any) {
       setError(
         err.message || 'Authentication failed. Please check your credentials.',
@@ -87,299 +85,421 @@ export const LoginPage: React.FC = () => {
     <Box
       sx={{
         minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-        background: (theme) =>
-          theme.palette.mode === 'dark'
-            ? 'radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.15) 0%, rgba(15, 23, 42, 1) 70%)'
-            : 'radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.08) 0%, rgba(248, 250, 252, 1) 70%)',
-        py: 6,
+        display: 'grid',
+        placeItems: 'center',
         px: 2,
+        py: { xs: 4, md: 6 },
+        bgcolor: BRAND_CONFIG.colors.creator.darkBackground,
+        backgroundImage:
+          'radial-gradient(circle at 12% 16%, rgba(34,197,94,0.20), transparent 30%), radial-gradient(circle at 88% 84%, rgba(94,234,212,0.13), transparent 28%), linear-gradient(135deg, #0b1512 0%, #123a32 52%, #0b1512 100%)',
       }}
     >
-      <Container maxWidth="sm">
-        {/* Product branding header */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
+      <Container maxWidth="lg">
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: 'minmax(0, 1.05fr) minmax(420px, 0.8fr)',
+            },
+            gap: { xs: 3, md: 6 },
+            alignItems: 'center',
+          }}
+        >
           <Box
             sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 56,
-              height: 56,
-              borderRadius: 3,
-              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-              color: '#ffffff',
-              boxShadow: '0 8px 24px rgba(99, 102, 241, 0.3)',
-              mb: 2,
+              color: '#f3faf6',
+              display: { xs: 'none', md: 'block' },
+              pr: 2,
             }}
           >
             <Box
-              component="img"
-              src={getBrandAssetUrl('creator', 'logoMark')}
-              alt=""
-              sx={{ width: 56, height: 56 }}
-            />
-          </Box>
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{
-              fontWeight: 800,
-              letterSpacing: '-0.02em',
-              mb: 0.5,
-              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            {BRAND_CONFIG.identity.name}
-          </Typography>
-          <Typography
-            variant="subtitle1"
-            color="text.secondary"
-            sx={{ fontWeight: 600 }}
-          >
-            {BRAND_CONFIG.products.creator.fullName}
-          </Typography>
-          <Chip
-            icon={<Sparkles size={14} />}
-            label="Secure Creator Access"
-            size="small"
-            color="primary"
-            variant="outlined"
-            sx={{ mt: 1.5, fontSize: '0.75rem', fontWeight: 600 }}
-          />
-        </Box>
-
-        {/* Login Card */}
-        <Card
-          elevation={6}
-          sx={{
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            backdropFilter: 'blur(10px)',
-            overflow: 'hidden',
-          }}
-        >
-          <CardContent sx={{ p: { xs: 3, sm: 4.5 } }}>
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-                Creator Sign In
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Enter your credentials to access live rooms, analytics, and
-                earnings.
-              </Typography>
+              sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 5 }}
+            >
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 3,
+                  bgcolor: '#ffffff',
+                  display: 'grid',
+                  placeItems: 'center',
+                  boxShadow: '0 16px 42px rgba(0,0,0,0.22)',
+                }}
+              >
+                <Box
+                  component="img"
+                  src={getBrandAssetUrl('creator', 'logoMark')}
+                  alt=""
+                  sx={{ width: 43, height: 43 }}
+                />
+              </Box>
+              <Box>
+                <Typography
+                  variant="h5"
+                  sx={{ color: '#ffffff', fontWeight: 700 }}
+                >
+                  {BRAND_CONFIG.identity.name}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ color: 'rgba(243,250,246,0.64)' }}
+                >
+                  {BRAND_CONFIG.products.creator.shortName}
+                </Typography>
+              </Box>
             </Box>
 
-            {error && (
-              <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-                {error}
-              </Alert>
-            )}
+            <Chip
+              icon={<Sparkles size={14} />}
+              label="Aurora Live Workspace"
+              sx={{
+                mb: 2.5,
+                color: BRAND_CONFIG.colors.creator.primaryLight,
+                bgcolor: 'rgba(34,197,94,0.12)',
+                border: '1px solid rgba(94,234,212,0.18)',
+              }}
+            />
+            <Typography
+              component="h1"
+              sx={{
+                maxWidth: 650,
+                fontSize: { md: '2.5rem', lg: '3rem' },
+                lineHeight: 1.08,
+                fontWeight: 700,
+                letterSpacing: '-0.035em',
+                color: '#ffffff',
+                mb: 2,
+              }}
+            >
+              Your voice, audience and earnings in one live studio.
+            </Typography>
+            <Typography
+              sx={{
+                maxWidth: 610,
+                color: 'rgba(243,250,246,0.68)',
+                fontSize: '1rem',
+                lineHeight: 1.7,
+                mb: 4,
+              }}
+            >
+              Manage live rooms, community activity, creator analytics and
+              monetization through the secure {BRAND_CONFIG.identity.name}{' '}
+              Creator workspace.
+            </Typography>
 
-            {accountCreatedInfo && (
-              <Alert
-                severity="info"
-                onClose={() => setAccountCreatedInfo(false)}
-                sx={{ mb: 3, borderRadius: 2 }}
-              >
-                Creator registrations are managed by{' '}
-                {BRAND_CONFIG.identity.name} Administration. Contact your system
-                administrator for creator access credentials.
-              </Alert>
-            )}
+            <Stack
+              direction="row"
+              spacing={2}
+              useFlexGap
+              sx={{ flexWrap: 'wrap' }}
+            >
+              {[
+                [Radio, 'Realtime live controls'],
+                [Users, 'Community focused'],
+                [ShieldCheck, 'Secure creator access'],
+              ].map(([Icon, label]) => {
+                const IconComponent = Icon as React.ComponentType<{
+                  size?: number;
+                }>;
+                return (
+                  <Box
+                    key={label as string}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      py: 1,
+                      px: 1.5,
+                      borderRadius: 2.5,
+                      bgcolor: 'rgba(255,255,255,0.045)',
+                      border: '1px solid rgba(216,227,222,0.10)',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        color: BRAND_CONFIG.colors.creator.accent,
+                        display: 'flex',
+                      }}
+                    >
+                      <IconComponent size={17} />
+                    </Box>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'rgba(243,250,246,0.78)', fontWeight: 600 }}
+                    >
+                      {label as string}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
+          </Box>
 
-            <form onSubmit={handleSignIn}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                <TextField
-                  label="Creator Email"
-                  type="email"
-                  fullWidth
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={BRAND_CONFIG.contacts.creatorLoginExample}
-                  required
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Mail size={18} />
-                        </InputAdornment>
-                      ),
-                    },
+          <Box>
+            <Box
+              sx={{
+                display: { xs: 'flex', md: 'none' },
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1.25,
+                mb: 3,
+              }}
+            >
+              <Box
+                component="img"
+                src={getBrandAssetUrl('creator', 'logoMark')}
+                alt=""
+                sx={{
+                  width: 42,
+                  height: 42,
+                  bgcolor: '#fff',
+                  borderRadius: 2.5,
+                }}
+              />
+              <Box>
+                <Typography
+                  variant="h6"
+                  sx={{ color: '#ffffff', fontWeight: 700 }}
+                >
+                  {BRAND_CONFIG.identity.name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'rgba(243,250,246,0.64)' }}
+                >
+                  Creator Studio
+                </Typography>
+              </Box>
+            </Box>
+
+            <Card
+              sx={{
+                bgcolor: 'rgba(243,247,245,0.97)',
+                borderColor: 'rgba(216,227,222,0.76)',
+                boxShadow: '0 28px 80px rgba(0,0,0,0.28)',
+                backdropFilter: 'blur(18px)',
+              }}
+            >
+              <CardContent sx={{ p: { xs: 3, sm: 4.5 } }}>
+                <Box sx={{ mb: 3.5 }}>
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      color: BRAND_CONFIG.colors.creator.textPrimary,
+                      fontWeight: 700,
+                      mb: 0.75,
+                    }}
+                  >
+                    Welcome back
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ color: BRAND_CONFIG.colors.creator.textSecondary }}
+                  >
+                    Sign in to continue to{' '}
+                    {BRAND_CONFIG.products.creator.fullName}.
+                  </Typography>
+                </Box>
+
+                {error && (
+                  <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                  </Alert>
+                )}
+                {accountCreatedInfo && (
+                  <Alert
+                    severity="info"
+                    onClose={() => setAccountCreatedInfo(false)}
+                    sx={{ mb: 3 }}
+                  >
+                    Creator registrations are managed by{' '}
+                    {BRAND_CONFIG.identity.name} Administration. Contact your
+                    system administrator for creator access credentials.
+                  </Alert>
+                )}
+
+                <form
+                  onSubmit={(event) => {
+                    void handleSignIn(event);
                   }}
-                  variant="outlined"
-                />
+                >
+                  <Stack spacing={2.5}>
+                    <TextField
+                      label="Creator Email"
+                      type="email"
+                      fullWidth
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder={BRAND_CONFIG.contacts.creatorLoginExample}
+                      required
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Mail size={18} />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                    <TextField
+                      label="Password"
+                      type={showPassword ? 'text' : 'password'}
+                      fullWidth
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="••••••••"
+                      required
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Lock size={18} />
+                            </InputAdornment>
+                          ),
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                onClick={() =>
+                                  setShowPassword((value) => !value)
+                                }
+                                edge="end"
+                                aria-label="toggle password visibility"
+                              >
+                                {showPassword ? (
+                                  <EyeOff size={18} />
+                                ) : (
+                                  <Eye size={18} />
+                                )}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
 
-                <TextField
-                  label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  fullWidth
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Lock size={18} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            onClick={() => setShowPassword(!showPassword)}
-                            edge="end"
-                            aria-label="toggle password visibility"
-                          >
-                            {showPassword ? (
-                              <EyeOff size={18} />
-                            ) : (
-                              <Eye size={18} />
-                            )}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                  variant="outlined"
-                />
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                      }}
+                    >
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={rememberMe}
+                            onChange={(event) =>
+                              setRememberMe(event.target.checked)
+                            }
+                            size="small"
+                          />
+                        }
+                        label={
+                          <Typography variant="body2" color="text.secondary">
+                            Remember me
+                          </Typography>
+                        }
+                      />
+                      <Link
+                        component="button"
+                        type="button"
+                        variant="body2"
+                        underline="hover"
+                        onClick={() =>
+                          alert(
+                            'Password reset assistance is managed by your administrator or support team.',
+                          )
+                        }
+                        sx={{ fontWeight: 600 }}
+                      >
+                        Forgot password?
+                      </Link>
+                    </Box>
+
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      size="large"
+                      fullWidth
+                      disabled={loading}
+                      endIcon={<ArrowRight size={18} />}
+                      sx={{
+                        py: 1.35,
+                        color: '#07130d',
+                        fontSize: '0.95rem',
+                        boxShadow: '0 12px 28px rgba(34,197,94,0.22)',
+                      }}
+                    >
+                      {loading ? 'Authenticating...' : 'Sign In to Studio'}
+                    </Button>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ textAlign: 'center' }}
+                    >
+                      Don't have a Creator account?{' '}
+                      <Link
+                        component="button"
+                        type="button"
+                        underline="hover"
+                        onClick={() => setAccountCreatedInfo(true)}
+                        sx={{ fontWeight: 700 }}
+                      >
+                        Apply for Creator Access
+                      </Link>
+                    </Typography>
+                  </Stack>
+                </form>
 
                 <Box
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                    mt: 3.5,
+                    pt: 2.5,
+                    borderTop: '1px solid',
+                    borderColor: 'divider',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 1,
                   }}
                 >
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        color="primary"
-                        size="small"
-                      />
-                    }
-                    label={
-                      <Typography variant="body2" color="text.secondary">
-                        Remember Me
-                      </Typography>
-                    }
-                  />
-
-                  <Link
-                    component="button"
-                    type="button"
-                    variant="body2"
-                    color="primary"
-                    underline="hover"
-                    onClick={() =>
-                      alert(
-                        'Password reset assistance is managed by your administrator or support team.',
-                      )
-                    }
-                    sx={{ fontWeight: 600 }}
-                  >
-                    Forgot Password?
-                  </Link>
+                  {[
+                    [ShieldCheck, 'Protected'],
+                    [Headphones, 'Live Audio'],
+                    [CheckCircle2, 'Creator Ready'],
+                  ].map(([Icon, label]) => {
+                    const IconComponent = Icon as React.ComponentType<{
+                      size?: number;
+                    }>;
+                    return (
+                      <Box
+                        key={label as string}
+                        sx={{ textAlign: 'center', color: 'text.secondary' }}
+                      >
+                        <Box
+                          sx={{
+                            color: 'primary.main',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            mb: 0.5,
+                          }}
+                        >
+                          <IconComponent size={17} />
+                        </Box>
+                        <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                          {label as string}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
                 </Box>
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  size="large"
-                  fullWidth
-                  disabled={loading}
-                  endIcon={<ArrowRight size={18} />}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: 2.5,
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                  }}
-                >
-                  {loading ? 'Authenticating...' : 'Sign In to Studio'}
-                </Button>
-
-                {/* Creator access information */}
-                <Box sx={{ textAlign: 'center', mt: 1 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Don't have a Creator account?{' '}
-                    <Link
-                      component="button"
-                      type="button"
-                      variant="body2"
-                      underline="hover"
-                      color="primary"
-                      onClick={() => setAccountCreatedInfo(true)}
-                      sx={{ fontWeight: 700 }}
-                    >
-                      Apply for Creator Access
-                    </Link>
-                  </Typography>
-                </Box>
-              </Box>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Feature Badges & Info Footnote */}
-        <Paper
-          elevation={0}
-          sx={{
-            mt: 3,
-            p: 2,
-            borderRadius: 2.5,
-            bgcolor: 'action.hover',
-            border: '1px solid',
-            borderColor: 'divider',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-around',
-            flexWrap: 'wrap',
-            gap: 1.5,
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ShieldCheck size={16} color="#10b981" />
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ fontWeight: 600 }}
-            >
-              Secure Session Guard
-            </Typography>
+              </CardContent>
+            </Card>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Headphones size={16} color="#6366f1" />
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ fontWeight: 600 }}
-            >
-              HD Audio Streaming Studio
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CheckCircle2 size={16} color="#8b5cf6" />
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ fontWeight: 600 }}
-            >
-              {BRAND_CONFIG.products.creator.workspaceLabel}
-            </Typography>
-          </Box>
-        </Paper>
+        </Box>
       </Container>
     </Box>
   );

@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Typography,
-} from '@mui/material';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
 interface ModalFormsProps {
@@ -32,17 +24,8 @@ export const ModalForms: React.FC<ModalFormsProps> = ({
   maxWidth = 'sm',
 }) => (
   <Dialog open={open} onClose={onClose} maxWidth={maxWidth} fullWidth>
-    <DialogTitle
-      sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 2,
-      }}
-    >
-      <Typography component="span" variant="h6">
-        {title}
-      </Typography>
+    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+      <Typography component="span" variant="h6">{title}</Typography>
       <IconButton size="small" onClick={onClose} aria-label="Close dialog">
         <CloseIcon fontSize="small" />
       </IconButton>
@@ -52,12 +35,8 @@ export const ModalForms: React.FC<ModalFormsProps> = ({
     </DialogContent>
     {onSubmit && (
       <DialogActions>
-        <Button variant="outlined" onClick={onClose} disabled={isLoading}>
-          Cancel
-        </Button>
-        <Button variant="contained" onClick={onSubmit} disabled={isLoading}>
-          {submitText}
-        </Button>
+        <Button variant="outlined" onClick={onClose} disabled={isLoading}>Cancel</Button>
+        <Button variant="contained" onClick={onSubmit} disabled={isLoading}>{submitText}</Button>
       </DialogActions>
     )}
   </Dialog>

@@ -48,11 +48,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           ),
           endAdornment: searchTerm ? (
             <InputAdornment position="end">
-              <IconButton
-                size="small"
-                onClick={handleClear}
-                aria-label="Clear search"
-              >
+              <IconButton size="small" onClick={handleClear} aria-label="Clear search">
                 <ClearIcon sx={{ fontSize: 17 }} />
               </IconButton>
             </InputAdornment>

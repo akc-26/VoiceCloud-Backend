@@ -42,30 +42,19 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           display: 'grid',
           placeItems: 'center',
           borderRadius: 3,
-          bgcolor: alpha(
-            theme.palette.primary.main,
-            theme.palette.mode === 'dark' ? 0.14 : 0.07,
-          ),
+          bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.14 : 0.07),
           color: 'primary.main',
           mb: 1.5,
         }}
       >
         {icon || <InboxOutlinedIcon sx={{ fontSize: 28 }} />}
       </Box>
-      <Typography variant="h6" gutterBottom>
-        {title}
-      </Typography>
-      <Typography
-        variant="body2"
-        color="text.secondary"
-        sx={{ maxWidth: 430, mb: actionText ? 2.5 : 0 }}
-      >
+      <Typography variant="h6" gutterBottom>{title}</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 430, mb: actionText ? 2.5 : 0 }}>
         {description}
       </Typography>
       {actionText && onAction && (
-        <Button variant="contained" onClick={onAction}>
-          {actionText}
-        </Button>
+        <Button variant="contained" onClick={onAction}>{actionText}</Button>
       )}
     </Paper>
   );

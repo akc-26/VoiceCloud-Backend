@@ -18,28 +18,28 @@ const routeNameMap: Record<string, string> = {
   'payout-requests': 'Payout Requests',
   notifications: 'Notifications Center',
   profile: 'Creator Profile',
+  verification: 'Host Verification',
   settings: 'Studio Settings',
   help: 'Help & Knowledge Base',
 };
 
 export const CreatorBreadcrumbs: React.FC = () => {
   const location = useLocation();
-  const pathnames = location.pathname.split('/').filter((x) => x && x !== 'creator');
+  const pathnames = location.pathname
+    .split('/')
+    .filter((value) => value && value !== 'creator');
 
   return (
-    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+    <Box sx={{ mb: 2.5, display: 'flex', alignItems: 'center' }}>
       <Breadcrumbs
-        separator={<ChevronRight size={14} style={{ opacity: 0.6 }} />}
+        separator={<ChevronRight size={13} style={{ opacity: 0.5 }} />}
         aria-label="breadcrumb"
-        sx={{
-          fontSize: '0.8125rem',
-          fontWeight: 500,
-        }}
+        sx={{ fontSize: '0.75rem', fontWeight: 500 }}
       >
         <Link
           component={RouterLink}
           to="/dashboard"
-          color="inherit"
+          color="text.secondary"
           sx={{
             display: 'flex',
             alignItems: 'center',
@@ -48,16 +48,21 @@ export const CreatorBreadcrumbs: React.FC = () => {
             '&:hover': { color: 'primary.main' },
           }}
         >
-          <Home size={14} />
+          <Home size={13} />
           Creator Studio
         </Link>
         {pathnames.map((value, index) => {
           const last = index === pathnames.length - 1;
           const to = `/${pathnames.slice(0, index + 1).join('/')}`;
-          const displayName = routeNameMap[value] || value.charAt(0).toUpperCase() + value.slice(1);
-
+          const displayName =
+            routeNameMap[value] ||
+            value.charAt(0).toUpperCase() + value.slice(1);
           return last ? (
-            <Typography key={to} color="text.primary" sx={{ fontSize: '0.8125rem', fontWeight: 600 }}>
+            <Typography
+              key={to}
+              color="text.primary"
+              sx={{ fontSize: '0.75rem', fontWeight: 600 }}
+            >
               {displayName}
             </Typography>
           ) : (
@@ -65,9 +70,9 @@ export const CreatorBreadcrumbs: React.FC = () => {
               key={to}
               component={RouterLink}
               to={to}
-              color="inherit"
+              color="text.secondary"
               underline="hover"
-              sx={{ fontSize: '0.8125rem' }}
+              sx={{ fontSize: '0.75rem' }}
             >
               {displayName}
             </Link>

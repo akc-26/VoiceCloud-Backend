@@ -28,11 +28,7 @@ import { BRAND_CONFIG, getBrandAssetUrl } from '@shared/branding';
 import { authService } from '../services/auth.service';
 import { useNotificationsStore } from '../store/notifications.store';
 
-const FeatureLine: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}> = ({ icon, title, description }) => (
+const FeatureLine: React.FC<{ icon: React.ReactNode; title: string; description: string }> = ({ icon, title, description }) => (
   <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start' }}>
     <Box
       sx={{
@@ -49,15 +45,8 @@ const FeatureLine: React.FC<{
       {icon}
     </Box>
     <Box>
-      <Typography variant="subtitle2" sx={{ color: 'common.white', mb: 0.2 }}>
-        {title}
-      </Typography>
-      <Typography
-        variant="caption"
-        sx={{ color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}
-      >
-        {description}
-      </Typography>
+      <Typography variant="subtitle2" sx={{ color: 'common.white', mb: 0.2 }}>{title}</Typography>
+      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}>{description}</Typography>
     </Box>
   </Box>
 );
@@ -80,16 +69,8 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const data = await authService.login(
-        email.trim().toLowerCase(),
-        password,
-      );
-      const allowedAdminRoles: UserRole[] = [
-        'SUPER_ADMIN',
-        'ADMIN',
-        'MODERATOR',
-        'SUPPORT',
-      ];
+      const data = await authService.login(email.trim().toLowerCase(), password);
+      const allowedAdminRoles: UserRole[] = ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'];
 
       if (!allowedAdminRoles.includes(data.user.role)) {
         throw new Error('This account does not have Admin Portal access.');
@@ -102,9 +83,7 @@ export const LoginPage: React.FC = () => {
       addToast('success', `Welcome back, ${data.user.displayName || 'Admin'}!`);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(
-        err?.message || 'Authentication failed. Please check your credentials.',
-      );
+      setError(err?.message || 'Authentication failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -115,10 +94,7 @@ export const LoginPage: React.FC = () => {
       sx={{
         minHeight: '100vh',
         display: 'grid',
-        gridTemplateColumns: {
-          xs: '1fr',
-          lg: 'minmax(380px, 0.9fr) minmax(520px, 1.1fr)',
-        },
+        gridTemplateColumns: { xs: '1fr', lg: 'minmax(380px, 0.9fr) minmax(520px, 1.1fr)' },
         backgroundColor: 'background.default',
       }}
     >
@@ -140,8 +116,7 @@ export const LoginPage: React.FC = () => {
             borderRadius: '50%',
             right: -170,
             top: -120,
-            background:
-              'radial-gradient(circle, rgba(56,189,248,0.34) 0%, rgba(56,189,248,0) 70%)',
+            background: 'radial-gradient(circle, rgba(56,189,248,0.34) 0%, rgba(56,189,248,0) 70%)',
           },
           '&::after': {
             content: '""',
@@ -150,8 +125,7 @@ export const LoginPage: React.FC = () => {
             width: 430,
             height: 430,
             borderRadius: '50%',
-            background:
-              'radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 70%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 70%)',
           },
         }}
       >
@@ -161,27 +135,13 @@ export const LoginPage: React.FC = () => {
               component="img"
               src={getBrandAssetUrl('admin', 'logoMark')}
               alt={`${BRAND_CONFIG.identity.name} logo`}
-              sx={{
-                width: 42,
-                height: 42,
-                filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.18))',
-              }}
+              sx={{ width: 42, height: 42, filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.18))' }}
             />
             <Box>
-              <Typography
-                variant="h5"
-                sx={{
-                  color: 'common.white',
-                  fontWeight: 750,
-                  lineHeight: 1.15,
-                }}
-              >
+              <Typography variant="h5" sx={{ color: 'common.white', fontWeight: 750, lineHeight: 1.15 }}>
                 {BRAND_CONFIG.identity.name}
               </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: 'rgba(255,255,255,0.68)' }}
-              >
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.68)' }}>
                 {BRAND_CONFIG.products.admin.fullName}
               </Typography>
             </Box>
@@ -189,54 +149,21 @@ export const LoginPage: React.FC = () => {
         </Box>
 
         <Box sx={{ position: 'relative', zIndex: 1, maxWidth: 520, my: 6 }}>
-          <Typography
-            variant="h2"
-            sx={{ color: 'common.white', mb: 1.5, maxWidth: 480 }}
-          >
+          <Typography variant="h2" sx={{ color: 'common.white', mb: 1.5, maxWidth: 480 }}>
             Operational clarity for the entire platform.
           </Typography>
-          <Typography
-            variant="body1"
-            sx={{
-              color: 'rgba(255,255,255,0.74)',
-              maxWidth: 500,
-              mb: 4,
-              lineHeight: 1.7,
-            }}
-          >
-            Securely manage users, Hosts, economy operations, realtime
-            infrastructure, moderation, content and system configuration from
-            one workspace.
+          <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.74)', maxWidth: 500, mb: 4, lineHeight: 1.7 }}>
+            Securely manage users, Hosts, economy operations, realtime infrastructure, moderation, content and system configuration from one workspace.
           </Typography>
           <Stack spacing={2.1}>
-            <FeatureLine
-              icon={<ShieldOutlinedIcon fontSize="small" />}
-              title="Role-aware administration"
-              description="Existing permissions and protected administrative workflows remain enforced."
-            />
-            <FeatureLine
-              icon={<CloudDoneOutlinedIcon fontSize="small" />}
-              title="Operational visibility"
-              description="Monitor the existing platform and infrastructure surfaces from a consistent control center."
-            />
-            <FeatureLine
-              icon={<InsightsOutlinedIcon fontSize="small" />}
-              title="Data-first interface"
-              description="Tables, statuses and financial information prioritize readability and precision."
-            />
+            <FeatureLine icon={<ShieldOutlinedIcon fontSize="small" />} title="Role-aware administration" description="Existing permissions and protected administrative workflows remain enforced." />
+            <FeatureLine icon={<CloudDoneOutlinedIcon fontSize="small" />} title="Operational visibility" description="Monitor the existing platform and infrastructure surfaces from a consistent control center." />
+            <FeatureLine icon={<InsightsOutlinedIcon fontSize="small" />} title="Data-first interface" description="Tables, statuses and financial information prioritize readability and precision." />
           </Stack>
         </Box>
 
-        <Typography
-          variant="caption"
-          sx={{
-            position: 'relative',
-            zIndex: 1,
-            color: 'rgba(255,255,255,0.58)',
-          }}
-        >
-          Authorized personnel only. Administrative activity is subject to audit
-          controls.
+        <Typography variant="caption" sx={{ position: 'relative', zIndex: 1, color: 'rgba(255,255,255,0.58)' }}>
+          Authorized personnel only. Administrative activity is subject to audit controls.
         </Typography>
       </Box>
 
@@ -253,39 +180,13 @@ export const LoginPage: React.FC = () => {
         }}
       >
         <Box sx={{ width: '100%', maxWidth: 470 }}>
-          <Box
-            sx={{
-              display: { xs: 'flex', lg: 'none' },
-              alignItems: 'center',
-              gap: 1.2,
-              mb: 3,
-              justifyContent: 'center',
-            }}
-          >
-            <Box
-              component="img"
-              src={getBrandAssetUrl('admin', 'logoMark')}
-              alt={`${BRAND_CONFIG.identity.name} logo`}
-              sx={{ width: 38, height: 38 }}
-            />
+          <Box sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', gap: 1.2, mb: 3, justifyContent: 'center' }}>
+            <Box component="img" src={getBrandAssetUrl('admin', 'logoMark')} alt={`${BRAND_CONFIG.identity.name} logo`} sx={{ width: 38, height: 38 }} />
             <Typography variant="h5">{BRAND_CONFIG.identity.name}</Typography>
           </Box>
 
-          <Card
-            elevation={0}
-            sx={{
-              boxShadow:
-                theme.palette.mode === 'dark'
-                  ? '0 22px 54px rgba(0,0,0,0.24)'
-                  : '0 22px 54px rgba(16,35,63,0.09)',
-            }}
-          >
-            <CardContent
-              sx={{
-                p: { xs: 2.5, sm: 3.5 },
-                '&:last-child': { pb: { xs: 2.5, sm: 3.5 } },
-              }}
-            >
+          <Card elevation={0} sx={{ boxShadow: theme.palette.mode === 'dark' ? '0 22px 54px rgba(0,0,0,0.24)' : '0 22px 54px rgba(16,35,63,0.09)' }}>
+            <CardContent sx={{ p: { xs: 2.5, sm: 3.5 }, '&:last-child': { pb: { xs: 2.5, sm: 3.5 } } }}>
               <Box sx={{ mb: 2.5 }}>
                 <Box
                   sx={{
@@ -295,28 +196,19 @@ export const LoginPage: React.FC = () => {
                     display: 'grid',
                     placeItems: 'center',
                     color: 'primary.main',
-                    bgcolor: alpha(
-                      theme.palette.primary.main,
-                      theme.palette.mode === 'dark' ? 0.16 : 0.075,
-                    ),
+                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.16 : 0.075),
                     mb: 1.5,
                   }}
                 >
                   <LockOutlinedIcon sx={{ fontSize: 21 }} />
                 </Box>
-                <Typography variant="h4" sx={{ mb: 0.65 }}>
-                  Administrator sign in
-                </Typography>
+                <Typography variant="h4" sx={{ mb: 0.65 }}>Administrator sign in</Typography>
                 <Typography variant="body2" color="text.secondary">
                   Use your authorized administrator credentials to continue.
                 </Typography>
               </Box>
 
-              {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
-              )}
+              {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
               <Box component="form" onSubmit={handleSubmit} noValidate>
                 <Stack spacing={1.6}>
@@ -342,19 +234,11 @@ export const LoginPage: React.FC = () => {
                         endAdornment: (
                           <InputAdornment position="end">
                             <IconButton
-                              onClick={() =>
-                                setShowPassword((current) => !current)
-                              }
+                              onClick={() => setShowPassword((current) => !current)}
                               edge="end"
-                              aria-label={
-                                showPassword ? 'Hide password' : 'Show password'
-                              }
+                              aria-label={showPassword ? 'Hide password' : 'Show password'}
                             >
-                              {showPassword ? (
-                                <VisibilityOff fontSize="small" />
-                              ) : (
-                                <Visibility fontSize="small" />
-                              )}
+                              {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                             </IconButton>
                           </InputAdornment>
                         ),
@@ -367,13 +251,7 @@ export const LoginPage: React.FC = () => {
                     variant="contained"
                     size="large"
                     disabled={isLoading}
-                    startIcon={
-                      isLoading ? (
-                        <CircularProgress size={18} color="inherit" />
-                      ) : (
-                        <LockOutlinedIcon fontSize="small" />
-                      )
-                    }
+                    startIcon={isLoading ? <CircularProgress size={18} color="inherit" /> : <LockOutlinedIcon fontSize="small" />}
                     sx={{ mt: 0.7, minHeight: 44 }}
                   >
                     {isLoading ? 'Authenticating…' : 'Sign in to Admin Console'}
@@ -382,15 +260,8 @@ export const LoginPage: React.FC = () => {
               </Box>
 
               <Divider sx={{ my: 2.5 }} />
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                align="center"
-                sx={{ display: 'block', lineHeight: 1.55 }}
-              >
-                Access is restricted to authorized administrative roles.
-                Authentication and administrative activity are logged according
-                to platform security policy.
+              <Typography variant="caption" color="text.secondary" align="center" sx={{ display: 'block', lineHeight: 1.55 }}>
+                Access is restricted to authorized administrative roles. Authentication and administrative activity are logged according to platform security policy.
               </Typography>
             </CardContent>
           </Card>

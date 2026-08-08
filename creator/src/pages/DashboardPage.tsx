@@ -1,342 +1,350 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Avatar,
-  Chip,
-  IconButton,
-  Divider,
-  Stack,
-  LinearProgress,
-  Skeleton,
   Alert,
   AlertTitle,
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Divider,
+  Grid,
+  IconButton,
+  Skeleton,
+  Stack,
+  Typography,
 } from '@mui/material';
 import {
-  Radio,
-  Users,
-  Crown,
-  Wallet,
-  DollarSign,
-  TrendingUp,
-  Gift,
-  Bell,
-  ArrowUpRight,
-  Plus,
-  Sparkles,
-  ChevronRight,
-  Zap,
   Activity,
-  CheckCircle2,
-  Calendar,
-  BadgeCheck,
-  RotateCcw,
-  Inbox,
   AlertCircle,
+  ArrowUpRight,
+  BadgeCheck,
+  Bell,
+  Calendar,
+  ChevronRight,
+  Crown,
+  DollarSign,
+  Gift,
+  Inbox,
+  Radio,
+  RotateCcw,
+  Sparkles,
+  Users,
+  Wallet,
+  Zap,
 } from 'lucide-react';
+import { BRAND_CONFIG } from '@shared/branding';
 import {
   useCreatorDashboard,
-  useCreatorProfile,
-  useCreatorWallet,
   useCreatorNotifications,
+  useCreatorProfile,
   useCreatorRecentActivity,
+  useCreatorWallet,
 } from '../hooks/useCreatorDashboard';
 import { useCreatorProfileStore } from '../store/creator-profile.store';
 import { WidgetErrorBoundary } from '../components/common/WidgetErrorBoundary';
+import { ConnectionStatusBadge } from '../components/common/ConnectionStatusBadge';
+
+const PAYOUT_USD_PER_DIAMOND = 0.005;
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-
-  // React Query Hooks (Critical & Optional Isolation)
   const dashboardQuery = useCreatorDashboard();
   const profileQuery = useCreatorProfile();
   const walletQuery = useCreatorWallet();
   const notificationsQuery = useCreatorNotifications();
   const activityQuery = useCreatorRecentActivity();
-
-  // Zustand Store Sync
   const storeProfile = useCreatorProfileStore((state) => state.profile);
 
-  // Critical Error State Check (If either profile or dashboard endpoint fails, show full page error state)
-  const isCriticalError = profileQuery.isError || dashboardQuery.isError;
-
-  // Derived Dashboard Data
-  const profile = profileQuery.data || storeProfile;
-  const dashboardData = dashboardQuery.data;
-  const walletData = walletQuery.data;
-
-  // Normalize the two accepted profile shapes for presentation only.
-  const profileVerified =
-    'verified' in profile ? profile.verified : profile.isVerified;
-  const profileTier = 'tier' in profile ? profile.tier : profile.creatorTier;
-  const profileLevel =
-    'level' in profile
-      ? profile.level
-      : (dashboardData?.creatorProfile?.level ?? 24);
-  const profileCategory =
-    'category' in profile ? profile.category : 'Podcast & Audio Lounge';
-  const profileHandle =
-    'handle' in profile ? profile.handle : `@${profile.username}`;
-
-  // Stats Card Config
-  const statsCards = [
-    {
-      title: 'Active Followers',
-      value: (profile.followersCount ?? 14250).toLocaleString(),
-      change: '+240 new this week',
-      icon: Users,
-      color: '#2563eb',
-      link: '/followers',
-    },
-    {
-      title: 'Active Subscribers',
-      value: (
-        dashboardData?.subscriberCount ??
-        profile.subscribersCount ??
-        840
-      ).toLocaleString(),
-      change: '84% VIP Retention Rate',
-      icon: Crown,
-      color: '#d97706',
-      link: '/subscribers',
-    },
-    {
-      title: 'Diamonds Earned',
-      value: `💎 ${(
-        walletData?.wallet?.totalDiamondsEarned ??
-        profile.walletDiamonds ??
-        84300
-      ).toLocaleString()}`,
-      change: '+14.2% vs last month',
-      icon: Radio,
-      color: '#7c3aed',
-      link: '/analytics',
-    },
-    {
-      title: 'Monthly Earnings (Est.)',
-      value: `$${(
-        dashboardData?.earningsSummary?.estimatedRecurringRevenue ?? 0
-      ).toFixed(2)}`,
-      change: '+18.5% growth',
-      icon: DollarSign,
-      color: '#059669',
-      link: '/earnings',
-    },
-  ];
-
-  if (isCriticalError) {
+  if (profileQuery.isError || dashboardQuery.isError) {
     return (
-      <Box sx={{ p: 4, maxWidth: 800, mx: 'auto', mt: 4 }}>
+      <Box sx={{ maxWidth: 820, mx: 'auto', mt: 4 }}>
         <Alert
           severity="error"
-          sx={{ borderRadius: 3, p: 3 }}
           action={
             <Button
               color="inherit"
-              size="medium"
               startIcon={<RotateCcw size={16} />}
               onClick={() => {
-                profileQuery.refetch();
-                dashboardQuery.refetch();
+                void profileQuery.refetch();
+                void dashboardQuery.refetch();
               }}
-              sx={{ fontWeight: 700 }}
             >
               Retry
             </Button>
           }
         >
-          <AlertTitle sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
-            Creator Studio Critical Service Error
+          <AlertTitle sx={{ fontWeight: 700 }}>
+            Creator Studio service unavailable
           </AlertTitle>
-          Unable to load critical creator profile or studio dashboard data.
-          Please verify your connection and click Retry to reload.
+          Unable to load the Creator profile or dashboard summary. Check the
+          connection and retry.
         </Alert>
       </Box>
     );
   }
 
+  const profile = profileQuery.data || storeProfile;
+  const dashboardData = dashboardQuery.data;
+  const walletData = walletQuery.data;
+  const profileVerified =
+    'verified' in profile ? profile.verified : profile.isVerified;
+  const profileTier = 'tier' in profile ? profile.tier : profile.creatorTier;
+  const profileLevel =
+    'level' in profile ? profile.level : dashboardData?.creatorProfile?.level;
+  const profileCategory = 'category' in profile ? profile.category : undefined;
+  const profileHandle =
+    'handle' in profile ? profile.handle : `@${profile.username}`;
+  const followerCount = Number(profile.followersCount ?? 0);
+  const subscriberCount = Number(
+    dashboardData?.subscriberCount ?? profile.subscribersCount ?? 0,
+  );
+  const diamondBalance = Number(
+    walletData?.wallet?.diamondBalance ?? profile.walletDiamonds ?? 0,
+  );
+  const recurringRevenue = Number(
+    dashboardData?.earningsSummary?.estimatedRecurringRevenue ?? 0,
+  );
+
+  const statsCards = [
+    {
+      title: 'Followers',
+      value: followerCount.toLocaleString(),
+      helper: 'Current creator community',
+      icon: Users,
+      tone: 'primary.main',
+      link: '/followers',
+    },
+    {
+      title: 'Subscribers',
+      value: subscriberCount.toLocaleString(),
+      helper: 'Current subscriber count',
+      icon: Crown,
+      tone: 'secondary.main',
+      link: '/subscribers',
+    },
+    {
+      title: 'Wallet Balance',
+      value: `💎 ${diamondBalance.toLocaleString()}`,
+      helper: 'Available diamond balance',
+      icon: Wallet,
+      tone: 'success.main',
+      link: '/wallet',
+    },
+    {
+      title: 'Recurring Revenue',
+      value: `$${recurringRevenue.toFixed(2)}`,
+      helper: 'Current backend estimate',
+      icon: DollarSign,
+      tone: 'success.main',
+      link: '/earnings',
+    },
+  ];
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* ================= 1. Creator Overview Header ================= */}
       {profileQuery.isLoading ? (
-        <Skeleton variant="rounded" height={140} sx={{ borderRadius: 3 }} />
+        <Skeleton variant="rounded" height={170} sx={{ borderRadius: 4 }} />
       ) : (
         <Card
           sx={{
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
-            color: '#ffffff',
-            boxShadow: '0 8px 32px rgba(124, 58, 237, 0.25)',
             overflow: 'hidden',
             position: 'relative',
+            color: '#f3faf6',
+            borderColor: 'rgba(94,234,212,0.18)',
+            background:
+              'radial-gradient(circle at 82% 22%, rgba(94,234,212,0.26), transparent 26%), radial-gradient(circle at 60% 120%, rgba(34,197,94,0.20), transparent 34%), linear-gradient(135deg, #123a32 0%, #0f766e 58%, #123a32 100%)',
+            boxShadow: '0 20px 52px rgba(8,45,35,0.20)',
           }}
         >
           <Box
             sx={{
-              p: { xs: 3, sm: 4 },
-              display: 'flex',
-              flexDirection: { xs: 'column', md: 'row' },
-              alignItems: { xs: 'flex-start', md: 'center' },
-              justifyContent: 'space-between',
-              gap: 2,
+              position: 'absolute',
+              inset: 0,
+              opacity: 0.28,
+              backgroundImage:
+                'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.08) 42%, transparent 70%)',
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            sx={{
               position: 'relative',
               zIndex: 1,
+              p: { xs: 3, sm: 4 },
+              display: 'flex',
+              flexDirection: { xs: 'column', lg: 'row' },
+              alignItems: { xs: 'flex-start', lg: 'center' },
+              justifyContent: 'space-between',
+              gap: 3,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2.5,
+                minWidth: 0,
+              }}
+            >
               <Avatar
-                src={profile.avatarUrl}
+                src={profile.avatarUrl || undefined}
                 alt={profile.displayName}
                 sx={{
-                  width: 72,
-                  height: 72,
-                  border: '3px solid #ffffff',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  width: { xs: 62, sm: 72 },
+                  height: { xs: 62, sm: 72 },
+                  border: '3px solid rgba(255,255,255,0.84)',
+                  boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
                 }}
               />
-              <Box>
-                <Box
+              <Box sx={{ minWidth: 0 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'rgba(243,250,246,0.70)', fontWeight: 600 }}
+                >
+                  Creator workspace
+                </Typography>
+                <Typography
+                  variant="h4"
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    flexWrap: 'wrap',
-                    mb: 0.5,
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    letterSpacing: '-0.025em',
+                    mt: 0.25,
+                    mb: 0.75,
                   }}
                 >
+                  Welcome back, {profile.displayName}
+                </Typography>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+                >
                   <Typography
-                    variant="h5"
-                    sx={{
-                      fontWeight: 800,
-                      letterSpacing: '-0.02em',
-                      color: '#ffffff',
-                    }}
+                    variant="body2"
+                    sx={{ color: 'rgba(243,250,246,0.72)' }}
                   >
-                    Welcome back, {profile.displayName}!
+                    {profileHandle}
                   </Typography>
                   {profileVerified && (
                     <Chip
-                      icon={<CheckCircle2 size={13} color="#ffffff" />}
-                      label="Verified Host"
+                      icon={<BadgeCheck size={13} />}
+                      label="Verified"
                       size="small"
                       sx={{
-                        bgcolor: 'rgba(255,255,255,0.2)',
+                        bgcolor: 'rgba(255,255,255,0.10)',
                         color: '#ffffff',
-                        fontWeight: 700,
-                        backdropFilter: 'blur(4px)',
                       }}
                     />
                   )}
                   {profileTier && (
                     <Chip
-                      label={`Level ${profileLevel} • ${profileTier} Tier`}
+                      label={`${profileTier}${profileLevel ? ` · Level ${profileLevel}` : ''}`}
                       size="small"
                       sx={{
-                        bgcolor: 'rgba(255,255,255,0.15)',
-                        color: '#ffffff',
-                        fontWeight: 600,
+                        bgcolor: 'rgba(34,197,94,0.18)',
+                        color: BRAND_CONFIG.colors.creator.primaryLight,
                       }}
                     />
                   )}
-                </Box>
-                <Typography
-                  variant="body2"
-                  sx={{ opacity: 0.9, color: 'rgba(255,255,255,0.85)' }}
-                >
-                  {profileCategory} • Username: <strong>{profileHandle}</strong>
-                </Typography>
+                  {profileCategory && (
+                    <Typography
+                      variant="caption"
+                      sx={{ color: 'rgba(243,250,246,0.62)' }}
+                    >
+                      {profileCategory}
+                    </Typography>
+                  )}
+                </Stack>
               </Box>
             </Box>
 
             <Stack
               direction={{ xs: 'column', sm: 'row' }}
-              spacing={1.5}
-              sx={{ width: { xs: '100%', md: 'auto' } }}
+              spacing={1.25}
+              sx={{ width: { xs: '100%', lg: 'auto' } }}
             >
               <Button
                 variant="contained"
-                size="large"
-                startIcon={<Radio size={18} />}
-                onClick={() => navigate('/rooms')}
+                startIcon={<Radio size={17} />}
+                onClick={() => {
+                  void navigate('/rooms');
+                }}
                 sx={{
-                  bgcolor: '#ffffff',
-                  color: '#7c3aed',
-                  fontWeight: 800,
-                  px: 3,
-                  '&:hover': { bgcolor: '#f8fafc' },
+                  bgcolor: BRAND_CONFIG.colors.creator.primary,
+                  color: '#07130d',
                 }}
               >
-                Go Live Now
+                Go Live
               </Button>
               <Button
                 variant="outlined"
-                size="large"
-                startIcon={<Calendar size={18} />}
-                onClick={() => navigate('/schedule')}
+                startIcon={<Calendar size={17} />}
+                onClick={() => {
+                  void navigate('/schedule');
+                }}
                 sx={{
-                  borderColor: 'rgba(255,255,255,0.5)',
+                  borderColor: 'rgba(255,255,255,0.30)',
                   color: '#ffffff',
-                  fontWeight: 700,
                   '&:hover': {
                     borderColor: '#ffffff',
-                    bgcolor: 'rgba(255,255,255,0.1)',
+                    bgcolor: 'rgba(255,255,255,0.07)',
                   },
                 }}
               >
-                Schedule Session
+                Schedule
               </Button>
               <Button
                 variant="outlined"
-                size="large"
-                startIcon={<BadgeCheck size={18} />}
-                onClick={() => navigate('/verification')}
+                startIcon={<BadgeCheck size={17} />}
+                onClick={() => {
+                  void navigate('/verification');
+                }}
                 sx={{
-                  borderColor: 'rgba(255,255,255,0.5)',
+                  borderColor: 'rgba(255,255,255,0.30)',
                   color: '#ffffff',
-                  fontWeight: 700,
                   '&:hover': {
                     borderColor: '#ffffff',
-                    bgcolor: 'rgba(255,255,255,0.1)',
+                    bgcolor: 'rgba(255,255,255,0.07)',
                   },
                 }}
               >
-                Host Verification
+                Verification
               </Button>
             </Stack>
           </Box>
         </Card>
       )}
 
-      {/* ================= 2. Top Statistics Cards ================= */}
       {dashboardQuery.isLoading ? (
         <Grid container spacing={2.5}>
-          {[1, 2, 3, 4].map((i) => (
-            <Grid key={i} size={{ xs: 12, sm: 6, lg: 3 }}>
-              <Skeleton
-                variant="rounded"
-                height={120}
-                sx={{ borderRadius: 3 }}
-              />
+          {[1, 2, 3, 4].map((item) => (
+            <Grid key={item} size={{ xs: 12, sm: 6, xl: 3 }}>
+              <Skeleton variant="rounded" height={118} />
             </Grid>
           ))}
         </Grid>
       ) : (
         <Grid container spacing={2.5}>
-          {statsCards.map((card, idx) => (
-            <Grid key={idx} size={{ xs: 12, sm: 6, lg: 3 }}>
+          {statsCards.map((card) => (
+            <Grid key={card.title} size={{ xs: 12, sm: 6, xl: 3 }}>
               <Card
-                onClick={() => navigate(card.link)}
+                onClick={() => {
+                  void navigate(card.link);
+                }}
                 sx={{
+                  height: '100%',
                   cursor: 'pointer',
-                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                  transition:
+                    'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
                   '&:hover': {
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+                    borderColor: 'primary.main',
+                    boxShadow: '0 12px 30px rgba(16,35,31,0.10)',
                   },
                 }}
               >
@@ -344,51 +352,37 @@ export const DashboardPage: React.FC = () => {
                   <Box
                     sx={{
                       display: 'flex',
-                      alignItems: 'center',
                       justifyContent: 'space-between',
+                      gap: 2,
                       mb: 1.5,
                     }}
                   >
                     <Typography
                       variant="caption"
                       color="text.secondary"
-                      sx={{
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
+                      sx={{ fontWeight: 700 }}
                     >
                       {card.title}
                     </Typography>
                     <Box
                       sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 2,
-                        bgcolor: `${card.color}15`,
-                        color: card.color,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        width: 34,
+                        height: 34,
+                        borderRadius: 2.5,
+                        bgcolor: 'action.selected',
+                        color: card.tone,
+                        display: 'grid',
+                        placeItems: 'center',
                       }}
                     >
-                      <card.icon size={20} />
+                      <card.icon size={18} />
                     </Box>
                   </Box>
-                  <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>
+                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
                     {card.value}
                   </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: 'success.main',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                    }}
-                  >
-                    <TrendingUp size={13} /> {card.change}
+                  <Typography variant="caption" color="text.secondary">
+                    {card.helper}
                   </Typography>
                 </CardContent>
               </Card>
@@ -397,106 +391,110 @@ export const DashboardPage: React.FC = () => {
         </Grid>
       )}
 
-      {/* ================= 3. Middle Section: Live Room Status & Wallet Summary ================= */}
       <Grid container spacing={3}>
-        {/* Live Room Status Widget */}
-        <Grid size={{ xs: 12, md: 7, lg: 8 }}>
-          <Card sx={{ height: '100%' }}>
+        <Grid size={{ xs: 12, lg: 7 }}>
+          <Card sx={{ height: '100%', overflow: 'hidden' }}>
             <CardContent sx={{ p: 3 }}>
               <Box
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  gap: 2,
                   mb: 2,
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Radio size={20} color="#7c3aed" />
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    Live Room Status
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.35 }}>
+                    Live Studio
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Open the existing Live Rooms workspace for room lifecycle,
+                    audience and Host controls.
                   </Typography>
                 </Box>
-                <Chip
-                  label="Offline / Ready"
-                  color="default"
-                  size="small"
-                  sx={{ fontWeight: 700 }}
-                />
+                <ConnectionStatusBadge />
               </Box>
-
               <Divider sx={{ mb: 2.5 }} />
 
               <Box
                 sx={{
-                  p: 2.5,
-                  borderRadius: 2.5,
-                  bgcolor: 'action.hover',
+                  minHeight: 205,
+                  borderRadius: 3.5,
+                  p: { xs: 2.5, sm: 3 },
+                  display: 'grid',
+                  placeItems: 'center',
+                  textAlign: 'center',
                   border: '1px solid',
                   borderColor: 'divider',
-                  mb: 2.5,
+                  background:
+                    'radial-gradient(circle at 50% 48%, rgba(34,197,94,0.14), transparent 30%), linear-gradient(135deg, rgba(18,58,50,0.05), rgba(94,234,212,0.04))',
                 }}
               >
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 700, mb: 0.5 }}
-                >
-                  Primary Audio Room: Late Night Audio Lounge & Chill Beats
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2 }}
-                >
-                  Audio Preset: 324kbps Ultra HD Voice | Soundboard Active |
-                  Co-Host Mic Seats: 8 Seats Available
-                </Typography>
-
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  sx={{ alignItems: 'center' }}
-                >
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<Radio size={16} />}
-                    onClick={() => navigate('/rooms')}
+                <Box>
+                  <Box
+                    sx={{
+                      width: 82,
+                      height: 82,
+                      borderRadius: '50%',
+                      mx: 'auto',
+                      mb: 2,
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: 'primary.main',
+                      bgcolor: 'action.selected',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    }}
                   >
-                    Manage Room
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    onClick={() => navigate('/settings')}
+                    <Radio size={34} />
+                  </Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.75 }}>
+                    Ready for your next live session
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ maxWidth: 520, mx: 'auto', mb: 2.5 }}
                   >
-                    Audio Settings
-                  </Button>
-                </Stack>
+                    No sample room state is shown here. Live status and controls
+                    remain authoritative in the existing Live Rooms page.
+                  </Typography>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1.25}
+                    sx={{ justifyContent: 'center' }}
+                  >
+                    <Button
+                      variant="contained"
+                      startIcon={<Radio size={16} />}
+                      onClick={() => {
+                        void navigate('/rooms');
+                      }}
+                    >
+                      Manage Live Rooms
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        void navigate('/settings');
+                      }}
+                    >
+                      Studio Settings
+                    </Button>
+                  </Stack>
+                </Box>
               </Box>
-
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}
-              >
-                Stream Quality Health Score: 98/100 (Optimal Bitrate)
-              </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={98}
-                color="success"
-                sx={{ height: 8, borderRadius: 4 }}
-              />
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Creator Wallet Summary Widget (Optional Service - Isolated Error Boundary) */}
-        <Grid size={{ xs: 12, md: 5, lg: 4 }}>
+        <Grid size={{ xs: 12, lg: 5 }}>
           <WidgetErrorBoundary
             title="Wallet"
-            onRetry={() => walletQuery.refetch()}
+            onRetry={() => {
+              void walletQuery.refetch();
+            }}
           >
             <Card sx={{ height: '100%' }}>
               <CardContent sx={{ p: 3 }}>
@@ -508,41 +506,35 @@ export const DashboardPage: React.FC = () => {
                     mb: 2,
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Wallet size={20} color="#059669" />
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      Wallet Summary
+                  <Box>
+                    <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.35 }}>
+                      Wallet & Earnings
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Current authoritative balances
                     </Typography>
                   </Box>
-                  <IconButton size="small" onClick={() => navigate('/wallet')}>
+                  <IconButton
+                    onClick={() => {
+                      void navigate('/wallet');
+                    }}
+                    aria-label="Open wallet"
+                  >
                     <ChevronRight size={18} />
                   </IconButton>
                 </Box>
-
                 <Divider sx={{ mb: 2.5 }} />
 
                 {walletQuery.isLoading ? (
                   <Stack spacing={2}>
-                    <Skeleton variant="rectangular" height={60} />
-                    <Skeleton variant="rectangular" height={80} />
+                    <Skeleton height={58} />
+                    <Skeleton height={96} />
                   </Stack>
                 ) : walletQuery.isError ? (
-                  <Box
-                    sx={{
-                      py: 3,
-                      px: 2,
-                      textAlign: 'center',
-                      bgcolor: 'action.hover',
-                      borderRadius: 2,
-                      border: '1px dashed',
-                      borderColor: 'divider',
-                    }}
-                  >
-                    <AlertCircle
-                      size={32}
-                      color="#f59e0b"
-                      style={{ marginBottom: 8 }}
-                    />
+                  <Box sx={{ py: 4, textAlign: 'center' }}>
+                    <Box sx={{ color: 'warning.main', mb: 1 }}>
+                      <AlertCircle size={30} />
+                    </Box>
                     <Typography
                       variant="subtitle2"
                       sx={{ fontWeight: 700, mb: 0.5 }}
@@ -554,143 +546,143 @@ export const DashboardPage: React.FC = () => {
                       color="text.secondary"
                       sx={{ display: 'block', mb: 2 }}
                     >
-                      Unable to retrieve current balance.
+                      Unable to retrieve current balances.
                     </Typography>
                     <Button
                       variant="outlined"
                       size="small"
                       startIcon={<RotateCcw size={14} />}
-                      onClick={() => walletQuery.refetch()}
-                      sx={{ fontWeight: 600 }}
+                      onClick={() => {
+                        void walletQuery.refetch();
+                      }}
                     >
                       Retry
                     </Button>
                   </Box>
                 ) : (
                   <>
-                    <Box sx={{ mb: 2.5 }}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontWeight: 600 }}
-                      >
-                        Available Diamonds Balance
-                      </Typography>
-                      <Typography
-                        variant="h4"
-                        sx={{
-                          fontWeight: 800,
-                          color: 'primary.main',
-                          my: 0.5,
-                        }}
-                      >
-                        💎{' '}
-                        {(
-                          walletData?.wallet?.diamondBalance ??
-                          profile.walletDiamonds ??
-                          84300
-                        ).toLocaleString()}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Available USD Value:{' '}
-                        <strong>
-                          $
-                          {(
-                            Number(
-                              walletData?.wallet?.withdrawableBalance ?? 0,
-                            ) * 0.005
-                          ).toFixed(2)}{' '}
-                          USD
-                        </strong>
-                      </Typography>
-                    </Box>
+                    <Grid container spacing={2} sx={{ mb: 2.5 }}>
+                      <Grid size={{ xs: 6 }}>
+                        <Box
+                          sx={{
+                            p: 2,
+                            borderRadius: 3,
+                            bgcolor: 'action.hover',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Wallet balance
+                          </Typography>
+                          <Typography
+                            variant="h5"
+                            sx={{ fontWeight: 700, mt: 0.5 }}
+                          >
+                            💎{' '}
+                            {Number(
+                              walletData?.wallet?.diamondBalance ?? 0,
+                            ).toLocaleString()}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Box
+                          sx={{
+                            p: 2,
+                            borderRadius: 3,
+                            bgcolor: 'action.hover',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Available for payout
+                          </Typography>
+                          <Typography
+                            variant="h5"
+                            sx={{
+                              fontWeight: 700,
+                              mt: 0.5,
+                              color: 'success.main',
+                            }}
+                          >
+                            $
+                            {(
+                              Number(
+                                walletData?.wallet?.withdrawableBalance ?? 0,
+                              ) * PAYOUT_USD_PER_DIAMOND
+                            ).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
 
-                    <Box
-                      sx={{
-                        p: 2,
-                        borderRadius: 2,
-                        bgcolor: 'action.hover',
-                        mb: 2.5,
-                      }}
-                    >
+                    <Stack spacing={1.25} sx={{ mb: 2.5 }}>
                       <Box
                         sx={{
                           display: 'flex',
                           justifyContent: 'space-between',
-                          alignItems: 'center',
-                          mb: 1,
+                          gap: 2,
                         }}
                       >
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          Coins Balance:
+                        <Typography variant="body2" color="text.secondary">
+                          Pending payouts
                         </Typography>
-                        <Typography
-                          variant="subtitle2"
-                          sx={{ fontWeight: 700 }}
-                        >
-                          🪙{' '}
-                          {(
-                            walletData?.wallet?.coinBalance ??
-                            profile.walletCoins ??
-                            12500
-                          ).toLocaleString()}
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          $
+                          {Number(
+                            dashboardData?.earningsSummary?.pendingPayouts ?? 0,
+                          ).toFixed(2)}
                         </Typography>
                       </Box>
-
                       <Box
                         sx={{
                           display: 'flex',
                           justifyContent: 'space-between',
-                          alignItems: 'center',
-                          mb: 1,
+                          gap: 2,
                         }}
                       >
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          Pending Payouts:
+                        <Typography variant="body2" color="text.secondary">
+                          Lifetime earnings
                         </Typography>
                         <Typography
-                          variant="subtitle2"
-                          sx={{ fontWeight: 700, color: 'warning.main' }}
-                        >
-                          $
-                          {(
-                            dashboardData?.earningsSummary?.pendingPayouts ?? 0
-                          ).toFixed(2)}{' '}
-                          USD
-                        </Typography>
-                      </Box>
-
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          Lifetime Earnings:
-                        </Typography>
-                        <Typography
-                          variant="subtitle2"
+                          variant="body2"
                           sx={{ fontWeight: 700, color: 'success.main' }}
                         >
                           $
-                          {(
+                          {Number(
                             dashboardData?.earningsSummary?.lifetimeEarnings ??
-                            0
-                          ).toFixed(2)}{' '}
-                          USD
+                              0,
+                          ).toFixed(2)}
                         </Typography>
                       </Box>
-                    </Box>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: 2,
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Active plans
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {Number(
+                            dashboardData?.plansSummary?.activePlans ?? 0,
+                          ).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Stack>
 
                     <Button
+                      fullWidth
                       variant="contained"
                       color="success"
-                      fullWidth
-                      startIcon={<DollarSign size={18} />}
-                      onClick={() => navigate('/payout-requests')}
-                      sx={{ fontWeight: 700 }}
+                      startIcon={<DollarSign size={17} />}
+                      onClick={() => {
+                        void navigate('/payout-requests');
+                      }}
                     >
                       Request Payout
                     </Button>
@@ -702,13 +694,13 @@ export const DashboardPage: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* ================= 4. Bottom Section: Recent Activity & Notifications ================= */}
       <Grid container spacing={3}>
-        {/* Recent Activity Stream (Optional Service - Isolated Error Boundary) */}
-        <Grid size={{ xs: 12, md: 7, lg: 8 }}>
+        <Grid size={{ xs: 12, lg: 7 }}>
           <WidgetErrorBoundary
             title="Recent Activity"
-            onRetry={() => activityQuery.refetch()}
+            onRetry={() => {
+              void activityQuery.refetch();
+            }}
           >
             <Card>
               <CardContent sx={{ p: 3 }}>
@@ -720,63 +712,54 @@ export const DashboardPage: React.FC = () => {
                     mb: 2,
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Activity size={20} color="#2563eb" />
+                  <Box
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}
+                  >
+                    <Box sx={{ color: 'primary.main', display: 'flex' }}>
+                      <Activity size={19} />
+                    </Box>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      Recent Activity Stream
+                      Recent Activity
                     </Typography>
                   </Box>
                   <Button
                     size="small"
-                    endIcon={<ChevronRight size={16} />}
-                    onClick={() => navigate('/gifts')}
+                    endIcon={<ChevronRight size={15} />}
+                    onClick={() => {
+                      void navigate('/analytics');
+                    }}
                   >
-                    View All
+                    Analytics
                   </Button>
                 </Box>
-
                 <Divider sx={{ mb: 2 }} />
 
                 {activityQuery.isLoading ? (
-                  <Stack spacing={2}>
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton
-                        key={i}
-                        variant="rectangular"
-                        height={64}
-                        sx={{ borderRadius: 2 }}
-                      />
+                  <Stack spacing={1.5}>
+                    {[1, 2, 3].map((item) => (
+                      <Skeleton key={item} variant="rounded" height={64} />
                     ))}
                   </Stack>
-                ) : activityQuery.isError ||
-                  !activityQuery.data ||
-                  activityQuery.data.length === 0 ? (
+                ) : !activityQuery.data || activityQuery.data.length === 0 ? (
                   <Box
-                    sx={{
-                      py: 6,
-                      textAlign: 'center',
-                      bgcolor: 'action.hover',
-                      borderRadius: 2,
-                    }}
+                    sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}
                   >
-                    <Inbox size={36} color="#94a3b8" />
-                    <Typography
-                      variant="subtitle2"
-                      color="text.secondary"
-                      sx={{ mt: 1 }}
-                    >
+                    <Inbox size={34} />
+                    <Typography variant="body2" sx={{ mt: 1 }}>
                       No recent activity
                     </Typography>
                   </Box>
                 ) : (
-                  <Stack spacing={2}>
-                    {activityQuery.data.map((act) => (
+                  <Stack spacing={1.25}>
+                    {activityQuery.data.slice(0, 5).map((activity) => (
                       <Box
-                        key={act.id}
+                        key={activity.id}
                         sx={{
-                          p: 2,
-                          borderRadius: 2,
+                          p: 1.75,
+                          borderRadius: 3,
                           bgcolor: 'action.hover',
+                          border: '1px solid',
+                          borderColor: 'divider',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -784,56 +767,61 @@ export const DashboardPage: React.FC = () => {
                         }}
                       >
                         <Box
-                          sx={{ display: 'flex', alignItems: 'center', gap: 2 }}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            minWidth: 0,
+                          }}
                         >
                           <Box
                             sx={{
-                              width: 42,
-                              height: 42,
-                              borderRadius: 2,
-                              bgcolor: `${act.color || '#6366f1'}15`,
-                              color: act.color || '#6366f1',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
+                              width: 38,
+                              height: 38,
+                              borderRadius: 2.5,
+                              bgcolor: 'action.selected',
+                              color: 'primary.main',
+                              display: 'grid',
+                              placeItems: 'center',
                               flexShrink: 0,
                             }}
                           >
-                            {act.type === 'gift' ? (
-                              <Gift size={20} />
-                            ) : act.type === 'subscription' ? (
-                              <Crown size={20} />
-                            ) : act.type === 'payout' ? (
-                              <Wallet size={20} />
+                            {activity.type === 'gift' ? (
+                              <Gift size={18} />
+                            ) : activity.type === 'subscription' ? (
+                              <Crown size={18} />
+                            ) : activity.type === 'payout' ? (
+                              <Wallet size={18} />
                             ) : (
-                              <Zap size={20} />
+                              <Zap size={18} />
                             )}
                           </Box>
-                          <Box>
+                          <Box sx={{ minWidth: 0 }}>
                             <Typography
                               variant="subtitle2"
                               sx={{ fontWeight: 700 }}
+                              noWrap
                             >
-                              {act.title}
+                              {activity.title}
                             </Typography>
                             <Typography
                               variant="caption"
                               color="text.secondary"
+                              noWrap
                             >
-                              {act.subtitle}
+                              {activity.subtitle}
                             </Typography>
                           </Box>
                         </Box>
-
-                        <Box sx={{ textAlign: 'right' }}>
+                        <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
                           <Typography
-                            variant="subtitle2"
-                            sx={{ fontWeight: 700, color: 'primary.main' }}
+                            variant="body2"
+                            sx={{ fontWeight: 700, color: 'success.main' }}
                           >
-                            {act.value}
+                            {activity.value}
                           </Typography>
-                          <Typography variant="caption" color="text.disabled">
-                            {act.time}
+                          <Typography variant="caption" color="text.secondary">
+                            {activity.time}
                           </Typography>
                         </Box>
                       </Box>
@@ -845,75 +833,55 @@ export const DashboardPage: React.FC = () => {
           </WidgetErrorBoundary>
         </Grid>
 
-        {/* Quick Actions Panel & Notifications Widget */}
-        <Grid size={{ xs: 12, md: 5, lg: 4 }}>
+        <Grid size={{ xs: 12, lg: 5 }}>
           <Stack spacing={3}>
-            {/* Quick Actions Panel */}
             <Card>
               <CardContent sx={{ p: 3 }}>
                 <Box
                   sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}
                 >
-                  <Sparkles size={20} color="#7c3aed" />
+                  <Box sx={{ color: 'primary.main', display: 'flex' }}>
+                    <Sparkles size={19} />
+                  </Box>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    Quick Studio Actions
+                    Studio Actions
                   </Typography>
                 </Box>
-                <Divider sx={{ mb: 2 }} />
-
-                <Grid container spacing={1.5}>
-                  <Grid size={{ xs: 6 }}>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      startIcon={<Plus size={16} />}
-                      onClick={() => navigate('/subscribers')}
-                      sx={{ py: 1.5, fontSize: '0.8125rem', fontWeight: 600 }}
-                    >
-                      New Plan
-                    </Button>
-                  </Grid>
-                  <Grid size={{ xs: 6 }}>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      startIcon={<Calendar size={16} />}
-                      onClick={() => navigate('/schedule')}
-                      sx={{ py: 1.5, fontSize: '0.8125rem', fontWeight: 600 }}
-                    >
-                      Schedule
-                    </Button>
-                  </Grid>
-                  <Grid size={{ xs: 6 }}>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      startIcon={<Gift size={16} />}
-                      onClick={() => navigate('/gifts')}
-                      sx={{ py: 1.5, fontSize: '0.8125rem', fontWeight: 600 }}
-                    >
-                      Gift Log
-                    </Button>
-                  </Grid>
-                  <Grid size={{ xs: 6 }}>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      startIcon={<ArrowUpRight size={16} />}
-                      onClick={() => navigate('/analytics')}
-                      sx={{ py: 1.5, fontSize: '0.8125rem', fontWeight: 600 }}
-                    >
-                      Analytics
-                    </Button>
-                  </Grid>
+                <Grid container spacing={1.25}>
+                  {[
+                    ['Live Rooms', Radio, '/rooms'],
+                    ['Schedule', Calendar, '/schedule'],
+                    ['Gift Log', Gift, '/gifts'],
+                    ['Analytics', ArrowUpRight, '/analytics'],
+                  ].map(([label, Icon, path]) => {
+                    const IconComponent = Icon as React.ComponentType<{
+                      size?: number;
+                    }>;
+                    return (
+                      <Grid key={label as string} size={{ xs: 6 }}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          startIcon={<IconComponent size={15} />}
+                          onClick={() => {
+                            void navigate(path as string);
+                          }}
+                          sx={{ py: 1.25 }}
+                        >
+                          {label as string}
+                        </Button>
+                      </Grid>
+                    );
+                  })}
                 </Grid>
               </CardContent>
             </Card>
 
-            {/* Notifications Widget (Optional Service - Isolated Error Boundary) */}
             <WidgetErrorBoundary
               title="Notifications"
-              onRetry={() => notificationsQuery.refetch()}
+              onRetry={() => {
+                void notificationsQuery.refetch();
+              }}
             >
               <Card>
                 <CardContent sx={{ p: 3 }}>
@@ -926,61 +894,66 @@ export const DashboardPage: React.FC = () => {
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Bell size={20} color="#d97706" />
+                      <Box sx={{ color: 'info.main', display: 'flex' }}>
+                        <Bell size={19} />
+                      </Box>
                       <Typography variant="h6" sx={{ fontWeight: 700 }}>
                         Notifications
                       </Typography>
                     </Box>
                     <Button
                       size="small"
-                      onClick={() => navigate('/notifications')}
+                      onClick={() => {
+                        void navigate('/notifications');
+                      }}
                     >
-                      View
+                      View all
                     </Button>
                   </Box>
                   <Divider sx={{ mb: 2 }} />
-
                   {notificationsQuery.isLoading ? (
-                    <Stack spacing={1.5}>
-                      <Skeleton variant="rectangular" height={48} />
-                      <Skeleton variant="rectangular" height={48} />
+                    <Stack spacing={1.25}>
+                      <Skeleton height={46} />
+                      <Skeleton height={46} />
                     </Stack>
-                  ) : notificationsQuery.isError ||
-                    !notificationsQuery.data?.data ||
-                    notificationsQuery.data.data.length === 0 ? (
+                  ) : !notificationsQuery.data?.data?.length ? (
                     <Typography
-                      variant="caption"
+                      variant="body2"
                       color="text.secondary"
-                      sx={{ display: 'block', textAlign: 'center', py: 2 }}
+                      sx={{ py: 2, textAlign: 'center' }}
                     >
                       No notifications available
                     </Typography>
                   ) : (
-                    <Stack spacing={1.5}>
-                      {notificationsQuery.data.data.slice(0, 3).map((notif) => (
-                        <Box
-                          key={notif.id}
-                          sx={{
-                            p: 1.5,
-                            borderRadius: 2,
-                            bgcolor: 'action.hover',
-                          }}
-                        >
-                          <Typography
-                            variant="subtitle2"
-                            sx={{ fontWeight: 700, fontSize: '0.8125rem' }}
+                    <Stack spacing={1.25}>
+                      {notificationsQuery.data.data
+                        .slice(0, 3)
+                        .map((notification) => (
+                          <Box
+                            key={notification.id}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 2.5,
+                              bgcolor: 'action.hover',
+                              border: '1px solid',
+                              borderColor: 'divider',
+                            }}
                           >
-                            {notif.title}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: 'block', my: 0.5 }}
-                          >
-                            {notif.message}
-                          </Typography>
-                        </Box>
-                      ))}
+                            <Typography
+                              variant="subtitle2"
+                              sx={{ fontWeight: 700 }}
+                            >
+                              {notification.title}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: 'block', mt: 0.35 }}
+                            >
+                              {notification.message}
+                            </Typography>
+                          </Box>
+                        ))}
                     </Stack>
                   )}
                 </CardContent>
