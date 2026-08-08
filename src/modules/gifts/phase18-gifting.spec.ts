@@ -1,11 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { RedisService } from '../../redis/redis.service';
 import { LuckyBoxTier } from './dto/lucky-box.dto';
 import { GiftingEngineService } from './gifting-engine.service';
 import { LuckyBoxService } from './lucky-box.service';
 import { MultiGiftingService } from './multi-gifting.service';
+import { WalletMutationService } from '../wallet/wallet-mutation.service';
+import { LuckyBoxOpening } from './entities/lucky-box-opening.entity';
 
 describe('Phase18 Gifting Engine', () => {
   let multiGiftingService: MultiGiftingService;
@@ -14,6 +17,8 @@ describe('Phase18 Gifting Engine', () => {
   let eventsGateway: any;
   let roomEmitter: any;
   let giftingEngineService: any;
+  let coinBalance: number;
+  let luckyBoxOpenings: Map<string, any>;
 
   beforeEach(async () => {
     redisService = {
@@ -49,6 +54,58 @@ describe('Phase18 Gifting Engine', () => {
       }),
     };
 
+    coinBalance = 2000;
+    luckyBoxOpenings = new Map();
+    const luckyBoxRepository = {
+      findOne: jest
+        .fn()
+        .mockImplementation(({ where }) =>
+          Promise.resolve(luckyBoxOpenings.get(where.operationKey) || null),
+        ),
+      create: jest
+        .fn()
+        .mockImplementation((value) => ({ id: 'opening-1', ...value })),
+      save: jest.fn().mockImplementation(async (value) => {
+        luckyBoxOpenings.set(value.operationKey, value);
+        return value;
+      }),
+    };
+    const dataSource = {
+      transaction: jest.fn().mockImplementation(async (callback) =>
+        callback({
+          query: jest.fn().mockResolvedValue(undefined),
+          getRepository: jest.fn().mockImplementation((entity) => {
+            if (entity === LuckyBoxOpening) return luckyBoxRepository;
+            throw new Error('Unexpected repository in Lucky Box test');
+          }),
+        }),
+      ),
+    };
+    const walletMutationService = {
+      debitInTransaction: jest
+        .fn()
+        .mockImplementation(async (_manager, input) => {
+          if (coinBalance < input.amount)
+            throw new BadRequestException('Insufficient coin balance');
+          coinBalance -= input.amount;
+          return {
+            wallet: { coinBalance },
+            transaction: { id: 'debit-1' },
+            idempotent: false,
+          };
+        }),
+      creditInTransaction: jest
+        .fn()
+        .mockImplementation(async (_manager, input) => {
+          coinBalance += input.amount;
+          return {
+            wallet: { coinBalance },
+            transaction: { id: 'credit-1' },
+            idempotent: false,
+          };
+        }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MultiGiftingService,
@@ -56,6 +113,8 @@ describe('Phase18 Gifting Engine', () => {
         { provide: RedisService, useValue: redisService },
         { provide: EventsGateway, useValue: eventsGateway },
         { provide: GiftingEngineService, useValue: giftingEngineService },
+        { provide: DataSource, useValue: dataSource },
+        { provide: WalletMutationService, useValue: walletMutationService },
       ],
     }).compile();
 
@@ -160,28 +219,39 @@ describe('Phase18 Gifting Engine', () => {
   });
 
   describe('LuckyBoxService', () => {
-    it('should throw BadRequestException if insufficient coins for lucky box', async () => {
-      redisService.get.mockResolvedValue('10');
-
+    it('should reject authoritative wallet debit when coins are insufficient', async () => {
+      coinBalance = 10;
       await expect(
         luckyBoxService.openLuckyBox('user-1', {
           tier: LuckyBoxTier.GOLD,
           count: 1,
+          operationKey: 'lucky-insufficient',
         }),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should open lucky box successfully and return rewards', async () => {
-      redisService.get.mockResolvedValue('2000');
-
-      const result = await luckyBoxService.openLuckyBox('user-1', {
+    it('should settle and replay the same Lucky Box operation exactly once', async () => {
+      coinBalance = 2000;
+      const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      const first = await luckyBoxService.openLuckyBox('user-1', {
         tier: LuckyBoxTier.BRONZE,
         count: 2,
+        operationKey: 'lucky-authority-1',
       });
+      const balanceAfterFirst = coinBalance;
+      const replay = await luckyBoxService.openLuckyBox('user-1', {
+        tier: LuckyBoxTier.BRONZE,
+        count: 2,
+        operationKey: 'lucky-authority-1',
+      });
+      randomSpy.mockRestore();
 
-      expect(result.success).toBe(true);
-      expect(result.data.rewards.length).toBe(2);
-      expect(redisService.set).toHaveBeenCalled();
+      expect(first.success).toBe(true);
+      expect(first.data.rewards).toHaveLength(2);
+      expect(replay.idempotent).toBe(true);
+      expect(replay.data.rewards).toEqual(first.data.rewards);
+      expect(coinBalance).toBe(balanceAfterFirst);
+      expect(redisService.set).not.toHaveBeenCalled();
     });
   });
 });

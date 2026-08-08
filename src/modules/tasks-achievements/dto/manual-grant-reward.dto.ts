@@ -21,6 +21,11 @@ export class ManualGrantRewardDto {
   @IsOptional()
   metadata?: string;
 
+  @ApiPropertyOptional({ description: 'Optional retry idempotency key' })
+  @IsString()
+  @IsOptional()
+  operationKey?: string;
+
   @ApiPropertyOptional({
     description: 'Reason or source note',
     example: 'Admin promotion',

@@ -49,6 +49,7 @@ export const JOB_TYPES = {
   },
   PAYOUT: {
     PROCESS_PAYOUT: 'process-payout',
+    VERIFY_RESERVATION: 'verify-payout-reservation',
   },
   RTC_CLEANUP: {
     CLEANUP_STALE_ROOM: 'cleanup-stale-room',
@@ -69,6 +70,7 @@ export const JOB_TYPES = {
     SEASONAL_EXPIRATION: 'gift-seasonal-expiration',
     STATISTICS_AGGREGATION: 'gift-statistics-aggregation',
     CACHE_REFRESH: 'gift-cache-refresh',
+    SETTLEMENT_VERIFY: 'gift-settlement-verify',
   },
   VIP: {
     REWARD_DISTRIBUTION: 'reward-distribution',

@@ -16,6 +16,7 @@ import { EventsModule } from '../../common/events/events.module';
 import { RedisModule } from '../../redis/redis.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { GiftSettlementService } from './gift-settlement.service';
+import { LuckyBoxOpening } from './entities/lucky-box-opening.entity';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { GiftSettlementService } from './gift-settlement.service';
       GiftCategory,
       GiftTransaction,
       GiftQueueItem,
+      LuckyBoxOpening,
     ]),
     StorageModule,
     EventsModule,

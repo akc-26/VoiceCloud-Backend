@@ -14,6 +14,8 @@ import { VipController } from './vip.controller';
 import { RedisModule } from '../../redis/redis.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EventsModule } from '../../common/events/events.module';
+import { WalletModule } from '../wallet/wallet.module';
+import { VipFinancialAuthorityService } from './vip-financial-authority.service';
 
 @Module({
   imports: [
@@ -29,9 +31,10 @@ import { EventsModule } from '../../common/events/events.module';
     RedisModule,
     NotificationsModule,
     EventsModule,
+    WalletModule,
   ],
   controllers: [VipController],
-  providers: [VipService],
-  exports: [VipService],
+  providers: [VipService, VipFinancialAuthorityService],
+  exports: [VipService, VipFinancialAuthorityService],
 })
 export class VipModule {}

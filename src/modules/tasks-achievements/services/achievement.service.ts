@@ -79,19 +79,6 @@ export class AchievementService {
 
         if (!existing) {
           try {
-            const unlock = this.userAchievementRepo.create({
-              userId,
-              achievementId: def.id,
-              unlockedAt: new Date(),
-            });
-            const saved = await this.userAchievementRepo.save(unlock);
-            newUnlocks.push(saved);
-
-            this.logger.log(
-              `User ${userId} unlocked achievement: ${def.title} (${def.rarity})`,
-            );
-
-            // Distribute rewards
             await this.rewardEngineService.distributeReward(
               userId,
               {
@@ -107,6 +94,19 @@ export class AchievementService {
               },
               'achievement_unlock',
               def.id,
+              `reward:achievement_unlock:${def.id}:${userId}`,
+            );
+
+            const unlock = this.userAchievementRepo.create({
+              userId,
+              achievementId: def.id,
+              unlockedAt: new Date(),
+            });
+            const saved = await this.userAchievementRepo.save(unlock);
+            newUnlocks.push(saved);
+
+            this.logger.log(
+              `User ${userId} unlocked achievement: ${def.title} (${def.rarity})`,
             );
 
             if (def.xpBonus > 0) {

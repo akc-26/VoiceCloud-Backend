@@ -9,7 +9,6 @@ import { UserStreak } from './entities/user-streak.entity';
 import { DailyCheckIn } from './entities/daily-check-in.entity';
 import { SeasonalEvent } from './entities/seasonal-event.entity';
 import { RewardAuditLog } from './entities/reward-audit-log.entity';
-import { User } from '../users/entities/user.entity';
 
 import { RewardEngineService } from './services/reward-engine.service';
 import { XpEngineService } from './services/xp-engine.service';
@@ -24,6 +23,7 @@ import { TasksAchievementsController } from './controllers/tasks-achievements.co
 import { AdminTasksAchievementsController } from './controllers/admin-tasks-achievements.controller';
 import { EventsModule } from '../../common/events/events.module';
 import { RedisModule } from '../../redis/redis.module';
+import { WalletModule } from '../wallet/wallet.module';
 
 @Module({
   imports: [
@@ -37,10 +37,10 @@ import { RedisModule } from '../../redis/redis.module';
       DailyCheckIn,
       SeasonalEvent,
       RewardAuditLog,
-      User,
     ]),
     EventsModule,
     RedisModule,
+    WalletModule,
   ],
   controllers: [TasksAchievementsController, AdminTasksAchievementsController],
   providers: [

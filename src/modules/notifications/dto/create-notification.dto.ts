@@ -57,4 +57,12 @@ export class CreateNotificationDto {
   @IsObject()
   @IsOptional()
   data?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    example: 'notification:reward:daily:abc',
+    description: 'Persistent idempotency key for notification creation',
+  })
+  @IsString()
+  @IsOptional()
+  operationKey?: string;
 }

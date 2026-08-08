@@ -41,6 +41,7 @@ import {
   HostStateTransitionService,
 } from './host-state-transition.service';
 import { HostFinancialAuthorityService } from './host-financial-authority.service';
+import { HostRewardAuthorityService } from './host-reward-authority.service';
 
 @Injectable()
 export class HostsService {
@@ -72,6 +73,8 @@ export class HostsService {
     private readonly hostStateTransitionService?: HostStateTransitionService,
     @Optional()
     private readonly hostFinancialAuthorityService?: HostFinancialAuthorityService,
+    @Optional()
+    private readonly hostRewardAuthorityService?: HostRewardAuthorityService,
   ) {}
 
   // ==========================================
@@ -954,7 +957,9 @@ export class HostsService {
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException('Settlement amount must be greater than zero');
+      throw new BadRequestException(
+        'Settlement amount must be greater than zero',
+      );
     }
     const earnings = await this.getEarnings(userId);
     const available =
@@ -1011,15 +1016,16 @@ export class HostsService {
     }
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException('Settlement amount must be greater than zero');
+      throw new BadRequestException(
+        'Settlement amount must be greater than zero',
+      );
     }
     if (amount > Number(earnings.pendingSettlements)) {
       throw new BadRequestException(
         'Settlement amount exceeds reserved pending balance',
       );
     }
-    earnings.pendingSettlements =
-      Number(earnings.pendingSettlements) - amount;
+    earnings.pendingSettlements = Number(earnings.pendingSettlements) - amount;
     earnings.completedSettlements =
       Number(earnings.completedSettlements) + amount;
     const saved = await this.earningsRepository.save(earnings);
@@ -1243,24 +1249,12 @@ export class HostsService {
   }
 
   async claimReward(userId: string, rewardId: string): Promise<HostReward> {
-    const host = await this.getHostProfile(userId);
-    const reward = await this.rewardRepository.findOne({
-      where: { id: rewardId, hostProfileId: host.id },
-    });
-    if (!reward) throw new NotFoundException('Reward not found');
-
-    if (reward.status === 'CLAIMED') {
-      throw new ConflictException('Reward has already been claimed');
+    if (!this.hostRewardAuthorityService) {
+      throw new ConflictException(
+        'Host reward financial authority is unavailable',
+      );
     }
-
-    reward.status = 'CLAIMED';
-    reward.claimedAt = new Date();
-    const saved = await this.rewardRepository.save(reward);
-
-    // Add to earnings
-    await this.recordIncome(userId, 0, Number(reward.amount), 0);
-
-    return saved;
+    return this.hostRewardAuthorityService.claim(userId, rewardId);
   }
 
   async grantReward(

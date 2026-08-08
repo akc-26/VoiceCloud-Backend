@@ -450,6 +450,68 @@ export class GiftSettlementService {
     };
   }
 
+  async verifyCommittedSettlement(operationGroupId: string): Promise<{
+    operationGroupId: string;
+    transactionCount: number;
+    walletTransactionIds: string[];
+  }> {
+    const transactions = await this.dataSource
+      .getRepository(GiftTransaction)
+      .find({
+        where: { operationGroupId },
+        order: { createdAt: 'ASC' },
+      });
+    if (transactions.length === 0) {
+      throw new NotFoundException(
+        `Gift settlement '${operationGroupId}' was not found`,
+      );
+    }
+
+    const walletRepository = this.dataSource.getRepository(WalletTransaction);
+    const walletTransactionIds: string[] = [];
+    const senderId = transactions[0].senderWalletTransactionId;
+    if (!senderId) {
+      throw new ConflictException(
+        'Committed gift settlement is missing sender wallet evidence',
+      );
+    }
+    const senderLedger = await walletRepository.findOne({
+      where: { id: senderId },
+    });
+    if (!senderLedger || senderLedger.operationGroupId !== operationGroupId) {
+      throw new ConflictException(
+        'Committed gift settlement sender ledger evidence is invalid',
+      );
+    }
+    walletTransactionIds.push(senderLedger.id);
+
+    for (const transaction of transactions) {
+      if (!transaction.settledAt || !transaction.receiverWalletTransactionId) {
+        throw new ConflictException(
+          'Committed gift settlement is missing receiver wallet evidence',
+        );
+      }
+      const receiverLedger = await walletRepository.findOne({
+        where: { id: transaction.receiverWalletTransactionId },
+      });
+      if (
+        !receiverLedger ||
+        receiverLedger.operationGroupId !== operationGroupId
+      ) {
+        throw new ConflictException(
+          'Committed gift settlement receiver ledger evidence is invalid',
+        );
+      }
+      walletTransactionIds.push(receiverLedger.id);
+    }
+
+    return {
+      operationGroupId,
+      transactionCount: transactions.length,
+      walletTransactionIds: [...new Set(walletTransactionIds)],
+    };
+  }
+
   private async writeWalletLedger(
     manager: EntityManager,
     wallet: WalletBalance,

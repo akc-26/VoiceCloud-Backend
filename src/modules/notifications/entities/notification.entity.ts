@@ -67,6 +67,35 @@ export class Notification {
   @Column({ type: 'timestamp', nullable: true })
   readAt: Date | null;
 
+  @ApiProperty({ example: 'reward:daily:abc', nullable: true })
+  @Index('UQ_notifications_operationKey', {
+    unique: true,
+    where: '"operationKey" IS NOT NULL',
+  })
+  @Column({ type: 'varchar', nullable: true })
+  operationKey: string | null;
+
+  @ApiProperty({ example: 'PENDING' })
+  @Index('IDX_notifications_deliveryStatus')
+  @Column({ type: 'varchar', default: 'PENDING' })
+  deliveryStatus: string;
+
+  @ApiProperty({ example: 0 })
+  @Column({ type: 'int', default: 0 })
+  deliveryAttemptCount: number;
+
+  @ApiProperty({ nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
+  lastDeliveryAttemptAt: Date | null;
+
+  @ApiProperty({ nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
+  deliveredAt: Date | null;
+
+  @ApiProperty({ nullable: true })
+  @Column({ type: 'text', nullable: true })
+  lastDeliveryError: string | null;
+
   @ApiProperty()
   @CreateDateColumn()
   @Index('IDX_notifications_createdAt')

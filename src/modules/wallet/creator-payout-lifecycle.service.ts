@@ -307,7 +307,8 @@ export class CreatorPayoutLifecycleService {
       const frozenBefore = wallet.frozenBalance;
       const totalWithdrawnBefore = wallet.totalDiamondsWithdrawn || 0;
       wallet.frozenBalance -= payout.diamondAmount;
-      wallet.totalDiamondsWithdrawn = totalWithdrawnBefore + payout.diamondAmount;
+      wallet.totalDiamondsWithdrawn =
+        totalWithdrawnBefore + payout.diamondAmount;
       await manager.getRepository(WalletBalance).save(wallet);
 
       const transaction = await this.writeLedger(manager, wallet, {
@@ -343,6 +344,48 @@ export class CreatorPayoutLifecycleService {
         transaction,
         idempotent: false,
       };
+    });
+  }
+
+  async verifyReservedPayout(payoutRequestId: string): Promise<{
+    payout: CreatorPayoutRequest;
+    reservationTransaction: WalletTransaction;
+  }> {
+    return this.dataSource.transaction(async (manager) => {
+      const payout = await this.getLockedPayout(manager, payoutRequestId);
+      if (
+        payout.status !== PayoutStatus.PENDING &&
+        payout.status !== PayoutStatus.APPROVED
+      ) {
+        throw new ConflictException(
+          `Payout ${payout.id} is not in a reservable verification state`,
+        );
+      }
+      if (!payout.reservationTransactionId || !payout.operationGroupId) {
+        throw new ConflictException(
+          'Payout reservation is missing immutable ledger evidence',
+        );
+      }
+      const reservationTransaction = await manager
+        .getRepository(WalletTransaction)
+        .findOne({ where: { id: payout.reservationTransactionId } });
+      if (
+        !reservationTransaction ||
+        reservationTransaction.operationGroupId !== payout.operationGroupId ||
+        reservationTransaction.referenceId !== payout.id ||
+        reservationTransaction.userId !== payout.creatorId
+      ) {
+        throw new ConflictException(
+          'Payout reservation ledger evidence does not match the payout request',
+        );
+      }
+      const wallet = await this.getLockedWallet(manager, payout.creatorId);
+      if (wallet.frozenBalance < payout.diamondAmount) {
+        throw new ConflictException(
+          'Payout reservation is not fully present in frozen balance',
+        );
+      }
+      return { payout, reservationTransaction };
     });
   }
 

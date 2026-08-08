@@ -234,11 +234,8 @@ export class DailyTasksService {
       throw new BadRequestException('Task is not completed yet');
     }
 
-    progress.status = TaskStatus.CLAIMED;
-    progress.claimedAt = new Date();
-    await this.userTaskProgressRepo.save(progress);
-
-    // Distribute rewards
+    // Settle the idempotent financial reward before committing CLAIMED so a
+    // transient reward failure can be safely retried.
     const auditLogs = await this.rewardEngineService.distributeReward(
       userId,
       {
@@ -254,8 +251,13 @@ export class DailyTasksService {
         metadata: `Task reward claimed: ${taskDef.title}`,
       },
       'task_claim',
-      taskDef.id,
+      progress.id,
+      `reward:task_claim:${progress.id}:${userId}`,
     );
+
+    progress.status = TaskStatus.CLAIMED;
+    progress.claimedAt = new Date();
+    await this.userTaskProgressRepo.save(progress);
 
     if (taskDef.rewardXp > 0) {
       await this.xpEngineService.addXp(userId, taskDef.rewardXp, 'task_claim');

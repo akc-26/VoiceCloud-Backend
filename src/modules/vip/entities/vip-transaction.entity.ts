@@ -42,6 +42,25 @@ export class VipTransaction {
   @Column({ type: 'varchar', default: 'SUCCESS' })
   status: string; // SUCCESS | FAILED
 
+  @Index('UQ_vip_transactions_operationKey', {
+    unique: true,
+    where: '"operationKey" IS NOT NULL',
+  })
+  @Column({ type: 'varchar', nullable: true })
+  operationKey: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  paymentProvider: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  paymentReference: string | null;
+
+  @Column({ type: 'varchar', default: 'USD' })
+  currency: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  walletTransactionId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

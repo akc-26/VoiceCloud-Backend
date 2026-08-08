@@ -34,6 +34,12 @@ export class HostReward {
   @Column({ type: 'timestamp', nullable: true })
   claimedAt: Date | null;
 
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  claimOperationKey: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  walletTransactionId: string | null;
+
   @Column({ type: 'timestamp', nullable: true })
   expiresAt: Date | null;
 

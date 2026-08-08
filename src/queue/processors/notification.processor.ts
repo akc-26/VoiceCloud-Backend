@@ -1,16 +1,12 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { QUEUE_NAMES, JOB_TYPES } from '../queue.constants';
+import { Repository } from 'typeorm';
+import { QUEUE_NAMES } from '../queue.constants';
 import { FirebaseMessagingService } from '../firebase/firebase-messaging.service';
 import { UserDevice } from '../../modules/users/entities/user-device.entity';
 import { NotificationsService } from '../../modules/notifications/notifications.service';
-import {
-  NotificationType,
-  Notification,
-} from '../../modules/notifications/entities/notification.entity';
 
 export interface SendPushJobData {
   userId?: string;
@@ -23,6 +19,7 @@ export interface SendPushJobData {
   deepLink?: string;
   data?: Record<string, string>;
   notificationId?: string;
+  operationKey?: string;
 }
 
 @Injectable()
@@ -45,86 +42,128 @@ export class NotificationProcessor extends WorkerHost {
       `[NotificationProcessor] Processing job ${job.id} (${job.name}) - Attempt ${job.attemptsMade + 1}`,
     );
 
-    try {
-      const data = job.data;
-      let targetTokens: string[] = [];
+    const data = job.data;
+    const persisted = data.notificationId
+      ? await this.notificationsService.getNotificationForDelivery(
+          data.notificationId,
+        )
+      : null;
 
+    if (data.userId && !persisted && !data.token && !data.tokens?.length) {
+      throw new BadRequestException(
+        'User-targeted notification jobs require a persisted notificationId',
+      );
+    }
+
+    if (persisted?.deliveryStatus === 'SENT') {
+      return {
+        success: true,
+        notificationId: persisted.id,
+        idempotent: true,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    try {
+      if (persisted) {
+        await this.notificationsService.markDeliveryAttempt(persisted.id);
+      }
+
+      const userId = persisted?.userId || data.userId;
+      let targetTokens: string[] = [];
       if (data.token) {
-        targetTokens.push(data.token);
-      } else if (data.tokens && data.tokens.length > 0) {
-        targetTokens.push(...data.tokens);
-      } else if (data.userId) {
+        targetTokens = [data.token];
+      } else if (data.tokens?.length) {
+        targetTokens = data.tokens;
+      } else if (userId) {
         const devices = await this.userDeviceRepository.find({
-          where: { userId: data.userId },
+          where: { userId },
         });
         targetTokens = devices
-          .map((d) => d.pushToken)
-          .filter((t): t is string => Boolean(t && t.trim().length > 0));
+          .map((device) => device.pushToken)
+          .filter((token): token is string =>
+            Boolean(token && token.trim().length),
+          );
       }
 
       if (targetTokens.length === 0) {
-        this.logger.warn(
-          `[NotificationProcessor] No valid push tokens found for job ${job.id}`,
-        );
-        return { success: false, reason: 'NO_TOKENS_FOUND' };
-      }
-
-      // If notificationId is not provided, create notification record in DB if userId is present
-      if (data.userId && !data.notificationId) {
-        try {
-          await this.notificationsService.createNotification({
-            userId: data.userId,
-            title: data.title,
-            message: data.body,
-            type: (data.type as NotificationType) || NotificationType.SYSTEM,
-            data: data.data || {},
-          });
-        } catch (err: any) {
-          this.logger.warn(
-            `[NotificationProcessor] DB notification save notice: ${err.message}`,
+        if (persisted) {
+          await this.notificationsService.markDeliveryResult(
+            persisted.id,
+            'NO_DEVICE',
+            'No valid push tokens found',
           );
         }
+        return {
+          success: false,
+          reason: 'NO_TOKENS_FOUND',
+          notificationId: persisted?.id,
+          durationMs: Date.now() - startTime,
+        };
       }
 
       const payload = {
-        title: data.title,
-        body: data.body,
+        title: persisted?.title || data.title,
+        body: persisted?.message || data.body,
         image: data.image,
         deepLink: data.deepLink,
         data: data.data,
       };
+      const sendResult =
+        targetTokens.length === 1
+          ? await this.firebaseMessagingService.sendSingleNotification(
+              targetTokens[0],
+              payload,
+            )
+          : await this.firebaseMessagingService.sendMultiNotification(
+              targetTokens,
+              payload,
+            );
 
-      let sendResult;
-      if (targetTokens.length === 1) {
-        sendResult = await this.firebaseMessagingService.sendSingleNotification(
-          targetTokens[0],
-          payload,
-        );
-      } else {
-        sendResult = await this.firebaseMessagingService.sendMultiNotification(
-          targetTokens,
-          payload,
+      if (!sendResult.success) {
+        const message = sendResult.error || 'Push provider reported a failure';
+        if (persisted) {
+          await this.notificationsService.markDeliveryResult(
+            persisted.id,
+            'FAILED',
+            message,
+          );
+        }
+        throw new Error(message);
+      }
+
+      if (persisted) {
+        await this.notificationsService.markDeliveryResult(
+          persisted.id,
+          'SENT',
         );
       }
 
-      const duration = Date.now() - startTime;
-      this.logger.log(
-        `[NotificationProcessor] Job ${job.id} completed in ${duration}ms. Result: ${JSON.stringify(sendResult)}`,
-      );
-
       return {
-        success: sendResult.success,
+        success: true,
         tokenCount: targetTokens.length,
-        durationMs: duration,
+        notificationId: persisted?.id,
+        idempotent: false,
+        durationMs: Date.now() - startTime,
         sendResult,
       };
     } catch (error: any) {
-      const duration = Date.now() - startTime;
+      if (persisted) {
+        try {
+          await this.notificationsService.markDeliveryResult(
+            persisted.id,
+            'FAILED',
+            error.message,
+          );
+        } catch {
+          // Preserve the delivery failure as the BullMQ retry cause.
+        }
+      }
       this.logger.error(
-        `[NotificationProcessor] Job ${job.id} failed after ${duration}ms: ${error.message}`,
+        `[NotificationProcessor] Job ${job.id} failed after ${Date.now() - startTime}ms: ${error.message}`,
         error.stack,
       );
-      throw error; // Let BullMQ retry according to backoff strategy
+      throw error;
     }
   }
 }

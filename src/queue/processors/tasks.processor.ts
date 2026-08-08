@@ -1,9 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { QUEUE_NAMES } from '../queue.constants';
 import { TasksAchievementsService } from '../../modules/tasks-achievements/tasks-achievements.service';
-import { DailyTasksService } from '../../modules/tasks-achievements/services/daily-tasks.service';
 import { SeasonalEventService } from '../../modules/tasks-achievements/services/seasonal-event.service';
 import { RewardEngineService } from '../../modules/tasks-achievements/services/reward-engine.service';
 import { StreakService } from '../../modules/tasks-achievements/services/streak.service';
@@ -30,7 +29,6 @@ export class TasksProcessor extends WorkerHost {
 
   constructor(
     private readonly tasksAchievementsService: TasksAchievementsService,
-    private readonly dailyTasksService: DailyTasksService,
     private readonly seasonalEventService: SeasonalEventService,
     private readonly rewardEngineService: RewardEngineService,
     private readonly streakService: StreakService,
@@ -40,75 +38,65 @@ export class TasksProcessor extends WorkerHost {
 
   async process(job: Job<TasksJobData, any, string>): Promise<any> {
     const startTime = Date.now();
-    this.logger.log(
-      `[TasksProcessor] Processing tasks job ${job.id} (${job.name}) - Action: ${job.data.action}`,
-    );
+    const { action, userId, payload } = job.data;
+    let result: any;
 
-    try {
-      const { action, userId, payload } = job.data;
-      let result: any = { success: true };
-
-      switch (action) {
-        case 'daily_reset':
-          result = await this.tasksAchievementsService.manualReset('daily');
-          break;
-
-        case 'weekly_reset':
-          result = await this.tasksAchievementsService.manualReset('weekly');
-          break;
-
-        case 'monthly_reset':
-          result = await this.tasksAchievementsService.manualReset('monthly');
-          break;
-
-        case 'season_rollover':
-          result = await this.seasonalEventService.triggerSeasonRollover();
-          break;
-
-        case 'reward_distribution':
-          if (userId && payload) {
-            result = await this.rewardEngineService.distributeReward(
-              userId,
-              payload,
-              payload.source || 'queue_job',
-              payload.sourceId,
-            );
-          }
-          break;
-
-        case 'streak_update':
-          if (userId && payload?.streakType) {
-            result = await this.streakService.recordStreakActivity(
-              userId,
-              payload.streakType as StreakType,
-            );
-          }
-          break;
-
-        case 'achievement_check':
-        case 'xp_calculation':
-          result = { success: true, processed: true };
-          break;
-
-        default:
-          this.logger.warn(
-            `[TasksProcessor] Unknown tasks job action: ${String(action)}`,
+    switch (action) {
+      case 'daily_reset':
+        result = await this.tasksAchievementsService.manualReset('daily');
+        break;
+      case 'weekly_reset':
+        result = await this.tasksAchievementsService.manualReset('weekly');
+        break;
+      case 'monthly_reset':
+        result = await this.tasksAchievementsService.manualReset('monthly');
+        break;
+      case 'season_rollover':
+        result = await this.seasonalEventService.triggerSeasonRollover();
+        break;
+      case 'reward_distribution': {
+        if (!userId || !payload?.source || !payload?.sourceId) {
+          throw new BadRequestException(
+            'Queued reward distribution requires userId, source and sourceId',
           );
-          break;
+        }
+        result = await this.rewardEngineService.distributeReward(
+          userId,
+          payload,
+          payload.source,
+          payload.sourceId,
+          payload.operationKey ||
+            `reward:queue:${payload.source}:${payload.sourceId}:${userId}`,
+        );
+        break;
       }
-
-      const duration = Date.now() - startTime;
-      this.logger.log(
-        `[TasksProcessor] Job ${job.id} (${String(action)}) finished in ${duration}ms`,
-      );
-      return { success: true, action, durationMs: duration, result };
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
-      this.logger.error(
-        `[TasksProcessor] Job ${job.id} failed after ${duration}ms: ${error.message}`,
-        error.stack,
-      );
-      throw error;
+      case 'streak_update':
+        if (!userId || !payload?.streakType) {
+          throw new BadRequestException(
+            'Queued streak update requires userId and streakType',
+          );
+        }
+        result = await this.streakService.recordStreakActivity(
+          userId,
+          payload.streakType as StreakType,
+        );
+        break;
+      case 'achievement_check':
+      case 'xp_calculation':
+        throw new BadRequestException(
+          `Queued ${action} has no persisted recovery operation and cannot report placeholder success`,
+        );
+      default:
+        throw new BadRequestException(
+          `Unknown tasks job action: ${String(action)}`,
+        );
     }
+
+    return {
+      success: true,
+      action,
+      durationMs: Date.now() - startTime,
+      result,
+    };
   }
 }

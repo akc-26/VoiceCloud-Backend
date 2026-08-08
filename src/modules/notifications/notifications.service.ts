@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
 import { UserDevice } from '../users/entities/user-device.entity';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { QueryNotificationDto } from './dto/query-notification.dto';
 import { RegisterDeviceDto } from './dto/register-device.dto';
 import { EventsGateway } from '../../common/events/events.gateway';
+
+export type NotificationDeliveryStatus =
+  'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'NO_DEVICE';
 
 @Injectable()
 export class NotificationsService {
@@ -77,6 +80,14 @@ export class NotificationsService {
   }
 
   async createNotification(dto: CreateNotificationDto): Promise<Notification> {
+    const operationKey = dto.operationKey?.trim() || null;
+    if (operationKey) {
+      const replay = await this.notificationRepository.findOne({
+        where: { operationKey },
+      });
+      if (replay) return replay;
+    }
+
     const notification = this.notificationRepository.create({
       userId: dto.userId,
       senderId: dto.senderId ?? null,
@@ -86,17 +97,96 @@ export class NotificationsService {
       data: dto.data ?? null,
       isRead: false,
       readAt: null,
+      operationKey,
+      deliveryStatus: 'PENDING',
+      deliveryAttemptCount: 0,
+      lastDeliveryAttemptAt: null,
+      deliveredAt: null,
+      lastDeliveryError: null,
     });
 
-    const saved = await this.notificationRepository.save(notification);
+    let saved: Notification;
+    try {
+      saved = await this.notificationRepository.save(notification);
+    } catch (error) {
+      if (operationKey) {
+        const replay = await this.notificationRepository.findOne({
+          where: { operationKey },
+        });
+        if (replay) return replay;
+      }
+      throw error;
+    }
 
-    // Broadcast Realtime Event
     this.eventsGateway.broadcastNotificationEvent('notification:new', {
       userId: saved.userId,
       notification: saved,
     });
 
     return saved;
+  }
+
+  async getNotificationForDelivery(
+    notificationId: string,
+  ): Promise<Notification> {
+    const notification = await this.notificationRepository.findOne({
+      where: { id: notificationId },
+    });
+    if (!notification) {
+      throw new NotFoundException(
+        `Notification with ID ${notificationId} not found`,
+      );
+    }
+    return notification;
+  }
+
+  async markDeliveryAttempt(notificationId: string): Promise<Notification> {
+    return this.notificationRepository.manager.transaction(async (manager) => {
+      const repository = manager.getRepository(Notification);
+      const notification = await repository.findOne({
+        where: { id: notificationId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!notification) {
+        throw new NotFoundException(
+          `Notification with ID ${notificationId} not found`,
+        );
+      }
+      if (notification.deliveryStatus === 'SENT') return notification;
+      notification.deliveryAttemptCount =
+        Number(notification.deliveryAttemptCount || 0) + 1;
+      notification.lastDeliveryAttemptAt = new Date();
+      notification.deliveryStatus = 'SENDING';
+      notification.lastDeliveryError = null;
+      return repository.save(notification);
+    });
+  }
+
+  async markDeliveryResult(
+    notificationId: string,
+    status: Extract<
+      NotificationDeliveryStatus,
+      'SENT' | 'FAILED' | 'NO_DEVICE'
+    >,
+    error?: string,
+  ): Promise<Notification> {
+    return this.notificationRepository.manager.transaction(async (manager) => {
+      const repository = manager.getRepository(Notification);
+      const notification = await repository.findOne({
+        where: { id: notificationId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!notification) {
+        throw new NotFoundException(
+          `Notification with ID ${notificationId} not found`,
+        );
+      }
+      if (notification.deliveryStatus === 'SENT') return notification;
+      notification.deliveryStatus = status;
+      notification.deliveredAt = status === 'SENT' ? new Date() : null;
+      notification.lastDeliveryError = error?.slice(0, 4000) || null;
+      return repository.save(notification);
+    });
   }
 
   async getUserNotifications(
@@ -115,13 +205,8 @@ export class NotificationsService {
 
     const where: FindOptionsWhere<Notification> = { userId };
 
-    if (query.type) {
-      where.type = query.type;
-    }
-
-    if (query.isRead !== undefined) {
-      where.isRead = query.isRead;
-    }
+    if (query.type) where.type = query.type;
+    if (query.isRead !== undefined) where.isRead = query.isRead;
 
     const [data, total] = await this.notificationRepository.findAndCount({
       where,
@@ -182,9 +267,7 @@ export class NotificationsService {
       where: { userId, isRead: false },
     });
 
-    if (unreadList.length === 0) {
-      return { success: true, updatedCount: 0 };
-    }
+    if (unreadList.length === 0) return { success: true, updatedCount: 0 };
 
     const now = new Date();
     for (const item of unreadList) {

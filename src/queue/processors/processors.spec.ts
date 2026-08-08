@@ -36,6 +36,15 @@ describe('Phase 3C Queue Processors (Workers)', () => {
 
   const mockNotificationsService = {
     createNotification: jest.fn().mockResolvedValue({ id: 'notif-1' }),
+    getNotificationForDelivery: jest.fn().mockResolvedValue({
+      id: 'notif-1',
+      userId: 'u1',
+      title: 'New Gift',
+      message: 'You received a gift!',
+      deliveryStatus: 'PENDING',
+    }),
+    markDeliveryAttempt: jest.fn().mockResolvedValue({ id: 'notif-1' }),
+    markDeliveryResult: jest.fn().mockResolvedValue({ id: 'notif-1' }),
   };
 
   const mockUserDeviceRepo = {
@@ -67,12 +76,11 @@ describe('Phase 3C Queue Processors (Workers)', () => {
     save: jest.fn().mockImplementation((entity) => Promise.resolve(entity)),
   };
 
-
-
   const mockPayoutLifecycleService = {
     approve: jest.fn(),
     reject: jest.fn(),
     settle: jest.fn(),
+    verifyReservedPayout: jest.fn(),
   };
 
   const mockRedisStateService = {
@@ -82,7 +90,24 @@ describe('Phase 3C Queue Processors (Workers)', () => {
   };
 
   beforeEach(async () => {
-    mockPayoutLifecycleService.settle.mockResolvedValue({ payout: { id: 'payout-1', creatorId: 'creator-1', diamondAmount: 1000, payoutAmount: 5, status: PayoutStatus.PROCESSED }, idempotent: false });
+    mockPayoutLifecycleService.settle.mockResolvedValue({
+      payout: {
+        id: 'payout-1',
+        creatorId: 'creator-1',
+        diamondAmount: 1000,
+        payoutAmount: 5,
+        status: PayoutStatus.PROCESSED,
+      },
+      idempotent: false,
+    });
+    mockPayoutLifecycleService.verifyReservedPayout.mockResolvedValue({
+      payout: {
+        id: 'payout-1',
+        creatorId: 'creator-1',
+        status: PayoutStatus.PENDING,
+      },
+      reservationTransaction: { id: 'reserve-tx-1' },
+    });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationProcessor,
@@ -130,6 +155,7 @@ describe('Phase 3C Queue Processors (Workers)', () => {
         name: 'send-push',
         attemptsMade: 0,
         data: {
+          notificationId: 'notif-1',
           userId: 'u1',
           title: 'New Gift',
           body: 'You received a gift!',
@@ -187,7 +213,7 @@ describe('Phase 3C Queue Processors (Workers)', () => {
   });
 
   describe('PayoutProcessor', () => {
-    it('should transition payout request status to PROCESSED and record timestamp', async () => {
+    it('preserves lifecycle delegation for idempotent payout settlement', async () => {
       const job = {
         id: 'job-4',
         name: 'process-payout',
@@ -206,6 +232,20 @@ describe('Phase 3C Queue Processors (Workers)', () => {
         'payout-1',
         'admin-1',
       );
+    });
+
+    it('supports reservation verification without changing payout status', async () => {
+      const res = await payoutProcessor.process({
+        id: 'job-verify',
+        name: 'verify-payout-reservation',
+        attemptsMade: 0,
+        data: {
+          payoutRequestId: 'payout-1',
+          action: 'verify_reservation',
+        },
+      } as any);
+      expect(res.verificationOnly).toBe(true);
+      expect(res.reservationTransactionId).toBe('reserve-tx-1');
     });
   });
 

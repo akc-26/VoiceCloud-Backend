@@ -103,7 +103,6 @@ export class DailyCheckInService {
 
     record.lastCheckInDate = today;
     record.totalCheckIns += 1;
-    await this.checkInRepository.save(record);
 
     const payload: RewardPayload = {
       coins: dayReward.coins,
@@ -117,8 +116,11 @@ export class DailyCheckInService {
       userId,
       payload,
       'daily_checkin',
-      `day-${record.cycleDay}`,
+      `checkin-${today}`,
+      `reward:daily_checkin:${today}:${userId}`,
     );
+
+    record = await this.checkInRepository.save(record);
 
     if (dayReward.xp > 0) {
       await this.xpEngineService.addXp(userId, dayReward.xp, 'daily_checkin');

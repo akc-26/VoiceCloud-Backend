@@ -56,6 +56,7 @@ describe('QueueService', () => {
 
   it('should enqueue notification job', async () => {
     const job = await service.addNotificationJob({
+      notificationId: 'notification-1',
       userId: 'user-1',
       title: 'Hello',
       body: 'World',
@@ -63,6 +64,7 @@ describe('QueueService', () => {
 
     expect(job.id).toBe('job-123');
     expect(job.name).toBe(JOB_TYPES.NOTIFICATION.SEND_PUSH);
+    expect(job.opts.jobId).toBe('notification-notification-1');
   });
 
   it('should enqueue reminder job', async () => {
@@ -86,13 +88,23 @@ describe('QueueService', () => {
     expect(job.name).toBe(JOB_TYPES.SUBSCRIPTION.EXPIRE_SUBSCRIPTION);
   });
 
-  it('should enqueue payout job', async () => {
+  it('should preserve payout lifecycle jobs', async () => {
     const job = await service.addPayoutJob({
       payoutRequestId: 'payout-1',
     });
 
     expect(job.id).toBe('job-123');
     expect(job.name).toBe(JOB_TYPES.PAYOUT.PROCESS_PAYOUT);
+  });
+
+  it('should enqueue payout reservation verification jobs separately', async () => {
+    const job = await service.addPayoutJob({
+      payoutRequestId: 'payout-1',
+      action: 'verify_reservation',
+    });
+
+    expect(job.id).toBe('job-123');
+    expect(job.name).toBe(JOB_TYPES.PAYOUT.VERIFY_RESERVATION);
   });
 
   it('should enqueue RTC cleanup job', async () => {

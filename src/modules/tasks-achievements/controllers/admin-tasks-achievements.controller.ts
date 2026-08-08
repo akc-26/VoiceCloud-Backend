@@ -178,6 +178,7 @@ export class AdminTasksAchievementsController {
       payload,
       'admin_grant',
       dto.reason || 'Admin Manual Grant',
+      dto.operationKey,
     );
   }
 

@@ -1,10 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual, Between } from 'typeorm';
+import { Between, In, LessThanOrEqual, Repository } from 'typeorm';
 import { CreatorSubscription } from '../../modules/users/entities/creator-subscription.entity';
+import { CreatorPayoutRequest } from '../../modules/users/entities/creator-payout-request.entity';
 import { ScheduledRoom } from '../../modules/rooms/entities/scheduled-room.entity';
-import { SubscriptionStatus, ScheduledRoomStatus } from '../../common/enums';
+import { Notification } from '../../modules/notifications/entities/notification.entity';
+import {
+  PayoutStatus,
+  ScheduledRoomStatus,
+  SubscriptionStatus,
+} from '../../common/enums';
 import { QueueService } from '../queue.service';
 import { QUEUE_NAMES } from '../queue.constants';
 
@@ -17,28 +23,23 @@ export class QueueSchedulerService {
     private readonly subscriptionRepository: Repository<CreatorSubscription>,
     @InjectRepository(ScheduledRoom)
     private readonly scheduledRoomRepository: Repository<ScheduledRoom>,
+    @InjectRepository(Notification)
+    private readonly notificationRepository: Repository<Notification>,
+    @InjectRepository(CreatorPayoutRequest)
+    private readonly payoutRepository: Repository<CreatorPayoutRequest>,
     private readonly queueService: QueueService,
   ) {}
 
-  /**
-   * Scan for expired subscriptions hourly.
-   */
   @Cron(CronExpression.EVERY_HOUR)
   async handleSubscriptionExpiryScan() {
     this.logger.log('[Scheduler] Running subscription expiry scan...');
     try {
-      const now = new Date();
       const expiredSubs = await this.subscriptionRepository.find({
         where: {
           status: SubscriptionStatus.ACTIVE,
-          expiresAt: LessThanOrEqual(now),
+          expiresAt: LessThanOrEqual(new Date()),
         },
       });
-
-      this.logger.log(
-        `[Scheduler] Found ${expiredSubs.length} expired subscriptions.`,
-      );
-
       for (const sub of expiredSubs) {
         await this.queueService.addSubscriptionJob({
           subscriptionId: sub.id,
@@ -54,36 +55,25 @@ export class QueueSchedulerService {
     }
   }
 
-  /**
-   * Scan for upcoming scheduled rooms every minute to queue reminders.
-   */
   @Cron(CronExpression.EVERY_MINUTE)
   async handleScheduledRoomReminderScan() {
     this.logger.log('[Scheduler] Running scheduled room reminder scan...');
     try {
       const now = new Date();
       const fifteenMinutesLater = new Date(now.getTime() + 15 * 60 * 1000);
-
       const upcomingRooms = await this.scheduledRoomRepository.find({
         where: {
           status: ScheduledRoomStatus.SCHEDULED,
           scheduledStartTime: Between(now, fifteenMinutesLater),
         },
       });
-
-      this.logger.log(
-        `[Scheduler] Found ${upcomingRooms.length} upcoming scheduled rooms.`,
-      );
-
       for (const room of upcomingRooms) {
         const diffMs = room.scheduledStartTime.getTime() - now.getTime();
-        const minutesBefore = Math.max(1, Math.round(diffMs / 60000));
-
         await this.queueService.addReminderJob({
           scheduledRoomId: room.id,
           title: room.title,
           hostId: room.hostId,
-          minutesBeforeStart: minutesBefore,
+          minutesBeforeStart: Math.max(1, Math.round(diffMs / 60000)),
         });
       }
     } catch (error: any) {
@@ -93,14 +83,69 @@ export class QueueSchedulerService {
     }
   }
 
-  /**
-   * Periodic RTC cleanup scan every 5 minutes.
-   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handlePendingNotificationDeliveryScan() {
+    this.logger.log('[Scheduler] Running notification delivery scan...');
+    try {
+      const notifications = await this.notificationRepository.find({
+        where: { deliveryStatus: In(['PENDING', 'FAILED']) },
+        order: { createdAt: 'ASC' },
+        take: 100,
+      });
+      for (const notification of notifications) {
+        if (Number(notification.deliveryAttemptCount || 0) >= 5) continue;
+        const rawData = notification.data || {};
+        const data = Object.fromEntries(
+          Object.entries(rawData).map(([key, value]) => [key, String(value)]),
+        );
+        await this.queueService.addNotificationJob({
+          notificationId: notification.id,
+          operationKey: notification.operationKey || undefined,
+          userId: notification.userId,
+          title: notification.title,
+          body: notification.message,
+          type: notification.type,
+          data,
+        });
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `[Scheduler Error] Notification delivery scan failed: ${error.message}`,
+      );
+    }
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handlePayoutReservationVerificationScan() {
+    this.logger.log(
+      '[Scheduler] Running payout reservation verification scan...',
+    );
+    try {
+      const payouts = await this.payoutRepository.find({
+        where: { status: In([PayoutStatus.PENDING, PayoutStatus.APPROVED]) },
+        order: { createdAt: 'ASC' },
+        take: 100,
+      });
+      for (const payout of payouts) {
+        await this.queueService.addPayoutJob(
+          {
+            payoutRequestId: payout.id,
+            action: 'verify_reservation',
+          },
+          { jobId: `payout-verify-${payout.id}` },
+        );
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `[Scheduler Error] Payout reservation verification scan failed: ${error.message}`,
+      );
+    }
+  }
+
   @Cron(CronExpression.EVERY_5_MINUTES)
   async handleRtcCleanupScan() {
     this.logger.log('[Scheduler] Running RTC cleanup scan...');
     try {
-      // Enqueue a general RTC cleanup check
       await this.queueService.addRtcCleanupJob({
         action: 'cleanup_stale_room',
       });
@@ -111,9 +156,6 @@ export class QueueSchedulerService {
     }
   }
 
-  /**
-   * Daily queue maintenance at midnight.
-   */
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleDailyMaintenanceJobs() {
     this.logger.log('[Scheduler] Running daily queue maintenance jobs...');
@@ -125,11 +167,9 @@ export class QueueSchedulerService {
         QUEUE_NAMES.PAYOUT,
         QUEUE_NAMES.RTC_CLEANUP,
       ];
-
-      for (const qName of queues) {
-        await this.queueService.cleanQueue(qName, 24 * 60 * 60 * 1000); // Clean completed/failed older than 24 hours
+      for (const queueName of queues) {
+        await this.queueService.cleanQueue(queueName, 24 * 60 * 60 * 1000);
       }
-      this.logger.log('[Scheduler] Daily queue maintenance completed.');
     } catch (error: any) {
       this.logger.error(
         `[Scheduler Error] Daily maintenance jobs failed: ${error.message}`,

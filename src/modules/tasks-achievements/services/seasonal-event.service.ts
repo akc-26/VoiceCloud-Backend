@@ -128,9 +128,6 @@ export class SeasonalEventService {
     });
 
     for (const season of endedSeasons) {
-      season.isActive = false;
-      await this.seasonalRepo.save(season);
-
       this.logger.log(`Season ended: ${season.title} (${season.id})`);
 
       // Award top 3 users seasonal rewards
@@ -153,9 +150,13 @@ export class SeasonalEventService {
             metadata: `Season Champion Rank ${rank} reward for ${season.title}`,
           },
           'seasonal_reward',
-          season.id,
+          `${season.id}:rank:${rank}`,
+          `reward:seasonal_reward:${season.id}:rank:${rank}:${topUsers[i].userId}`,
         );
       }
+
+      season.isActive = false;
+      await this.seasonalRepo.save(season);
 
       if (this.eventsGateway?.server) {
         this.eventsGateway.server.emit('season_ended', {

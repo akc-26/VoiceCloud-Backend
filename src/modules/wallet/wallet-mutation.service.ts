@@ -77,13 +77,98 @@ export class WalletMutationService {
    * callers from locking the same pair in opposite order.
    */
   getDeterministicLockOrder(userIds: string[]): string[] {
-    return [...new Set(userIds)].sort((left, right) => left.localeCompare(right));
+    return [...new Set(userIds)].sort((left, right) =>
+      left.localeCompare(right),
+    );
   }
 
   async getOrCreateWalletBalance(userId: string): Promise<WalletBalance> {
     return this.dataSource.transaction(async (manager) =>
       this.getLockedWallet(manager, userId),
     );
+  }
+
+  async creditInTransaction(
+    manager: EntityManager,
+    params: WalletLedgerParams,
+  ): Promise<WalletMutationResult> {
+    this.assertPositiveAmount(params.amount);
+    const operationKey = this.resolveOperationKey(
+      params.operationKey,
+      'credit',
+      params.userId,
+      params.referenceType,
+      params.referenceId,
+    );
+    const wallet = await this.getLockedWallet(manager, params.userId);
+    const replay = await this.findReplay(manager, operationKey, {
+      userId: params.userId,
+      transactionType: params.transactionType,
+      amount: params.amount,
+      balanceType: params.balanceType,
+      source: params.source,
+      destination: params.destination,
+      referenceType: params.referenceType,
+      referenceId: params.referenceId,
+      operationGroupId: params.operationGroupId,
+    });
+    if (replay) return { wallet, transaction: replay, idempotent: true };
+
+    const balanceBefore = this.readBalance(wallet, params.balanceType);
+    this.applyCredit(wallet, params.balanceType, params.amount);
+    const balanceAfter = this.readBalance(wallet, params.balanceType);
+    await manager.getRepository(WalletBalance).save(wallet);
+    const transaction = await this.writeLedger(manager, wallet, {
+      ...params,
+      operationKey,
+      balanceBefore,
+      balanceAfter,
+    });
+    return { wallet, transaction, idempotent: false };
+  }
+
+  async debitInTransaction(
+    manager: EntityManager,
+    params: WalletLedgerParams,
+  ): Promise<WalletMutationResult> {
+    this.assertPositiveAmount(params.amount);
+    const operationKey = this.resolveOperationKey(
+      params.operationKey,
+      'debit',
+      params.userId,
+      params.referenceType,
+      params.referenceId,
+    );
+    const wallet = await this.getLockedWallet(manager, params.userId);
+    const replay = await this.findReplay(manager, operationKey, {
+      userId: params.userId,
+      transactionType: params.transactionType,
+      amount: params.amount,
+      balanceType: params.balanceType,
+      source: params.source,
+      destination: params.destination,
+      referenceType: params.referenceType,
+      referenceId: params.referenceId,
+      operationGroupId: params.operationGroupId,
+    });
+    if (replay) return { wallet, transaction: replay, idempotent: true };
+
+    const balanceBefore = this.readBalance(wallet, params.balanceType);
+    if (balanceBefore < params.amount) {
+      throw new BadRequestException(
+        `Insufficient ${params.balanceType} balance for debit`,
+      );
+    }
+    this.applyDebit(wallet, params.balanceType, params.amount);
+    const balanceAfter = this.readBalance(wallet, params.balanceType);
+    await manager.getRepository(WalletBalance).save(wallet);
+    const transaction = await this.writeLedger(manager, wallet, {
+      ...params,
+      operationKey,
+      balanceBefore,
+      balanceAfter,
+    });
+    return { wallet, transaction, idempotent: false };
   }
 
   async credit(params: WalletLedgerParams): Promise<WalletMutationResult> {
@@ -263,7 +348,12 @@ export class WalletMutationService {
       );
 
       this.applyDebit(senderWallet, params.balanceType, params.amount);
-      this.applyCredit(recipientWallet, params.balanceType, params.amount, false);
+      this.applyCredit(
+        recipientWallet,
+        params.balanceType,
+        params.amount,
+        false,
+      );
 
       const senderAfter = this.readBalance(senderWallet, params.balanceType);
       const recipientAfter = this.readBalance(
@@ -429,7 +519,10 @@ export class WalletMutationService {
         operationGroupId,
         balanceBefore: coinBefore,
         balanceAfter: coinAfter,
-        metadata: { diamondsConverted: params.diamondAmount, ledgerLeg: 'CREDIT' },
+        metadata: {
+          diamondsConverted: params.diamondAmount,
+          ledgerLeg: 'CREDIT',
+        },
       });
 
       return {
@@ -502,10 +595,11 @@ export class WalletMutationService {
     });
   }
 
-
   private assertPositiveAmount(amount: number): void {
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException('Financial mutation amount must be positive');
+      throw new BadRequestException(
+        'Financial mutation amount must be positive',
+      );
     }
   }
 
@@ -580,7 +674,8 @@ export class WalletMutationService {
       transaction.destination === expected.destination &&
       (transaction.referenceType ?? undefined) === expected.referenceType &&
       (transaction.referenceId ?? undefined) === expected.referenceId &&
-      (transaction.operationGroupId ?? undefined) === expected.operationGroupId &&
+      (transaction.operationGroupId ?? undefined) ===
+        expected.operationGroupId &&
       transaction.status === WalletTransactionStatus.COMPLETED;
 
     if (!matches) {

@@ -4,7 +4,13 @@ import { QueueSchedulerService } from './queue-scheduler.service';
 import { QueueService } from '../queue.service';
 import { CreatorSubscription } from '../../modules/users/entities/creator-subscription.entity';
 import { ScheduledRoom } from '../../modules/rooms/entities/scheduled-room.entity';
-import { SubscriptionStatus, ScheduledRoomStatus } from '../../common/enums';
+import { Notification } from '../../modules/notifications/entities/notification.entity';
+import { CreatorPayoutRequest } from '../../modules/users/entities/creator-payout-request.entity';
+import {
+  SubscriptionStatus,
+  ScheduledRoomStatus,
+  PayoutStatus,
+} from '../../common/enums';
 
 describe('QueueSchedulerService', () => {
   let schedulerService: QueueSchedulerService;
@@ -33,10 +39,39 @@ describe('QueueSchedulerService', () => {
     ]),
   };
 
+  const mockNotificationRepo = {
+    find: jest.fn().mockResolvedValue([
+      {
+        id: 'notification-1',
+        userId: 'user-1',
+        title: 'Persisted notification',
+        message: 'Deliver me once',
+        type: 'SYSTEM',
+        data: { payoutRequestId: 'payout-1' },
+        operationKey: 'notification:payout-1',
+        deliveryStatus: 'PENDING',
+        deliveryAttemptCount: 0,
+        createdAt: new Date(),
+      },
+    ]),
+  };
+
+  const mockPayoutRepo = {
+    find: jest.fn().mockResolvedValue([
+      {
+        id: 'payout-1',
+        status: PayoutStatus.PENDING,
+        createdAt: new Date(),
+      },
+    ]),
+  };
+
   const mockQueueService = {
     addSubscriptionJob: jest.fn().mockResolvedValue({ id: 'job-sub' }),
     addReminderJob: jest.fn().mockResolvedValue({ id: 'job-rem' }),
     addRtcCleanupJob: jest.fn().mockResolvedValue({ id: 'job-rtc' }),
+    addNotificationJob: jest.fn().mockResolvedValue({ id: 'job-notification' }),
+    addPayoutJob: jest.fn().mockResolvedValue({ id: 'job-payout' }),
     cleanQueue: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -51,6 +86,14 @@ describe('QueueSchedulerService', () => {
         {
           provide: getRepositoryToken(ScheduledRoom),
           useValue: mockScheduledRoomRepo,
+        },
+        {
+          provide: getRepositoryToken(Notification),
+          useValue: mockNotificationRepo,
+        },
+        {
+          provide: getRepositoryToken(CreatorPayoutRequest),
+          useValue: mockPayoutRepo,
         },
         { provide: QueueService, useValue: mockQueueService },
       ],
@@ -83,6 +126,25 @@ describe('QueueSchedulerService', () => {
         title: 'Upcoming Talk',
         hostId: 'host-1',
       }),
+    );
+  });
+
+  it('should queue only persisted notification identities for delivery', async () => {
+    await schedulerService.handlePendingNotificationDeliveryScan();
+    expect(mockQueueService.addNotificationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notificationId: 'notification-1',
+        userId: 'user-1',
+        operationKey: 'notification:payout-1',
+      }),
+    );
+  });
+
+  it('should queue payout reservation verification without settlement authority', async () => {
+    await schedulerService.handlePayoutReservationVerificationScan();
+    expect(mockQueueService.addPayoutJob).toHaveBeenCalledWith(
+      { payoutRequestId: 'payout-1', action: 'verify_reservation' },
+      { jobId: 'payout-verify-payout-1' },
     );
   });
 

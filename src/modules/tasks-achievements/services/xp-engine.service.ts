@@ -132,6 +132,7 @@ export class XpEngineService {
         },
         'level_up',
         `level-${xpRecord.level}`,
+        `reward:level_up:${xpRecord.level}:${userId}`,
       );
 
       // Broadcast WebSocket level_up

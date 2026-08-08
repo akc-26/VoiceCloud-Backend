@@ -53,6 +53,7 @@ import { PaymentGatewayFactory } from './providers/payment-gateway.factory';
     WalletService,
     WalletMutationService,
     CreatorPayoutLifecycleService,
+    PaymentGatewayFactory,
     TypeOrmModule,
   ],
 })

@@ -40,6 +40,8 @@ import { TasksAchievementsModule } from '../modules/tasks-achievements/tasks-ach
 import { StoreModule } from '../modules/store/store.module';
 import { ReferralModule } from '../modules/referral/referral.module';
 import { WalletModule } from '../modules/wallet/wallet.module';
+import { HostsModule } from '../modules/hosts/hosts.module';
+import { GiftsModule } from '../modules/gifts/gifts.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { WalletModule } from '../modules/wallet/wallet.module';
     forwardRef(() => StoreModule),
     forwardRef(() => ReferralModule),
     WalletModule,
+    HostsModule,
+    GiftsModule,
     ScheduleModule.forRoot(),
     TypeOrmModule.forFeature([
       UserDevice,

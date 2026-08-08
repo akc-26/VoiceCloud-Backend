@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 
 @Entity('vip_reward_claims')
+@Index(['userId', 'rewardId', 'periodKey'])
 export class VipRewardClaim {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -31,6 +32,16 @@ export class VipRewardClaim {
   @Index()
   @Column({ type: 'varchar' })
   periodKey: string; // e.g. '2026-07-29', '2026-W30', '2026-07'
+
+  @Index('UQ_vip_reward_claims_operationKey', {
+    unique: true,
+    where: '"operationKey" IS NOT NULL',
+  })
+  @Column({ type: 'varchar', nullable: true })
+  operationKey: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  walletTransactionId: string | null;
 
   @CreateDateColumn()
   claimedAt: Date;

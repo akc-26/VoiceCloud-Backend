@@ -36,6 +36,14 @@ export class OpenLuckyBoxDto {
   count?: number = 1;
 
   @ApiPropertyOptional({
+    description: 'Persistent idempotency key for retry-safe opening',
+    example: 'lucky-box:user-1:client-request-123',
+  })
+  @IsString()
+  @IsOptional()
+  operationKey?: string;
+
+  @ApiPropertyOptional({
     description: 'Associated room ID if opened live in a room',
     example: 'room-uuid-123',
   })

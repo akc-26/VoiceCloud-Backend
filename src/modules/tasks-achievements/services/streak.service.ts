@@ -119,6 +119,7 @@ export class StreakService {
         },
         'streak_milestone',
         `${streakType}-${streak.currentStreak}`,
+        `reward:streak_milestone:${streakType}:${streak.currentStreak}:${userId}`,
       );
       await this.xpEngineService.addXp(userId, bonusXp, 'streak_milestone');
     }

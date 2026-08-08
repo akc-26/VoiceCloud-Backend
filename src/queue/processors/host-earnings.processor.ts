@@ -1,7 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { QUEUE_NAMES } from '../queue.constants';
+import { HostFinancialAuthorityService } from '../../modules/hosts/host-financial-authority.service';
 
 export interface HostEarningsJobData {
   hostProfileId?: string;
@@ -13,10 +14,24 @@ export interface HostEarningsJobData {
 export class HostEarningsProcessor extends WorkerHost {
   private readonly logger = new Logger(HostEarningsProcessor.name);
 
+  constructor(
+    private readonly hostFinancialAuthority: HostFinancialAuthorityService,
+  ) {
+    super();
+  }
+
   async process(job: Job<HostEarningsJobData>): Promise<any> {
-    this.logger.log(
-      `[HostEarningsProcessor] Calculating host earnings for job ${job.id}`,
+    if (!job.data.userId) {
+      throw new BadRequestException(
+        'Host earnings recovery requires the Host userId',
+      );
+    }
+    const earnings = await this.hostFinancialAuthority.getEarnings(
+      job.data.userId,
     );
-    return { success: true, processedAt: new Date() };
+    this.logger.log(
+      `[HostEarningsProcessor] Reconciled Host earnings for ${job.data.userId}`,
+    );
+    return { success: true, earnings };
   }
 }

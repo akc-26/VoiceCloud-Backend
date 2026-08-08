@@ -128,11 +128,20 @@ export class QueueService {
     data: SendPushJobData,
     options?: JobsOptions,
   ): Promise<Job<SendPushJobData>> {
-    const jobOpts: JobsOptions = { ...DEFAULT_JOB_OPTIONS, ...options };
     const jobName =
       data.tokens && data.tokens.length > 1
         ? JOB_TYPES.NOTIFICATION.SEND_BATCH
         : JOB_TYPES.NOTIFICATION.SEND_PUSH;
+    const stableJobId = data.notificationId
+      ? `notification-${data.notificationId}`
+      : data.operationKey
+        ? `notification-${this.toSafeJobId(data.operationKey)}`
+        : undefined;
+    const jobOpts: JobsOptions = {
+      ...DEFAULT_JOB_OPTIONS,
+      ...(stableJobId ? { jobId: stableJobId } : {}),
+      ...options,
+    };
 
     this.logger.log(
       `Enqueuing notification job "${jobName}" for user: ${data.userId || 'multi'}`,
@@ -176,7 +185,10 @@ export class QueueService {
     options?: JobsOptions,
   ): Promise<Job<PayoutJobData>> {
     const jobOpts: JobsOptions = { ...DEFAULT_JOB_OPTIONS, ...options };
-    const jobName = JOB_TYPES.PAYOUT.PROCESS_PAYOUT;
+    const jobName =
+      data.action === 'verify_reservation'
+        ? JOB_TYPES.PAYOUT.VERIFY_RESERVATION
+        : JOB_TYPES.PAYOUT.PROCESS_PAYOUT;
 
     this.logger.log(
       `Enqueuing payout job "${jobName}" for payoutRequestId: ${data.payoutRequestId}`,
@@ -333,6 +345,10 @@ export class QueueService {
     const queue = this.getQueueInstance(queueName);
     await queue.clean(gracePeriodMs, limit, 'completed');
     await queue.clean(gracePeriodMs, limit, 'failed');
+  }
+
+  private toSafeJobId(value: string): string {
+    return value.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 180);
   }
 
   private getQueueInstance(queueName: string): Queue {

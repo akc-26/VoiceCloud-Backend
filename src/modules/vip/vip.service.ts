@@ -6,6 +6,7 @@ import {
   Logger,
   Inject,
   forwardRef,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -33,6 +34,7 @@ import { RedisService } from '../../redis/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
 import { VIP_REDIS_KEYS, DEFAULT_VIP_BENEFITS } from './vip.constants';
+import { VipFinancialAuthorityService } from './vip-financial-authority.service';
 
 @Injectable()
 export class VipService implements OnModuleInit {
@@ -56,6 +58,8 @@ export class VipService implements OnModuleInit {
     private readonly eventsGateway: EventsGateway,
     private readonly redisService: RedisService,
     private readonly notificationsService: NotificationsService,
+    @Optional()
+    private readonly financialAuthority?: VipFinancialAuthorityService,
   ) {}
 
   async onModuleInit() {
@@ -358,6 +362,8 @@ export class VipService implements OnModuleInit {
     userId: string,
     dto: SubscribeVipDto,
   ): Promise<VipMembership> {
+    if (this.financialAuthority)
+      return this.financialAuthority.subscribe(userId, dto);
     const targetId = dto.tierId || dto.planId;
     if (!targetId) {
       throw new BadRequestException('tierId or planId is required');
@@ -489,11 +495,17 @@ export class VipService implements OnModuleInit {
     return this.subscribe(userId, {
       tierId: dto.planId || dto.tierId,
       autoRenew: dto.autoRenew,
-      cycle: SubscriptionCycle.MONTHLY,
+      cycle: dto.cycle || SubscriptionCycle.MONTHLY,
+      provider: dto.provider,
+      receipt: dto.receipt,
+      signature: dto.signature,
+      operationKey: dto.operationKey,
     });
   }
 
   async renew(userId: string, dto: RenewVipDto): Promise<VipMembership> {
+    if (this.financialAuthority)
+      return this.financialAuthority.renew(userId, dto);
     const current = await this.membershipRepository.findOne({
       where: { userId },
     });
@@ -623,6 +635,8 @@ export class VipService implements OnModuleInit {
     dto: UpgradeDowngradeVipDto,
     isUpgrade: boolean,
   ): Promise<VipMembership> {
+    if (this.financialAuthority)
+      return this.financialAuthority.changeTier(userId, dto, isUpgrade);
     const targetTier = await this.findTierById(dto.newTierId);
     const current = await this.membershipRepository.findOne({
       where: { userId },
@@ -888,6 +902,8 @@ export class VipService implements OnModuleInit {
   }
 
   async claimReward(userId: string, rewardId: string): Promise<VipRewardClaim> {
+    if (this.financialAuthority)
+      return this.financialAuthority.claimReward(userId, rewardId);
     const details = await this.getCurrentMembershipDetails(userId);
     if (!details.isVip) {
       throw new BadRequestException(

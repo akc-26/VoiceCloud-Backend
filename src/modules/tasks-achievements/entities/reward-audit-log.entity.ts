@@ -45,6 +45,19 @@ export class RewardAuditLog {
   @Column({ nullable: true })
   sourceId: string;
 
+  @Index('UQ_reward_audit_logs_operationKey', {
+    unique: true,
+    where: '"operationKey" IS NOT NULL',
+  })
+  @Column({ type: 'varchar', nullable: true })
+  operationKey: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  walletTransactionId: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  settledAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

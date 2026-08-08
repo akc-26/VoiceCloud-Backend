@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { TaskDefinition, TaskPeriod } from './entities/task-definition.entity';
 import {
@@ -32,6 +33,7 @@ import { TasksProcessor } from '../../queue/processors/tasks.processor';
 import { RedisService } from '../../redis/redis.service';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { WalletMutationService } from '../wallet/wallet-mutation.service';
 
 describe('Phase 28 - Daily Tasks, Achievements & Gamification Engine', () => {
   let rewardEngineService: RewardEngineService;
@@ -94,6 +96,29 @@ describe('Phase 28 - Daily Tasks, Achievements & Gamification Engine', () => {
     del: jest.fn().mockResolvedValue(1),
   };
 
+  const mockWalletMutationService = {
+    creditInTransaction: jest
+      .fn()
+      .mockImplementation(async (_manager, input) => ({
+        wallet: {
+          userId: input.userId,
+          coinBalance: 1000,
+          diamondBalance: 1000,
+        },
+        transaction: { id: `wallet-${input.operationKey}` },
+        idempotent: false,
+      })),
+  };
+
+  const mockDataSource = {
+    transaction: jest.fn().mockImplementation(async (callback) =>
+      callback({
+        query: jest.fn().mockResolvedValue(undefined),
+        getRepository: jest.fn().mockReturnValue(mockRepository),
+      }),
+    ),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -141,6 +166,8 @@ describe('Phase 28 - Daily Tasks, Achievements & Gamification Engine', () => {
         { provide: getRepositoryToken(User), useValue: mockRepository },
         { provide: EventsGateway, useValue: mockEventsGateway },
         { provide: RedisService, useValue: mockRedisService },
+        { provide: DataSource, useValue: mockDataSource },
+        { provide: WalletMutationService, useValue: mockWalletMutationService },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -189,7 +216,9 @@ describe('Phase 28 - Daily Tasks, Achievements & Gamification Engine', () => {
         'test_source',
         'test-id',
       );
-      expect(mockRepository.increment).toHaveBeenCalledTimes(2);
+      expect(
+        mockWalletMutationService.creditInTransaction,
+      ).toHaveBeenCalledTimes(2);
       expect(logs.length).toBe(3);
     });
   });

@@ -1,12 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { randomUUID } from 'node:crypto';
+import { DataSource, EntityManager, Repository } from 'typeorm';
+import {
+  WalletBalanceType,
+  WalletTransactionType,
+} from '../../../common/enums';
+import { EventsGateway } from '../../../common/events/events.gateway';
+import { WalletMutationService } from '../../wallet/wallet-mutation.service';
 import {
   RewardAuditLog,
   RewardType,
 } from '../entities/reward-audit-log.entity';
-import { User } from '../../users/entities/user.entity';
-import { EventsGateway } from '../../../common/events/events.gateway';
 
 export interface RewardPayload {
   coins?: number;
@@ -28,9 +33,9 @@ export class RewardEngineService {
   constructor(
     @InjectRepository(RewardAuditLog)
     private readonly rewardAuditLogRepository: Repository<RewardAuditLog>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
     private readonly eventsGateway: EventsGateway,
+    private readonly dataSource: DataSource,
+    private readonly walletMutationService: WalletMutationService,
   ) {}
 
   async distributeReward(
@@ -38,152 +43,195 @@ export class RewardEngineService {
     payload: RewardPayload,
     source: string,
     sourceId?: string,
+    operationKey?: string,
   ): Promise<RewardAuditLog[]> {
-    const auditLogs: RewardAuditLog[] = [];
+    const baseOperationKey =
+      operationKey?.trim() ||
+      (sourceId && source !== 'admin_grant'
+        ? `reward:${source}:${sourceId}:${userId}`
+        : `reward:${randomUUID()}:${userId}`);
 
-    // 1. Process Coins
-    if (payload.coins && payload.coins > 0) {
-      await this.userRepository.increment(
-        { id: userId },
-        'coins',
-        payload.coins,
-      );
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.COINS,
-        amount: payload.coins,
-        source,
-        sourceId,
-        metadata: payload.metadata || `Coins earned via ${source}`,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
+    const auditLogs = await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        baseOperationKey,
+      ]);
+      const results: RewardAuditLog[] = [];
 
-    // 2. Process Diamonds
-    if (payload.diamonds && payload.diamonds > 0) {
-      await this.userRepository.increment(
-        { id: userId },
-        'diamonds',
-        payload.diamonds,
-      );
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.DIAMONDS,
-        amount: payload.diamonds,
-        source,
-        sourceId,
-        metadata: payload.metadata || `Diamonds earned via ${source}`,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
+      if (Number(payload.coins || 0) > 0) {
+        results.push(
+          await this.settleCurrencyReward(manager, {
+            userId,
+            rewardType: RewardType.COINS,
+            amount: Number(payload.coins),
+            balanceType: WalletBalanceType.COIN,
+            source,
+            sourceId,
+            metadata: payload.metadata || `Coins earned via ${source}`,
+            operationKey: `${baseOperationKey}:coins`,
+          }),
+        );
+      }
 
-    // 3. Process XP (handled as audit record; caller may pass to XpEngine for level progress)
-    if (payload.xp && payload.xp > 0) {
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.XP,
-        amount: payload.xp,
-        source,
-        sourceId,
-        metadata: payload.metadata || `XP gained via ${source}`,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
+      if (Number(payload.diamonds || 0) > 0) {
+        results.push(
+          await this.settleCurrencyReward(manager, {
+            userId,
+            rewardType: RewardType.DIAMONDS,
+            amount: Number(payload.diamonds),
+            balanceType: WalletBalanceType.DIAMOND,
+            source,
+            sourceId,
+            metadata: payload.metadata || `Diamonds earned via ${source}`,
+            operationKey: `${baseOperationKey}:diamonds`,
+          }),
+        );
+      }
 
-    // 4. Process VIP Trial Days
-    if (payload.vipDays && payload.vipDays > 0) {
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.VIP_TRIAL,
-        amount: payload.vipDays,
-        source,
-        sourceId,
-        metadata:
-          payload.metadata || `${payload.vipDays} VIP trial days granted`,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
+      const nonFinancial: Array<{
+        type: RewardType;
+        amount: number;
+        metadata: string;
+        suffix: string;
+      }> = [];
+      if (Number(payload.xp || 0) > 0) {
+        nonFinancial.push({
+          type: RewardType.XP,
+          amount: Number(payload.xp),
+          metadata: payload.metadata || `XP gained via ${source}`,
+          suffix: 'xp',
+        });
+      }
+      if (Number(payload.vipDays || 0) > 0) {
+        nonFinancial.push({
+          type: RewardType.VIP_TRIAL,
+          amount: Number(payload.vipDays),
+          metadata:
+            payload.metadata || `${payload.vipDays} VIP trial days granted`,
+          suffix: 'vip-trial',
+        });
+      }
+      const itemRewards: Array<[RewardType, string | undefined, string]> = [
+        [RewardType.PROFILE_FRAME, payload.profileFrame, 'profile-frame'],
+        [RewardType.CHAT_BUBBLE, payload.chatBubble, 'chat-bubble'],
+        [RewardType.ENTRANCE_EFFECT, payload.entranceEffect, 'entrance-effect'],
+        [RewardType.EXCLUSIVE_STICKER, payload.exclusiveSticker, 'sticker'],
+        [RewardType.BADGE, payload.badge, 'badge'],
+      ];
+      for (const [type, value, suffix] of itemRewards) {
+        if (value)
+          nonFinancial.push({ type, amount: 1, metadata: value, suffix });
+      }
 
-    // 5. Profile Frame
-    if (payload.profileFrame) {
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.PROFILE_FRAME,
-        amount: 1,
-        source,
-        sourceId,
-        metadata: payload.profileFrame,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
-
-    // 6. Chat Bubble
-    if (payload.chatBubble) {
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.CHAT_BUBBLE,
-        amount: 1,
-        source,
-        sourceId,
-        metadata: payload.chatBubble,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
-
-    // 7. Entrance Effect
-    if (payload.entranceEffect) {
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.ENTRANCE_EFFECT,
-        amount: 1,
-        source,
-        sourceId,
-        metadata: payload.entranceEffect,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
-
-    // 8. Exclusive Sticker
-    if (payload.exclusiveSticker) {
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.EXCLUSIVE_STICKER,
-        amount: 1,
-        source,
-        sourceId,
-        metadata: payload.exclusiveSticker,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
-
-    // 9. Badge
-    if (payload.badge) {
-      const log = this.rewardAuditLogRepository.create({
-        userId,
-        rewardType: RewardType.BADGE,
-        amount: 1,
-        source,
-        sourceId,
-        metadata: payload.badge,
-      });
-      auditLogs.push(await this.rewardAuditLogRepository.save(log));
-    }
+      for (const reward of nonFinancial) {
+        results.push(
+          await this.writeNonFinancialAudit(manager, {
+            userId,
+            rewardType: reward.type,
+            amount: reward.amount,
+            source,
+            sourceId,
+            metadata: reward.metadata,
+            operationKey: `${baseOperationKey}:${reward.suffix}`,
+          }),
+        );
+      }
+      return results;
+    });
 
     this.logger.log(
-      `Distributed ${auditLogs.length} rewards to user ${userId} from ${source}`,
+      `Distributed ${auditLogs.length} durable rewards to user ${userId} from ${source}`,
     );
-
-    // Broadcast WebSocket event
     if (this.eventsGateway?.server) {
       this.eventsGateway.server.emit('reward_claimed', {
         userId,
         payload,
         source,
         sourceId,
+        operationKey: baseOperationKey,
         timestamp: new Date().toISOString(),
       });
     }
-
     return auditLogs;
+  }
+
+  private async settleCurrencyReward(
+    manager: EntityManager,
+    input: {
+      userId: string;
+      rewardType: RewardType;
+      amount: number;
+      balanceType: WalletBalanceType;
+      source: string;
+      sourceId?: string;
+      metadata: string;
+      operationKey: string;
+    },
+  ): Promise<RewardAuditLog> {
+    const repository = manager.getRepository(RewardAuditLog);
+    const replay = await repository.findOne({
+      where: { operationKey: input.operationKey },
+    });
+    if (replay) return replay;
+
+    const walletResult = await this.walletMutationService.creditInTransaction(
+      manager,
+      {
+        userId: input.userId,
+        transactionType: WalletTransactionType.REWARD_CREDIT,
+        amount: input.amount,
+        balanceType: input.balanceType,
+        source: input.source,
+        destination: input.userId,
+        referenceType: 'REWARD',
+        referenceId: input.sourceId || input.source,
+        description: input.metadata,
+        operationKey: `${input.operationKey}:wallet`,
+        operationGroupId: input.operationKey,
+        metadata: {
+          rewardType: input.rewardType,
+          rewardSource: input.source,
+          sourceId: input.sourceId,
+        },
+      },
+    );
+
+    const log = repository.create({
+      userId: input.userId,
+      rewardType: input.rewardType,
+      amount: input.amount,
+      source: input.source,
+      sourceId: input.sourceId,
+      metadata: input.metadata,
+      operationKey: input.operationKey,
+      walletTransactionId: walletResult.transaction.id,
+      settledAt: new Date(),
+    });
+    return repository.save(log);
+  }
+
+  private async writeNonFinancialAudit(
+    manager: EntityManager,
+    input: {
+      userId: string;
+      rewardType: RewardType;
+      amount: number;
+      source: string;
+      sourceId?: string;
+      metadata: string;
+      operationKey: string;
+    },
+  ): Promise<RewardAuditLog> {
+    const repository = manager.getRepository(RewardAuditLog);
+    const replay = await repository.findOne({
+      where: { operationKey: input.operationKey },
+    });
+    if (replay) return replay;
+    return repository.save(
+      repository.create({
+        ...input,
+        walletTransactionId: null,
+        settledAt: new Date(),
+      }),
+    );
   }
 }

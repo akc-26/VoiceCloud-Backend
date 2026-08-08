@@ -1,16 +1,31 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { QUEUE_NAMES, JOB_TYPES } from '../queue.constants';
+import { GiftSettlementService } from '../../modules/gifts/gift-settlement.service';
 
+@Injectable()
 @Processor(QUEUE_NAMES.GIFT)
 export class GiftProcessor extends WorkerHost {
   private readonly logger = new Logger(GiftProcessor.name);
+
+  constructor(private readonly giftSettlementService: GiftSettlementService) {
+    super();
+  }
 
   async process(job: Job): Promise<any> {
     this.logger.log(`Processing gift job ${job.name} (id: ${job.id})`);
 
     switch (job.name) {
+      case JOB_TYPES.GIFT.SETTLEMENT_VERIFY:
+        if (!job.data?.operationGroupId) {
+          throw new BadRequestException(
+            'Gift settlement verification requires operationGroupId',
+          );
+        }
+        return this.giftSettlementService.verifyCommittedSettlement(
+          job.data.operationGroupId,
+        );
       case JOB_TYPES.GIFT.ANIMATION_DISPATCH:
         return this.handleAnimationDispatch(job.data);
       case JOB_TYPES.GIFT.COMBO_EXPIRATION:
@@ -24,8 +39,7 @@ export class GiftProcessor extends WorkerHost {
       case JOB_TYPES.GIFT.CACHE_REFRESH:
         return this.handleCacheRefresh(job.data);
       default:
-        this.logger.warn(`Unknown gift job type: ${job.name}`);
-        return { status: 'skipped', reason: 'unknown job name' };
+        throw new BadRequestException(`Unknown gift job type: ${job.name}`);
     }
   }
 

@@ -24,6 +24,8 @@ import { HostLevelConfigService } from './host-level-config.service';
 import { HostStateTransitionService } from './host-state-transition.service';
 import { HostSettlementRequest } from './entities/host-settlement-request.entity';
 import { HostFinancialAuthorityService } from './host-financial-authority.service';
+import { HostRewardAuthorityService } from './host-reward-authority.service';
+import { WalletModule } from '../wallet/wallet.module';
 
 @Module({
   imports: [
@@ -44,6 +46,7 @@ import { HostFinancialAuthorityService } from './host-financial-authority.servic
       HostSettlementRequest,
     ]),
     StorageModule,
+    WalletModule,
   ],
   controllers: [HostsController],
   providers: [
@@ -55,6 +58,7 @@ import { HostFinancialAuthorityService } from './host-financial-authority.servic
     HostLevelConfigService,
     HostStateTransitionService,
     HostFinancialAuthorityService,
+    HostRewardAuthorityService,
   ],
   exports: [
     HostsService,
@@ -64,6 +68,7 @@ import { HostFinancialAuthorityService } from './host-financial-authority.servic
     HostLevelConfigService,
     HostStateTransitionService,
     HostFinancialAuthorityService,
+    HostRewardAuthorityService,
   ],
 })
 export class HostsModule {}
