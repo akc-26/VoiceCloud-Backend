@@ -68,7 +68,9 @@ export const LoginPage: React.FC = () => {
         password,
       });
       if (authResponse.user?.role !== 'CREATOR') {
-        throw new Error('This account does not have Creator Studio access.');
+        throw new Error(
+          `This account does not have ${BRAND_CONFIG.products.creator.shortName} access.`,
+        );
       }
       setAuthResponse(authResponse);
       void navigate('/dashboard', { replace: true });
@@ -152,7 +154,7 @@ export const LoginPage: React.FC = () => {
 
             <Chip
               icon={<Sparkles size={14} />}
-              label="Aurora Live Workspace"
+              label={BRAND_CONFIG.products.creator.workspaceLabel}
               sx={{
                 mb: 2.5,
                 color: BRAND_CONFIG.colors.creator.primaryLight,
@@ -268,7 +270,7 @@ export const LoginPage: React.FC = () => {
                   variant="caption"
                   sx={{ color: 'rgba(243,250,246,0.64)' }}
                 >
-                  Creator Studio
+                  {BRAND_CONFIG.products.creator.shortName}
                 </Typography>
               </Box>
             </Box>

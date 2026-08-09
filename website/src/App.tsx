@@ -32,15 +32,15 @@ export default function App() {
           style={{
             display: 'inline-block',
             padding: '0.5rem 1rem',
-            backgroundColor: THEME_TOKENS.colors.primary[500] + '15',
-            color: THEME_TOKENS.colors.primary[600],
+            backgroundColor: BRAND_CONFIG.colors.website.primaryLight,
+            color: BRAND_CONFIG.colors.website.primary,
             borderRadius: THEME_TOKENS.borderRadius.full,
             fontSize: '0.875rem',
             fontWeight: 600,
             marginBottom: '1rem',
           }}
         >
-          Live Audio Platform
+          {BRAND_CONFIG.products.website.shortName}
         </div>
         <h1
           style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.75rem' }}

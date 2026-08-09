@@ -47,3 +47,15 @@ In the engineering repository, before generating a customer/white-label delivery
 5. Deliver the generated production **source** package when the customer receives source, or the generated production **runtime** package for compiled deployment.
 
 Do not copy the full engineering repository as the customer release package. The release pipeline removes tests, engineering acceptance history, local data, secrets, caches and development-only artifacts while keeping required product source/migrations/branding assets.
+
+## Consolidated validation
+
+Before freezing a branded release, run:
+
+```powershell
+npm run ui:white-label:check
+```
+
+The consolidated check builds a synthetic alternate brand in an ignored staging copy and proves that Admin, Creator and Website consume centralized identity/product labels, presentation colors and all four brand assets. It does not mutate the authoritative source tree.
+
+Customer-facing display text must use `BRAND_CONFIG`. Technical compatibility identifiers such as persisted storage keys, authentication/protocol identifiers and infrastructure domains remain intentionally outside presentation branding unless a separately approved migration changes them.

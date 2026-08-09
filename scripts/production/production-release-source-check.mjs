@@ -10,21 +10,41 @@ import {
 } from './production-release-policy.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const protectedDirectoryDigests = new Map([
-  ['src', 'e539eddd899266ce7c89fd0110b17eac4a4d5d114223f1c00ab76e26851dd54a'],
-  ['admin', '1af9fa390a1f25b8fac11b2c731b127b0e7f6d8cbe9c80f51039f61248e4f0c3'],
-  [
-    'creator',
-    '2cc327d289791c0b7c49eab494054e3e6c346cacc6dea9095bfe0dbbcf8bbc5e',
-  ],
-  [
-    'website',
-    '949ce92289b62ade8be0883d3e87c1f63622d93ac8fe7ef826fc52736bc941c6',
-  ],
-  [
-    'shared',
-    '5dc85f4f2d46fb4b5380e6a0a8c719176f03f2df1e1f92241d9ce08ab3fa0a23',
-  ],
+const consolidatedParentBranch = 'VoiceCloud-Backend-VC-PH08-WP08-04-05-R02';
+const consolidatedParentCommit = '6ce1634c292645cb521c8d178adb0a7680ab77bb';
+const protectedParentDigest =
+  'ff5e7c31db3c38897ff4e037dd537250dcfb4bd9932974bf82f9a4d9ba227714';
+const protectedParentFileCount = 880;
+const allowedConsolidatedChanges = new Set([
+  '.gitignore',
+  'package.json',
+  'CHANGELOG.md',
+  'docs/production/WHITE-LABEL-GUIDE.md',
+  'admin/src/pages/DashboardPage.tsx',
+  'admin/src/pages/LoginPage.tsx',
+  'admin/src/pages/BackupManagementPage.tsx',
+  'creator/src/components/layout/CreatorTopBar.tsx',
+  'creator/src/components/layout/CreatorBreadcrumbs.tsx',
+  'creator/src/pages/DashboardPage.tsx',
+  'creator/src/pages/LoginPage.tsx',
+  'website/src/App.tsx',
+  'docs/production/CONSOLIDATED-UI-WHITE-LABEL-ACCEPTANCE.md',
+  'scripts/production/consolidated-ui-white-label-source-check.mjs',
+  'scripts/production/white-label-propagation-check.mjs',
+  'scripts/production/consolidated-ui-white-label-check.mjs',
+  'scripts/production/production-release-source-check.mjs',
+]);
+const excludedDirectories = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  'coverage',
+  '.cache',
+  '.release',
+  'uploads',
+  'private_uploads',
+  'release-smoke-staging',
+  'white-label-smoke-staging',
 ]);
 
 const fail = (message) => {
@@ -36,37 +56,49 @@ const read = (relativePath) => {
   if (!existsSync(file)) fail(`missing required file: ${relativePath}`);
   return readFileSync(file, 'utf8');
 };
-const directoryDigest = (relativeDirectory) => {
-  const directory = join(root, relativeDirectory);
+
+const protectedDigest = () => {
   const files = [];
-  const walk = (current) => {
-    for (const name of readdirSync(current)) {
-      const absolute = join(current, name);
+  const walk = (directory) => {
+    for (const name of readdirSync(directory)) {
+      if (excludedDirectories.has(name)) continue;
+      const absolute = join(directory, name);
       const info = statSync(absolute);
       if (info.isDirectory()) walk(absolute);
       else files.push(absolute);
     }
   };
-  walk(directory);
+  walk(root);
+
   const hash = createHash('sha256');
+  let count = 0;
   for (const absolute of files.sort((left, right) =>
-    relative(directory, left).localeCompare(relative(directory, right)),
+    relative(root, left).localeCompare(relative(root, right)),
   )) {
-    const rel = relative(directory, absolute).replaceAll('\\', '/');
+    const rel = relative(root, absolute).replaceAll('\\', '/');
+    if (allowedConsolidatedChanges.has(rel)) continue;
+    if (
+      rel === '.env' ||
+      rel.endsWith('.log') ||
+      rel.endsWith('.tsbuildinfo') ||
+      rel.endsWith('.zip')
+    )
+      continue;
     hash.update(rel);
     hash.update('\0');
     hash.update(createHash('sha256').update(readFileSync(absolute)).digest());
+    count += 1;
   }
-  return hash.digest('hex');
+  return { digest: hash.digest('hex'), count };
 };
 
-for (const [directory, expected] of protectedDirectoryDigests) {
-  if (!existsSync(join(root, directory)))
-    fail(`missing protected directory: ${directory}`);
-  const actual = directoryDigest(directory);
-  if (actual !== expected)
-    fail(`accepted product source changed unexpectedly: ${directory}`);
-}
+const protectedState = protectedDigest();
+if (protectedState.count !== protectedParentFileCount)
+  fail(
+    `protected source file count changed: expected ${protectedParentFileCount}, received ${protectedState.count}`,
+  );
+if (protectedState.digest !== protectedParentDigest)
+  fail('source outside the approved consolidated white-label delta changed');
 
 const lockfile = readFileSync(join(root, 'package-lock.json'));
 if (sha256(lockfile) !== PROTECTED_PACKAGE_LOCK_SHA256)
@@ -109,6 +141,8 @@ if (!/^\/\.release\/$/m.test(gitignore))
   fail('.gitignore does not exclude generated .release packages');
 if (!/^\/release-smoke-staging\/$/m.test(gitignore))
   fail('.gitignore does not exclude runtime-smoke staging output');
+if (!/^\/white-label-smoke-staging\/$/m.test(gitignore))
+  fail('.gitignore does not exclude white-label smoke staging output');
 
 const policy = read('scripts/production/production-release-policy.mjs');
 for (const required of [
@@ -148,14 +182,52 @@ for (const required of [
     fail(`runtime ZIP smoke is missing permanent control: ${required}`);
 }
 
+for (const required of [
+  'BRAND_CONFIG.identity.name',
+  'BRAND_CONFIG.products.admin.shortName',
+]) {
+  const combined = [
+    read('admin/src/pages/DashboardPage.tsx'),
+    read('admin/src/pages/LoginPage.tsx'),
+    read('admin/src/pages/BackupManagementPage.tsx'),
+  ].join('\n');
+  if (!combined.includes(required))
+    fail(
+      `Admin release source is missing centralized branding binding: ${required}`,
+    );
+}
+for (const required of ['BRAND_CONFIG.products.creator.shortName']) {
+  const combined = [
+    read('creator/src/components/layout/CreatorTopBar.tsx'),
+    read('creator/src/components/layout/CreatorBreadcrumbs.tsx'),
+    read('creator/src/pages/DashboardPage.tsx'),
+    read('creator/src/pages/LoginPage.tsx'),
+  ].join('\n');
+  if (!combined.includes(required))
+    fail(
+      `Creator release source is missing centralized branding binding: ${required}`,
+    );
+}
+for (const required of [
+  'BRAND_CONFIG.products.website.shortName',
+  'BRAND_CONFIG.colors.website.primary',
+]) {
+  if (!read('website/src/App.tsx').includes(required))
+    fail(
+      `Website release source is missing centralized branding binding: ${required}`,
+    );
+}
+
 console.log('Production release source contract passed.');
-console.log(`Release: ${RELEASE_ID}`);
-console.log(`Accepted parent branch: ${ACCEPTED_PARENT_BRANCH}`);
-console.log(`Accepted parent commit: ${ACCEPTED_PARENT_COMMIT}`);
+console.log(`Release pipeline: ${RELEASE_ID}`);
+console.log(`Release foundation parent: ${ACCEPTED_PARENT_BRANCH}`);
+console.log(`Release foundation commit: ${ACCEPTED_PARENT_COMMIT}`);
+console.log(`Consolidated parent branch: ${consolidatedParentBranch}`);
+console.log(`Consolidated parent commit: ${consolidatedParentCommit}`);
 console.log(
-  'Backend, Admin, Creator, Website and shared product source remain byte-identical to the accepted parent.',
+  `${protectedState.count} parent-controlled source files remain byte-identical outside the approved consolidated presentation/tooling delta.`,
 );
 console.log('package-lock.json retains its protected LF-byte identity.');
 console.log(
-  'Production source/runtime packaging policy and white-label instructions are present.',
+  'Production source/runtime packaging policy and centralized white-label bindings are present.',
 );

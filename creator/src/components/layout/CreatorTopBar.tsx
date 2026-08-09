@@ -148,7 +148,7 @@ export const CreatorTopBar: React.FC<CreatorTopBarProps> = ({
               variant="body2"
               sx={{ color: 'rgba(243,250,246,0.68)', fontWeight: 600 }}
             >
-              Creator Studio
+              {BRAND_CONFIG.products.creator.shortName}
             </Typography>
             <ConnectionStatusBadge />
           </Box>

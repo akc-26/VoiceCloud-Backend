@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, Link as RouterLink } from 'react-router-dom';
 import { Breadcrumbs, Typography, Link, Box } from '@mui/material';
 import { ChevronRight, Home } from 'lucide-react';
+import { BRAND_CONFIG } from '@shared/branding';
 
 const routeNameMap: Record<string, string> = {
   '': 'Dashboard',
@@ -49,7 +50,7 @@ export const CreatorBreadcrumbs: React.FC = () => {
           }}
         >
           <Home size={13} />
-          Creator Studio
+          {BRAND_CONFIG.products.creator.shortName}
         </Link>
         {pathnames.map((value, index) => {
           const last = index === pathnames.length - 1;

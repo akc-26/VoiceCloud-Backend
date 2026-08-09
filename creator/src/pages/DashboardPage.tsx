@@ -77,7 +77,7 @@ export const DashboardPage: React.FC = () => {
           }
         >
           <AlertTitle sx={{ fontWeight: 700 }}>
-            Creator Studio service unavailable
+            {BRAND_CONFIG.products.creator.shortName} service unavailable
           </AlertTitle>
           Unable to load the Creator profile or dashboard summary. Check the
           connection and retry.

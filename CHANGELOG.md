@@ -1,5 +1,12 @@
 ## VC-PH08-WP08-03-04 R03 — Real-Infrastructure Historical Baseline Bootstrap Correction
 
+## VC-PH08-WP08-04-06 — Consolidated UI & White-label Acceptance
+
+- R02 hardens Admin async UI event boundaries, makes synthetic Website color propagation CRLF/LF-aware, and makes the nested production-release Prettier regression EOL-portable without modifying frozen parent product source.
+- Centralized the remaining customer-facing Admin, Creator and Website product labels through `BRAND_CONFIG` without changing technical compatibility identifiers.
+- Added non-mutating synthetic white-label propagation validation across Website, Admin and Creator builds, including centralized colors and all four brand assets.
+- Added consolidated source-boundary, lint, production-release regression and source-immutability acceptance.
+
 - Hardened Creator Studio UI async event handling for MUI/React callbacks: promise-capable navigation, React Query refetch/invalidation, and async actions now use explicit await/void boundaries, with a source-level regression guard.
 
 ## WP08-04-04 Creator Studio — Aurora Live / Green
