@@ -84,3 +84,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /src/App.tsx
 /src/main.tsx
 /src/index.css
+
+# Generated production release packages
+/.release/
+/release-smoke-staging/

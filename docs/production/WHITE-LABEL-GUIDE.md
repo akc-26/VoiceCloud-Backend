@@ -32,6 +32,18 @@ Keep the filenames, or update the corresponding paths in `BRAND_CONFIG.assets`.
 
 Do not treat technical identifiers as branding. A visual rebrand must not automatically change JWT issuer/audience, database name, migration names, local-storage keys, Android/iOS package IDs, payment product IDs, RTC/CDN/storage domains or persisted usernames. Those can affect authentication, stored sessions, migrations, external integrations and existing customers.
 
-## Admin/Creator redesign rule
+## Admin/Creator presentation rule
 
-The upcoming redesign may change presentation only. Every existing route, page, action, API call, permission gate, business rule and state transition must remain available unless a separately approved functional change is created.
+Admin and Creator visual themes are presentation-only. Every existing route, page, action, API call, permission gate, business rule and state transition must remain available unless a separately approved functional change is created.
+
+## Production release workflow
+
+In the engineering repository, before generating a customer/white-label delivery:
+
+1. Edit `shared/branding/index.ts`.
+2. Replace `shared/branding/public/brand/logo-mark.svg`, `logo-horizontal.svg`, `favicon.svg`, and `app-icon.svg` while keeping the filenames unless the configured asset paths are intentionally changed.
+3. Run `npm run build`.
+4. Run `npm run release:production:check`.
+5. Deliver the generated production **source** package when the customer receives source, or the generated production **runtime** package for compiled deployment.
+
+Do not copy the full engineering repository as the customer release package. The release pipeline removes tests, engineering acceptance history, local data, secrets, caches and development-only artifacts while keeping required product source/migrations/branding assets.

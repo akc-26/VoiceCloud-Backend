@@ -111,7 +111,14 @@
     "lint:creator-ui": "eslint \"shared/branding/index.ts\" \"creator/src/theme/theme.ts\" \"creator/src/components/common/ConnectionStatusBadge.tsx\" \"creator/src/components/common/RealtimeToast.tsx\" \"creator/src/components/layout/CreatorBreadcrumbs.tsx\" \"creator/src/components/layout/CreatorFooter.tsx\" \"creator/src/components/layout/CreatorShell.tsx\" \"creator/src/components/layout/CreatorSidebar.tsx\" \"creator/src/components/layout/CreatorTopBar.tsx\" \"creator/src/hooks/useCreatorDashboard.ts\" \"creator/src/pages/AnalyticsPage.tsx\" \"creator/src/pages/DashboardPage.tsx\" \"creator/src/pages/FollowersPage.tsx\" \"creator/src/pages/HelpPage.tsx\" \"creator/src/pages/HostVerificationPage.tsx\" \"creator/src/pages/LiveRoomsPage.tsx\" \"creator/src/pages/LoginPage.tsx\" \"creator/src/pages/ProfilePage.tsx\" \"creator/src/pages/SettingsPage.tsx\" \"creator/src/pages/SubscribersPage.tsx\" \"creator/src/store/creator-profile.store.ts\" --no-cache",
     "creator:ui-redesign:source-check": "node scripts/production/creator-ui-redesign-source-check.mjs",
     "creator:ui-redesign:prepare": "npm ci --include=dev && npm run format:creator-ui && npm run format:check:creator-ui",
-    "creator:ui-redesign:check": "node scripts/production/creator-ui-redesign-check.mjs"
+    "creator:ui-redesign:check": "node scripts/production/creator-ui-redesign-check.mjs",
+    "format:production-release": "prettier --write \"package.json\" \"docs/production/PRODUCTION-RELEASE-PACKAGING.md\" \"docs/production/PRODUCTION-DEPLOYMENT-GUIDE.md\" \"docs/production/WHITE-LABEL-GUIDE.md\" \"scripts/production/production-release-policy.mjs\" \"scripts/production/production-release-package.mjs\" \"scripts/production/production-release-runtime-smoke.mjs\" \"scripts/production/production-release-source-check.mjs\" \"scripts/production/production-release-check.mjs\"",
+    "format:check:production-release": "prettier --check \"package.json\" \"docs/production/PRODUCTION-RELEASE-PACKAGING.md\" \"docs/production/PRODUCTION-DEPLOYMENT-GUIDE.md\" \"docs/production/WHITE-LABEL-GUIDE.md\" \"scripts/production/production-release-policy.mjs\" \"scripts/production/production-release-package.mjs\" \"scripts/production/production-release-runtime-smoke.mjs\" \"scripts/production/production-release-source-check.mjs\" \"scripts/production/production-release-check.mjs\"",
+    "release:production:prepare": "npm ci --include=dev && npm run format:production-release && npm run format:check:production-release",
+    "release:production:source-check": "node scripts/production/production-release-source-check.mjs",
+    "release:production:package": "node scripts/production/production-release-package.mjs",
+    "release:production:runtime-smoke": "node scripts/production/production-release-runtime-smoke.mjs",
+    "release:production:check": "node scripts/production/production-release-check.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
