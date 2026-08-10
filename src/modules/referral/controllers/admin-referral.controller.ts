@@ -19,6 +19,9 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { UserRole } from '../../../common/enums';
 import { ReferralService } from '../services/referral.service';
 import { ReferralCampaignService } from '../services/referral-campaign.service';
 import { ReferralFraudService } from '../services/referral-fraud.service';
@@ -34,7 +37,8 @@ import {
 
 @ApiTags('Admin Referral & Invite System')
 @Controller('admin/referrals')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
 @ApiBearerAuth()
 export class AdminReferralController {
   constructor(

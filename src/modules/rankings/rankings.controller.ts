@@ -28,6 +28,9 @@ import { RankingSnapshotQueryDto } from './dto/ranking-snapshot-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 
 @ApiTags('Leaderboards, Rankings & Trending')
 @Controller()
@@ -302,7 +305,8 @@ export class RankingsController {
     'rankings/admin/cache/refresh',
     'rankings/admin/cache-refresh',
   ])
-  @Public()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Refresh all ranking Redis caches' })
   @ApiResponse({ status: 200, description: 'Ranking cache refreshed.' })
   async refreshCache() {
@@ -314,7 +318,8 @@ export class RankingsController {
     'rankings/admin/cache/status',
     'rankings/admin/cache-status',
   ])
-  @Public()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get Redis cache status for rankings' })
   @ApiResponse({ status: 200, description: 'Cache status info.' })
   async getCacheStatus() {
@@ -326,7 +331,8 @@ export class RankingsController {
     'rankings/admin/snapshot',
     'rankings/admin/snapshots',
   ])
-  @Public()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Trigger historical ranking snapshot creation' })
   @ApiResponse({ status: 201, description: 'Snapshot created.' })
   async createSnapshot(

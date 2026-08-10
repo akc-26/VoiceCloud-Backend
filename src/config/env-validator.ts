@@ -21,6 +21,14 @@ export function validateProductionEnvironment(): void {
 
   const requiredProductionVars: Array<{ name: string; description: string }> = [
     { name: 'JWT_SECRET', description: 'JWT signature secret key' },
+    {
+      name: 'ENCRYPTION_KEY',
+      description: 'Independent application encryption key',
+    },
+    {
+      name: 'CORS_ALLOWED_ORIGINS',
+      description: 'Explicit comma-separated credentialed CORS allow-list',
+    },
     { name: 'DATABASE_HOST', description: 'PostgreSQL database host address' },
     { name: 'DATABASE_NAME', description: 'PostgreSQL database name' },
     { name: 'DATABASE_USER', description: 'PostgreSQL database username' },
@@ -57,6 +65,26 @@ export function validateProductionEnvironment(): void {
     ) {
       missingVars.push(`${item.name} (${item.description})`);
     }
+  }
+
+  if (
+    process.env.ENCRYPTION_KEY &&
+    process.env.JWT_SECRET &&
+    process.env.ENCRYPTION_KEY === process.env.JWT_SECRET
+  ) {
+    missingVars.push(
+      'ENCRYPTION_KEY (must be independent from JWT_SECRET in production)',
+    );
+  }
+
+  if (
+    process.env.CORS_ALLOWED_ORIGINS?.split(',')
+      .map((origin) => origin.trim())
+      .some((origin) => origin === '*')
+  ) {
+    missingVars.push(
+      'CORS_ALLOWED_ORIGINS (wildcard origins are forbidden with credentialed production CORS)',
+    );
   }
 
   // Storage checks if cloud storage driver is enabled

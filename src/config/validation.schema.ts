@@ -29,4 +29,12 @@ export const validationSchema = Joi.object({
     .integer()
     .positive()
     .default(20971520),
+  BACKUP_UPLOAD_MAX_SIZE: Joi.number()
+    .integer()
+    .positive()
+    .max(1073741824)
+    .default(268435456),
+  RATE_LIMIT_WINDOW_SECONDS: Joi.number().integer().positive().default(60),
+  RATE_LIMIT_MAX_REQUESTS: Joi.number().integer().positive().default(300),
+  AUTH_RATE_LIMIT_MAX_REQUESTS: Joi.number().integer().positive().default(20),
 });

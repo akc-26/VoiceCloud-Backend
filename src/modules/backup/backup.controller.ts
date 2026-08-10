@@ -12,6 +12,7 @@ import {
   UploadedFile,
   StreamableFile,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -22,6 +23,10 @@ import { RestoreService } from './restore.service';
 import { BackupScheduleService } from './backup-schedule.service';
 import { DisasterRecoveryService } from './disaster-recovery.service';
 import { CreateBackupDto } from './dto/create-backup.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 import { RestoreBackupDto } from './dto/restore-backup.dto';
 import {
   CreateScheduleDto,
@@ -37,6 +42,8 @@ interface RequestWithUser extends Request {
 
 @ApiTags('Admin / Infrastructure Backup & Disaster Recovery')
 @Controller('admin/backups')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
 export class BackupController {
   constructor(
     private readonly backupService: BackupService,
@@ -84,8 +91,11 @@ export class BackupController {
   ): Promise<StreamableFile> {
     const { fullPath, fileName } =
       await this.backupService.getBackupFileStream(id);
+    const backup = await this.backupService.getBackupById(id);
     res.set({
-      'Content-Type': 'application/zip',
+      'Content-Type': backup.isEncrypted
+        ? 'application/octet-stream'
+        : 'application/zip',
       'Content-Disposition': `attachment; filename="${fileName}"`,
     });
     const file = createReadStream(fullPath);
@@ -95,7 +105,14 @@ export class BackupController {
   @Post('upload')
   @ApiOperation({ summary: 'Upload external backup file package' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: Number(process.env.BACKUP_UPLOAD_MAX_SIZE ?? 268435456),
+        files: 1,
+      },
+    }),
+  )
   async uploadBackup(
     @UploadedFile() file: Express.Multer.File,
     @Req() req: RequestWithUser,
@@ -103,11 +120,8 @@ export class BackupController {
     if (!file) {
       throw new BadRequestException('No backup ZIP file uploaded');
     }
-    return this.backupService.createBackup(
-      {
-        name: `Uploaded_Backup_${file.originalname.replace('.zip', '')}`,
-        notes: `Uploaded external backup archive (${file.size} bytes)`,
-      },
+    return this.backupService.importBackup(
+      file,
       req.user?.userId || 'ADMIN_USER',
     );
   }

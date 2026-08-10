@@ -75,6 +75,8 @@ interface RequestWithUser extends Request {
 @ApiTags('Admin Panel')
 @ApiBearerAuth()
 @Controller('admin')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
 export class AdminController {
   constructor(
     private readonly settingsService: AdminSettingsService,

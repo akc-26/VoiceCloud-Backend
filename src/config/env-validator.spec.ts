@@ -9,6 +9,8 @@ function secureProductionEnvironment(): NodeJS.ProcessEnv {
     INFRASTRUCTURE_MODE: 'real',
     DATABASE_SYNCHRONIZE: 'false',
     JWT_SECRET: 'wp08-production-jwt-secret-with-sufficient-entropy',
+    ENCRYPTION_KEY: 'wp09-independent-encryption-key-with-sufficient-entropy',
+    CORS_ALLOWED_ORIGINS: 'https://voicecloud.example.com',
     DATABASE_HOST: 'db.internal.voicecloud',
     DATABASE_NAME: 'voicecloud',
     DATABASE_USER: 'voicecloud_app',

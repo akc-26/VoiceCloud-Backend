@@ -9,6 +9,11 @@ import * as path from 'path';
 import { AppModule } from './app.module';
 import { AppLogger } from './common/logger/app-logger.service';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { RedisService } from './redis/redis.service';
+import {
+  registerApiRateLimiting,
+  registerProductionSecurityHeaders,
+} from './common/http/production-http-hardening';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { validateProductionEnvironment } from './config/env-validator';
 import {
@@ -31,11 +36,23 @@ async function bootstrap() {
   });
 
   const expressApp = app.getHttpAdapter().getInstance();
+  const isProd = process.env.NODE_ENV === 'production';
+
+  // Production HTTP hardening is registered before static assets and Nest routes.
+  registerProductionSecurityHeaders(expressApp, isProd);
+  registerApiRateLimiting(expressApp, app.get(RedisService), appLogger);
 
   // Enable HTTP response compression and CORS before static assets and Nest routes.
   expressApp.use(compression());
+  const configuredCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const corsOrigin =
+    process.env.NODE_ENV === 'production' ? configuredCorsOrigins : true;
+
   app.enableCors({
-    origin: '*',
+    origin: corsOrigin,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
@@ -82,7 +99,6 @@ async function bootstrap() {
 
   // 4. Configure Swagger OpenAPI Documentation (Protected in production)
   const port = Number(process.env.PORT ?? 3000);
-  const isProd = process.env.NODE_ENV === 'production';
   const enableSwagger = process.env.ENABLE_SWAGGER === 'true' || !isProd;
 
   if (enableSwagger) {

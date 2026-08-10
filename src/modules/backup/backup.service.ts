@@ -18,12 +18,13 @@ import { EventsGateway } from '../../common/events/events.gateway';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import AdmZip from 'adm-zip';
+import * as AdmZip from 'adm-zip';
 
 @Injectable()
 export class BackupService {
   private readonly logger = new Logger(BackupService.name);
   private readonly backupDir = path.join(process.cwd(), 'backups');
+  private readonly encryptedBackupMagic = Buffer.from('VCBKP1', 'ascii');
 
   constructor(
     @InjectRepository(BackupRecord)
@@ -46,9 +47,10 @@ export class BackupService {
   ): Promise<BackupRecord> {
     const startTime = Date.now();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupName =
+    const requestedBackupName =
       dto.name ||
       `VoiceCloud_Backup_${dto.type || BackupType.MANUAL}_${timestamp}`;
+    const backupName = this.sanitizeBackupName(requestedBackupName);
     const components = dto.components || [
       'database',
       'redis',
@@ -58,7 +60,7 @@ export class BackupService {
     ];
 
     const fileName = `${backupName}.zip`;
-    const fullPath = path.join(this.backupDir, fileName);
+    const fullPath = this.resolveBackupPath(fileName);
 
     const record = this.backupRepository.create({
       name: backupName,
@@ -176,8 +178,13 @@ export class BackupService {
         totalFiles++;
       }
 
-      // Write ZIP Archive
-      zip.writeZip(fullPath);
+      // Serialize the ZIP payload, then apply authenticated encryption at rest
+      // when requested. Existing API/file naming remains unchanged.
+      const zipBuffer = zip.toBuffer();
+      const archiveBuffer = record.isEncrypted
+        ? this.encryptBackupBuffer(zipBuffer)
+        : zipBuffer;
+      fs.writeFileSync(fullPath, archiveBuffer);
 
       const compressedSize = fs.statSync(fullPath).size;
       const compressionRatio =
@@ -234,9 +241,108 @@ export class BackupService {
     }
   }
 
+  async importBackup(
+    file: Express.Multer.File,
+    createdBy = 'SYSTEM',
+  ): Promise<BackupRecord> {
+    if (!file?.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('Uploaded backup file is empty');
+    }
+
+    const maxBytes = this.getBackupUploadMaxBytes();
+    if (file.buffer.length > maxBytes) {
+      throw new BadRequestException(
+        `Backup upload exceeds the maximum allowed size of ${maxBytes} bytes`,
+      );
+    }
+
+    const originalName = path.basename(file.originalname || 'imported-backup.zip');
+    const safeBaseName = this.sanitizeBackupName(
+      originalName.replace(/\.(zip|vcbkp)$/i, ''),
+    );
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const storedName = `${safeBaseName}_${timestamp}.zip`;
+    const fullPath = this.resolveBackupPath(storedName);
+
+    fs.writeFileSync(fullPath, file.buffer, { flag: 'wx' });
+
+    try {
+      const archive = this.readBackupArchive(fullPath);
+      const zip = new AdmZip(archive.zipBuffer);
+      const entries = zip.getEntries();
+      if (entries.length === 0) {
+        throw new BadRequestException('Uploaded backup archive is empty');
+      }
+
+      const unsafeEntry = entries.find((entry) => {
+        const normalized = entry.entryName.replace(/\\/g, '/');
+        return (
+          normalized.startsWith('/') ||
+          normalized.includes('../') ||
+          /^[A-Za-z]:\//.test(normalized)
+        );
+      });
+      if (unsafeEntry) {
+        throw new BadRequestException(
+          `Uploaded backup archive contains an unsafe path: ${unsafeEntry.entryName}`,
+        );
+      }
+
+      const components = Array.from(
+        new Set(
+          entries
+            .map((entry) => entry.entryName.split('/')[0])
+            .filter((component) =>
+              ['database', 'redis', 'storage', 'config', 'ssl'].includes(
+                component,
+              ),
+            ),
+        ),
+      );
+
+      if (components.length === 0) {
+        throw new BadRequestException(
+          'Uploaded file is not a recognized VoiceCloud backup archive',
+        );
+      }
+
+      const record = this.backupRepository.create({
+        name: safeBaseName,
+        type: BackupType.MANUAL,
+        status: BackupStatus.COMPLETED,
+        filePath: storedName,
+        storageLocation: 'local',
+        componentsIncluded: components,
+        isEncrypted: archive.encrypted,
+        encryptionAlgorithm: archive.encrypted ? 'AES-256-GCM' : 'NONE',
+        notes: archive.legacyPlainZip
+          ? `Imported legacy VoiceCloud backup (${file.size} bytes)`
+          : `Imported VoiceCloud backup (${file.size} bytes)`,
+        createdBy,
+        fileSizeOriginal: archive.zipBuffer.length,
+        fileSizeCompressed: file.buffer.length,
+        compressionRatio:
+          archive.zipBuffer.length > 0
+            ? Number((file.buffer.length / archive.zipBuffer.length).toFixed(2))
+            : 1,
+        durationMs: 0,
+        checksum: this.calculateFileChecksum(fullPath),
+        fileCount: entries.length,
+      });
+      await this.backupRepository.save(record);
+      await this.verifyBackup(record.id);
+      return this.getBackupById(record.id);
+    } catch (error) {
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+      throw error;
+    }
+  }
+
   async verifyBackup(id: string): Promise<BackupRecord> {
     const backup = await this.getBackupById(id);
-    const fullPath = path.join(this.backupDir, backup.filePath);
+    const fullPath = this.resolveBackupPath(backup.filePath);
 
     const logs: string[] = [];
     let archiveIntegrity = false;
@@ -261,8 +367,18 @@ export class BackupService {
 
       // 2. Archive Integrity
       try {
-        const zip = new AdmZip(fullPath);
+        const archive = this.readBackupArchive(fullPath);
+        const zip = new AdmZip(archive.zipBuffer);
         const entries = zip.getEntries();
+        if (backup.isEncrypted && archive.legacyPlainZip) {
+          logs.push(
+            'Encryption compatibility: LEGACY PLAIN ZIP detected despite encrypted metadata; readable for backward compatibility',
+          );
+        } else if (archive.encrypted) {
+          logs.push('Encryption verification: PASSED (AES-256-GCM authentication tag valid)');
+        } else {
+          logs.push('Encryption verification: backup intentionally stored without encryption');
+        }
         archiveIntegrity = entries.length > 0;
         fileCountCheck = true;
         logs.push(
@@ -322,7 +438,7 @@ export class BackupService {
 
   async deleteBackup(id: string): Promise<boolean> {
     const backup = await this.getBackupById(id);
-    const fullPath = path.join(this.backupDir, backup.filePath);
+    const fullPath = this.resolveBackupPath(backup.filePath);
 
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);
@@ -339,7 +455,7 @@ export class BackupService {
     id: string,
   ): Promise<{ fullPath: string; fileName: string }> {
     const backup = await this.getBackupById(id);
-    const fullPath = path.join(this.backupDir, backup.filePath);
+    const fullPath = this.resolveBackupPath(backup.filePath);
 
     if (!fs.existsSync(fullPath)) {
       throw new NotFoundException(
@@ -379,6 +495,127 @@ export class BackupService {
     }
 
     return { deletedCount: totalDeleted };
+  }
+
+
+  getArchiveZip(id: string): Promise<AdmZip> {
+    return this.getBackupById(id).then((backup) => {
+      const fullPath = this.resolveBackupPath(backup.filePath);
+      if (!fs.existsSync(fullPath)) {
+        throw new NotFoundException(
+          `Backup file on disk '${backup.filePath}' does not exist`,
+        );
+      }
+      const archive = this.readBackupArchive(fullPath);
+      return new AdmZip(archive.zipBuffer);
+    });
+  }
+
+  private getEncryptionKey(): Buffer {
+    const material =
+      process.env.ENCRYPTION_KEY ||
+      process.env.JWT_SECRET ||
+      'voicecloud-development-backup-key';
+    return crypto.createHash('sha256').update(material, 'utf8').digest();
+  }
+
+  private encryptBackupBuffer(plainZip: Buffer): Buffer {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv(
+      'aes-256-gcm',
+      this.getEncryptionKey(),
+      iv,
+    );
+    const ciphertext = Buffer.concat([cipher.update(plainZip), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    return Buffer.concat([
+      this.encryptedBackupMagic,
+      iv,
+      authTag,
+      ciphertext,
+    ]);
+  }
+
+  private readBackupArchive(filePath: string): {
+    zipBuffer: Buffer;
+    encrypted: boolean;
+    legacyPlainZip: boolean;
+  } {
+    const stored = fs.readFileSync(filePath);
+    const magicLength = this.encryptedBackupMagic.length;
+    const hasMagic =
+      stored.length > magicLength + 28 &&
+      stored.subarray(0, magicLength).equals(this.encryptedBackupMagic);
+
+    if (hasMagic) {
+      const iv = stored.subarray(magicLength, magicLength + 12);
+      const authTag = stored.subarray(magicLength + 12, magicLength + 28);
+      const ciphertext = stored.subarray(magicLength + 28);
+      try {
+        const decipher = crypto.createDecipheriv(
+          'aes-256-gcm',
+          this.getEncryptionKey(),
+          iv,
+        );
+        decipher.setAuthTag(authTag);
+        const zipBuffer = Buffer.concat([
+          decipher.update(ciphertext),
+          decipher.final(),
+        ]);
+        return { zipBuffer, encrypted: true, legacyPlainZip: false };
+      } catch {
+        throw new BadRequestException(
+          'Backup archive authentication/decryption failed. The encryption key may be incorrect or the archive may be corrupted.',
+        );
+      }
+    }
+
+    // Backward compatibility for pre-WP09 archives: older releases wrote a
+    // normal ZIP while persisting isEncrypted=true/AES-256-GCM metadata.
+    const isZip =
+      stored.length >= 4 &&
+      stored[0] === 0x50 &&
+      stored[1] === 0x4b &&
+      [0x03, 0x05, 0x07].includes(stored[2]);
+    if (!isZip) {
+      throw new BadRequestException(
+        'Backup archive is neither a valid VoiceCloud encrypted backup nor a legacy ZIP archive.',
+      );
+    }
+    return { zipBuffer: stored, encrypted: false, legacyPlainZip: true };
+  }
+
+  private getBackupUploadMaxBytes(): number {
+    const configured = Number(process.env.BACKUP_UPLOAD_MAX_SIZE ?? 268435456);
+    if (!Number.isFinite(configured) || configured <= 0) {
+      return 268435456;
+    }
+    return Math.floor(configured);
+  }
+
+  private sanitizeBackupName(name: string): string {
+    const sanitized = name
+      .normalize('NFKC')
+      .replace(/[^A-Za-z0-9._-]+/g, '_')
+      .replace(/^\.+/, '')
+      .slice(0, 120);
+    if (!sanitized || sanitized === '.' || sanitized === '..') {
+      return `VoiceCloud_Backup_${Date.now()}`;
+    }
+    return sanitized;
+  }
+
+  private resolveBackupPath(fileName: string): string {
+    const baseName = path.basename(fileName);
+    if (baseName !== fileName || !baseName) {
+      throw new BadRequestException('Invalid backup file path');
+    }
+    const resolved = path.resolve(this.backupDir, baseName);
+    const root = `${path.resolve(this.backupDir)}${path.sep}`;
+    if (!resolved.startsWith(root)) {
+      throw new BadRequestException('Backup path escapes the configured directory');
+    }
+    return resolved;
   }
 
   private calculateFileChecksum(filePath: string): string {

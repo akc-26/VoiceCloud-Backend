@@ -22,6 +22,9 @@ import { RtcService } from './rtc.service';
 import { RtcQualityService } from './rtc-quality.service';
 import { ReportRtcMetricsDto } from './dto/report-rtc-metrics.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateRtcConfigDto } from './dto/update-rtc-config.dto';
 import { GenerateTokenDto } from './dto/generate-token.dto';
@@ -465,6 +468,8 @@ export class RtcController {
   }
 
   @Get('admin/monitoring')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get enterprise RTC live monitoring statistics' })
   @ApiResponse({ status: 200, description: 'RTC monitoring statistics' })
   async getAdminMonitoringStats() {

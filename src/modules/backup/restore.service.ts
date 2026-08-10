@@ -13,7 +13,6 @@ import { RestoreBackupDto } from './dto/restore-backup.dto';
 import { EventsGateway } from '../../common/events/events.gateway';
 import * as fs from 'fs';
 import * as path from 'path';
-import AdmZip from 'adm-zip';
 
 @Injectable()
 export class RestoreService {
@@ -39,7 +38,7 @@ export class RestoreService {
       );
     }
 
-    const zip = new AdmZip(fullPath);
+    const zip = await this.backupService.getArchiveZip(backup.id);
     const entries = zip.getEntries();
 
     let dbTablesAffected: string[] = [];
@@ -124,7 +123,7 @@ export class RestoreService {
         step: 'Unpacking and validating backup archive',
       });
 
-      const zip = new AdmZip(fullPath);
+      const zip = await this.backupService.getArchiveZip(backup.id);
       const componentsToRestore =
         dto.targetComponents && dto.targetComponents.length > 0
           ? dto.targetComponents

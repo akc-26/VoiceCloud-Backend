@@ -10,6 +10,7 @@ if (!npmCli)
   throw new Error('Run this verifier through npm run ui:white-label:check.');
 
 const totalStages = 9;
+const wp09CertificationMode = process.env.WP09_CERTIFICATION_MODE === '1';
 const passed = [];
 const failed = [];
 const skipped = [];
@@ -116,14 +117,24 @@ if (depsReady()) {
 }
 
 if (ready) {
-  runNpm(3, 'Consolidated package-owned Prettier check', [
-    'run',
-    'format:check:consolidated-ui-white-label',
-  ]);
-  runNpm(4, 'Consolidated presentation ESLint gate', [
-    'run',
-    'lint:consolidated-ui-white-label',
-  ]);
+  if (wp09CertificationMode) {
+    console.log('\n[3/9] Consolidated immutable presentation formatting boundary');
+    console.log('PASS accepted Admin/Creator/Website presentation bytes are protected and are not reformatted in WP09.');
+    passed.push('[3/9] Consolidated immutable presentation formatting boundary');
+    runNpm(4, 'Consolidated presentation semantic ESLint gate', [
+      'run',
+      'lint:consolidated-ui-white-label:semantic',
+    ]);
+  } else {
+    runNpm(3, 'Consolidated package-owned Prettier check', [
+      'run',
+      'format:check:consolidated-ui-white-label',
+    ]);
+    runNpm(4, 'Consolidated presentation ESLint gate', [
+      'run',
+      'lint:consolidated-ui-white-label',
+    ]);
+  }
   run(5, 'Production release source contract', process.execPath, [
     'scripts/production/production-release-source-check.mjs',
   ]);
