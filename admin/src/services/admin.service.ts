@@ -52,6 +52,21 @@ export type UpdateStreamingInfrastructureSettings = Omit<
   'updatedAt'
 >;
 
+
+export interface RtcMonitoringStats {
+  activeRoomsCount: number;
+  connectedParticipantsCount: number;
+  activeProvider: string;
+  providerStatus: string;
+  averageRtt: number;
+  averagePacketLoss: number;
+  recordingStatus: string;
+  activeRecordingsCount: number;
+  connectionFailures: number;
+  reconnectionCount: number;
+  activeSpeakersCount: number;
+}
+
 export interface ProviderConfigData {
   id: string;
   category: string;
@@ -74,6 +89,31 @@ export interface ProviderConfigData {
   statusDetails?: Record<string, any>;
   createdAt?: string;
   updatedAt?: string;
+}
+
+
+export interface CreateProviderConfigRequest {
+  category: string;
+  providerType: string;
+  name: string;
+  config: Record<string, any>;
+  isEnabled?: boolean;
+  isActive?: boolean;
+  isSandbox?: boolean;
+  priority?: number;
+  notes?: string;
+  tags?: string[];
+}
+
+export interface UpdateProviderConfigRequest {
+  name?: string;
+  config?: Record<string, any>;
+  isEnabled?: boolean;
+  isActive?: boolean;
+  isSandbox?: boolean;
+  priority?: number;
+  notes?: string;
+  tags?: string[];
 }
 
 export const adminService = {
@@ -154,6 +194,12 @@ export const adminService = {
     return res.data;
   },
 
+
+  async getRtcMonitoringStats() {
+    const res = await api.get<RtcMonitoringStats>('/rtc/admin/monitoring');
+    return res.data;
+  },
+
   // Infrastructure Provider Management
   async getProviderConfigs() {
     const res = await api.get('/admin/providers');
@@ -165,12 +211,12 @@ export const adminService = {
     return res.data;
   },
 
-  async createProviderConfig(dto: Partial<ProviderConfigData>) {
+  async createProviderConfig(dto: CreateProviderConfigRequest) {
     const res = await api.post('/admin/providers', dto);
     return res.data;
   },
 
-  async updateProviderConfig(id: string, dto: Partial<ProviderConfigData>) {
+  async updateProviderConfig(id: string, dto: UpdateProviderConfigRequest) {
     const res = await api.patch(`/admin/providers/${id}`, dto);
     return res.data;
   },

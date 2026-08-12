@@ -25,6 +25,7 @@ import { RtcAnalytics } from './entities/rtc-analytics.entity';
 import { Room } from '../rooms/entities/room.entity';
 import { RtcProviderFactory } from './providers/rtc-provider.factory';
 import { RedisService } from '../../redis/redis.service';
+import { RedisStateService } from '../../redis/redis-state.service';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { UpdateRtcConfigDto } from './dto/update-rtc-config.dto';
 import { GenerateTokenDto } from './dto/generate-token.dto';
@@ -76,9 +77,47 @@ export class RtcService {
     private readonly qualityRepository: Repository<RtcQualityMetric>,
     private readonly providerFactory: RtcProviderFactory,
     private readonly redisService: RedisService,
+    private readonly redisStateService: RedisStateService,
     private readonly eventsGateway: EventsGateway,
     private readonly adminSettingsService: AdminSettingsService,
   ) {}
+
+  private async assertRoomStageManager(
+    requesterId: string,
+    roomId: string,
+    options?: { ownerOnly?: boolean; targetUserId?: string },
+  ): Promise<Room> {
+    const room = await this.roomRepository.findOne({ where: { id: roomId } });
+    if (!room) {
+      throw new NotFoundException(`Room ${roomId} not found`);
+    }
+
+    if (room.hostId === requesterId) {
+      return room;
+    }
+
+    if (options?.ownerOnly) {
+      throw new ForbiddenException('Only room host can perform this RTC action');
+    }
+
+    const isModerator = await this.redisStateService.isModerator(
+      roomId,
+      requesterId,
+    );
+    if (!isModerator) {
+      throw new ForbiddenException(
+        'Only room host or authorized moderator can manage the RTC stage',
+      );
+    }
+
+    if (options?.targetUserId === room.hostId) {
+      throw new ForbiddenException(
+        'Only the room host can change the host stage state',
+      );
+    }
+
+    return room;
+  }
 
   private async validateSpeakerSeatIndex(seatIndex?: number): Promise<void> {
     if (seatIndex === undefined) return;
@@ -423,8 +462,9 @@ export class RtcService {
   async approveSpeaker(hostId: string, roomId: string, dto: SpeakerActionDto) {
     const seatIndex = dto.seatIndex ?? 1;
     await this.validateSpeakerSeatIndex(seatIndex);
-    const room = await this.roomRepository.findOne({ where: { id: roomId } });
-    if (!room) throw new NotFoundException(`Room ${roomId} not found`);
+    await this.assertRoomStageManager(hostId, roomId, {
+      targetUserId: dto.targetUserId,
+    });
 
     const activeSession = await this.sessionRepository.findOne({
       where: { roomId, status: RtcSessionStatus.ACTIVE },
@@ -471,6 +511,10 @@ export class RtcService {
   }
 
   async rejectSpeaker(hostId: string, roomId: string, dto: SpeakerActionDto) {
+    await this.assertRoomStageManager(hostId, roomId, {
+      targetUserId: dto.targetUserId,
+    });
+
     this.eventsGateway.server?.emit('hand_rejected', {
       roomId,
       targetUserId: dto.targetUserId,
@@ -489,6 +533,10 @@ export class RtcService {
   }
 
   async removeSpeaker(hostId: string, roomId: string, dto: SpeakerActionDto) {
+    await this.assertRoomStageManager(hostId, roomId, {
+      targetUserId: dto.targetUserId,
+    });
+
     const activeSession = await this.sessionRepository.findOne({
       where: { roomId, status: RtcSessionStatus.ACTIVE },
     });
@@ -527,6 +575,10 @@ export class RtcService {
   }
 
   async muteUser(hostId: string, roomId: string, dto: RtcMuteUserDto) {
+    await this.assertRoomStageManager(hostId, roomId, {
+      targetUserId: dto.targetUserId,
+    });
+
     const config = await this.getRtcConfig();
     const provider = this.providerFactory.getProvider(config.activeProvider);
     await provider.muteUser(config, roomId, dto.targetUserId, dto.mute);
@@ -547,6 +599,7 @@ export class RtcService {
   }
 
   async lockSeat(hostId: string, roomId: string, dto: LockSeatDto) {
+    await this.assertRoomStageManager(hostId, roomId);
     await this.validateSpeakerSeatIndex(dto.seatIndex);
     const eventName = dto.lock ? 'seat_locked' : 'seat_unlocked';
     this.eventsGateway.server?.emit(eventName, {
@@ -567,6 +620,8 @@ export class RtcService {
     roomId: string,
     dto: AudioProfileDto,
   ) {
+    await this.assertRoomStageManager(hostId, roomId, { ownerOnly: true });
+
     const activeSession = await this.sessionRepository.findOne({
       where: { roomId, status: RtcSessionStatus.ACTIVE },
     });
@@ -912,6 +967,10 @@ export class RtcService {
     adminOrHostId: string,
     dto: ForceDisconnectDto,
   ) {
+    await this.assertRoomStageManager(adminOrHostId, dto.roomId, {
+      targetUserId: dto.targetUserId,
+    });
+
     const config = await this.getRtcConfig();
     const provider = this.providerFactory.getProvider(config.activeProvider);
     await provider.kickUser(config, dto.roomId, dto.targetUserId);

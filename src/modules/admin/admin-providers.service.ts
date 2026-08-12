@@ -21,6 +21,7 @@ import { EventsGateway } from '../../common/events/events.gateway';
 import { AdminAuditLogsService } from './admin-audit-logs.service';
 import { EncryptionService } from '../../common/services/encryption.service';
 import { ProviderTestConnectionService } from './provider-test-connection.service';
+import { RtcConfig, RtcProviderType } from '../rtc/entities/rtc-config.entity';
 
 const PUBLIC_PROVIDERS_CACHE = 'cache:provider_configs:public';
 
@@ -446,6 +447,35 @@ export class AdminProvidersService implements OnModuleInit {
     };
   }
 
+  private mergeProviderConfig(
+    current: Record<string, any>,
+    incoming: Record<string, any>,
+  ): Record<string, any> {
+    const merged: Record<string, any> = { ...current };
+
+    for (const [key, value] of Object.entries(incoming || {})) {
+      if (typeof value === 'string' && value.includes('••••')) {
+        continue;
+      }
+
+      const currentValue = current?.[key];
+      if (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        currentValue &&
+        typeof currentValue === 'object' &&
+        !Array.isArray(currentValue)
+      ) {
+        merged[key] = this.mergeProviderConfig(currentValue, value);
+      } else {
+        merged[key] = value;
+      }
+    }
+
+    return merged;
+  }
+
   async update(
     id: string,
     dto: UpdateProviderConfigDto,
@@ -463,7 +493,10 @@ export class AdminProvidersService implements OnModuleInit {
       const currentDecrypted = this.encryptionService.decryptConfig(
         provider.config || {},
       );
-      const mergedConfig = { ...currentDecrypted, ...dto.config };
+      const mergedConfig = this.mergeProviderConfig(
+        currentDecrypted,
+        dto.config,
+      );
       provider.config = this.encryptionService.encryptConfig(mergedConfig);
     }
 
@@ -763,11 +796,73 @@ export class AdminProvidersService implements OnModuleInit {
     category: ProviderCategory,
     activeId: string,
   ) {
-    await this.providerRepo.update({ category }, { isActive: false });
-    await this.providerRepo.update(
-      { id: activeId },
-      { isActive: true, isEnabled: true },
-    );
+    await this.providerRepo.manager.transaction(async (manager) => {
+      const providerRepo = manager.getRepository(ProviderConfig);
+      const selectedProvider = await providerRepo.findOne({
+        where: { id: activeId, category },
+      });
+      if (!selectedProvider) {
+        throw new NotFoundException(
+          `Provider configuration '${activeId}' not found for category '${category}'`,
+        );
+      }
+
+      await providerRepo.update({ category }, { isActive: false });
+      await providerRepo.update(
+        { id: activeId },
+        { isActive: true, isEnabled: true },
+      );
+
+      if (category === ProviderCategory.RTC) {
+        const providerType = selectedProvider.providerType.toLowerCase();
+        if (!Object.values(RtcProviderType).includes(providerType as RtcProviderType)) {
+          throw new NotFoundException(
+            `Unsupported RTC provider type '${selectedProvider.providerType}'`,
+          );
+        }
+
+        const rtcConfigRepo = manager.getRepository(RtcConfig);
+        let rtcConfig = await rtcConfigRepo.findOne({
+          where: { isActive: true },
+          order: { createdAt: 'DESC' },
+        });
+        if (!rtcConfig) {
+          rtcConfig = rtcConfigRepo.create({
+            activeProvider: providerType as RtcProviderType,
+            tokenExpiration: 3600,
+            recordingEnabled: true,
+            audioEnabled: true,
+            videoEnabled: false,
+            isActive: true,
+          });
+        }
+
+        const providerConfig = this.encryptionService.decryptConfig(
+          selectedProvider.config || {},
+        );
+        rtcConfig.activeProvider = providerType as RtcProviderType;
+        if (providerType === RtcProviderType.AGORA) {
+          rtcConfig.appId = String(providerConfig.appId || rtcConfig.appId || '');
+          rtcConfig.appCertificate = String(
+            providerConfig.appCertificate || rtcConfig.appCertificate || '',
+          );
+        } else if (providerType === RtcProviderType.LIVEKIT) {
+          rtcConfig.apiKey = String(providerConfig.apiKey || rtcConfig.apiKey || '');
+          rtcConfig.secret = String(
+            providerConfig.apiSecret || providerConfig.secret || rtcConfig.secret || '',
+          );
+        } else if (providerType === RtcProviderType.ZEGOCLOUD) {
+          rtcConfig.appId = String(providerConfig.appId || rtcConfig.appId || '');
+          rtcConfig.secret = String(
+            providerConfig.serverSecret || providerConfig.secret || rtcConfig.secret || '',
+          );
+        }
+        if (Number.isSafeInteger(Number(providerConfig.tokenExpiration))) {
+          rtcConfig.tokenExpiration = Number(providerConfig.tokenExpiration);
+        }
+        await rtcConfigRepo.save(rtcConfig);
+      }
+    });
   }
 
   private async recordHistory(

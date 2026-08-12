@@ -4,7 +4,11 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RtcService } from './rtc.service';
 import { RtcQualityService } from './rtc-quality.service';
 import { RtcConfig, RtcProviderType } from './entities/rtc-config.entity';
-import { RtcSession, RtcSessionStatus } from './entities/rtc-session.entity';
+import {
+  RtcSession,
+  RtcSessionStatus,
+  AudioQualityProfile,
+} from './entities/rtc-session.entity';
 import {
   RtcSpeakerHistory,
   SpeakerRole,
@@ -22,6 +26,7 @@ import { AgoraProvider } from './providers/agora.provider';
 import { ZegoCloudProvider } from './providers/zegocloud.provider';
 import { LiveKitProvider } from './providers/livekit.provider';
 import { RedisService } from '../../redis/redis.service';
+import { RedisStateService } from '../../redis/redis-state.service';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { DynamicConfigService } from '../config/dynamic-config.service';
 import { AdminSettingsService } from '../admin/admin-settings.service';
@@ -31,6 +36,7 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
   let qualityService: RtcQualityService;
   let factory: RtcProviderFactory;
   let adminSettingsService: { getOperationalSettings: jest.Mock };
+  let redisStateService: { isModerator: jest.Mock };
 
   const mockConfig: RtcConfig = {
     id: '1',
@@ -161,6 +167,12 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
           },
         },
         {
+          provide: RedisStateService,
+          useValue: {
+            isModerator: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
           provide: EventsGateway,
           useValue: {
             server: {
@@ -195,6 +207,7 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
     qualityService = module.get<RtcQualityService>(RtcQualityService);
     factory = module.get<RtcProviderFactory>(RtcProviderFactory);
     adminSettingsService = module.get(AdminSettingsService);
+    redisStateService = module.get(RedisStateService);
 
     mockRepository.findOne.mockImplementation(({ where }) => {
       if (where?.id === 'room-101' || where?.roomId === 'room-101')
@@ -346,6 +359,50 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ seatIndex: 1 }),
       );
+    });
+  });
+
+
+  describe('RTC room stage authority', () => {
+    it('rejects speaker approval from an authenticated non-host/non-moderator', async () => {
+      redisStateService.isModerator.mockResolvedValue(false);
+
+      await expect(
+        service.approveSpeaker('ordinary-user', 'room-101', {
+          targetUserId: 'speaker-user-1',
+        }),
+      ).rejects.toThrow('Only room host or authorized moderator');
+    });
+
+    it('allows an explicitly authorized moderator to approve a speaker', async () => {
+      redisStateService.isModerator.mockResolvedValue(true);
+
+      await expect(
+        service.approveSpeaker('moderator-user', 'room-101', {
+          targetUserId: 'speaker-user-1',
+        }),
+      ).resolves.toMatchObject({ message: 'Speaker approved successfully' });
+    });
+
+    it('prevents a moderator from muting the room host', async () => {
+      redisStateService.isModerator.mockResolvedValue(true);
+
+      await expect(
+        service.muteUser('moderator-user', 'room-101', {
+          targetUserId: 'host-user-1',
+          mute: true,
+        }),
+      ).rejects.toThrow('Only the room host can change the host stage state');
+    });
+
+    it('keeps room-wide audio profile changes host-only', async () => {
+      redisStateService.isModerator.mockResolvedValue(true);
+
+      await expect(
+        service.updateAudioProfile('moderator-user', 'room-101', {
+          qualityProfile: AudioQualityProfile.SPEECH,
+        }),
+      ).rejects.toThrow('Only room host can perform this RTC action');
     });
   });
 

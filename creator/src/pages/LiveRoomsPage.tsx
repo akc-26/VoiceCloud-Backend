@@ -17,6 +17,7 @@ import {
   TextField,
   MenuItem,
   CircularProgress,
+  Alert,
   Badge,
   Tooltip,
   useTheme,
@@ -116,14 +117,12 @@ export const LiveRoomsPage: React.FC = () => {
   });
 
   const handleCreate = () => {
-    if (!newTitle.trim()) return;
+    const title = newTitle.trim();
+    if (!title) return;
     createMutation.mutate({
-      title: newTitle,
+      title,
       category: newCategory,
       audioQuality: newQuality,
-      status: 'offline',
-      currentListeners: 0,
-      peakListeners: 0,
     });
   };
 
@@ -177,7 +176,7 @@ export const LiveRoomsPage: React.FC = () => {
           variant="contained"
           color="primary"
           startIcon={<Plus size={18} />}
-          onClick={() => setIsCreateOpen(true)}
+          onClick={() => { createMutation.reset(); setIsCreateOpen(true); }}
           sx={{ fontWeight: 700 }}
         >
           Create Audio Room
@@ -191,7 +190,7 @@ export const LiveRoomsPage: React.FC = () => {
           title="No Audio Rooms Available"
           description="Create your first audio room to start broadcasting live sessions to your followers."
           actionLabel="Create Audio Room"
-          onAction={() => setIsCreateOpen(true)}
+          onAction={() => { createMutation.reset(); setIsCreateOpen(true); }}
         />
       ) : (
         <Grid container spacing={3}>
@@ -482,7 +481,7 @@ export const LiveRoomsPage: React.FC = () => {
       {/* Create Room Modal */}
       <Dialog
         open={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
+        onClose={() => { createMutation.reset(); setIsCreateOpen(false); }}
         maxWidth="sm"
         fullWidth
       >
@@ -491,6 +490,13 @@ export const LiveRoomsPage: React.FC = () => {
         </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2.5} sx={{ mt: 1 }}>
+            {createMutation.isError && (
+              <Alert severity="error">
+                {createMutation.error instanceof Error
+                  ? createMutation.error.message
+                  : 'Unable to create the room. Please review the room details and try again.'}
+              </Alert>
+            )}
             <TextField
               label="Room Title"
               placeholder="e.g. Late Night Acoustic Session & Chat"
@@ -528,7 +534,7 @@ export const LiveRoomsPage: React.FC = () => {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2.5 }}>
-          <Button onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+          <Button onClick={() => { createMutation.reset(); setIsCreateOpen(false); }}>Cancel</Button>
           <Button
             variant="contained"
             onClick={handleCreate}

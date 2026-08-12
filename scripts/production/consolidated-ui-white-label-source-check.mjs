@@ -60,6 +60,29 @@ const wp09ModifiedFiles = new Map([
   ['src/modules/store/controllers/admin-store.controller.ts', { baseline: '26de54dd88e4a96dcd7a121346ca151c78d694254f5a4a45a667fbdfb4043794', approved: '997c9442131d6c23849f97b2d461dc21d7b02bf964eb197d6ddf239d89079f6b' }],
 ]);
 
+const postWp09ModifiedFiles = new Map([
+  ['src/modules/rtc/rtc.service.ts', { baseline: '661a0fab96c02841da32bd9635380e2f7195a1f27f29133bc7a0e5d6c75dd59d', approved: '11406395ec7e1447b0c2176fa1bcbf9f30779539cdf2f08c7ede00959b12ab37' }],
+  ['src/modules/rtc/phase20-rtc.spec.ts', { baseline: '2faf2ea4605c2f25246dbdd7414cea05451e82475e974d29269667d840541efe', approved: 'b3657557856205ff09e39cd2a7258eea884ff4593f4608fbaef208555b0b9a24' }],
+  ['src/modules/hosts/host-verification-asset.service.ts', { baseline: '6c18bf9c10545a88c77f1730fd34168d7817c9f5fbddc0f859910d83637ecf38', approved: 'e1138fb4eb257b9c506459f27dc8f07c7dc3d3deb269eb166b97b8322cef15df' }],
+  ['admin/src/pages/ProviderConfigsPage.tsx', { baseline: '19ea5bf37e3cc6dfcab98e39ed6b95bbf25bb218781e4e5855645cd9b2df11bc', approved: '35050e4fbc8bcb5d62fe13b38f1cc1924b896d9aa94813ffaf672fb07a0ed406' }],
+  ['src/modules/storage/storage.factory.spec.ts', { baseline: '8686fdce7bd7fb021260136feaa62f5f2c676e735d88ca9179e93c2dbce05676', approved: 'd5afe882a3b31934b5ec6b60122d4790a7984b70d51066decef8658475f385af' }],
+  ['src/modules/storage/storage.factory.ts', { baseline: '092a32e68268618c35bcbf6311b916ece8e70d983ac9bbadc4f8673da66f80ef', approved: '77c659459a5d496b84e0095c7847ecefab5ff90a5e5fb675791929b71f6225cb' }],
+  ['src/modules/storage/storage.service.ts', { baseline: 'e05ce8a4687da7f650e3ce1b42ea3b0e51b1fd1fcd475e2b741b4b20869b4354', approved: '344a9141fcb890aa00d96902889b002e761273ddbe4d33014e8699553216e55d' }],
+  ['admin/src/pages/RtcPage.tsx', { baseline: '89529091f2d2529510c4427bbdef90d0ef3b57875052dc8fb5280bcad674e813', approved: '9809262e4d2b403666b23b681f2a1e13f6c27168ae7215123cf6f2551362b819' }],
+  ['admin/src/services/admin.service.ts', { baseline: '73813c1784b2c04937fa43ca18bed31b6c7c69296bfa079561908447a1b9fd8f', approved: '780fd685709716d6c247e2f0b500bd8805ca2272f7ba938b6b61d4cd8fffe9c7' }],
+  ['creator/src/pages/LiveRoomsPage.tsx', { baseline: 'f0b4132c04682e5de0e0ae545a96e38cfe151ca179fa72fc61087dd401f89342', approved: 'e7a2f14c1a22c6126631c8ada69ae4f07f8cf4e219b8bf1aae3e47412167b5ec' }],
+  ['creator/src/services/creator-api.service.ts', { baseline: '8e9751e2ca112c25895db194b943e10ff40b0be084924a6fe61b5f0295f8f415', approved: 'af6ddbc4792eaa8b1e8f873e2d7dcadbcebb00ce56b9488885a0c596e438df8a' }],
+  ['src/modules/admin/admin-providers.service.ts', { baseline: 'acd4be11fdfd86f29ce07753ee985ae9d751b1a9a7c91e0e7af24305566dddec', approved: 'a1f6dd464a2d46334bae231b22410f8794f394d033e873237753faa4c4e3ffe6' }],
+]);
+const postWp09AddedFiles = new Set([
+  'scripts/wp09/wp09-r05-manual-fixes-source-check.mjs',
+  'scripts/wp09/wp09-r06-provider-private-storage-source-check.mjs',
+  'scripts/wp09/wp09-r07-host-real-infra-source-check.mjs',
+  'scripts/wp09/wp09-r08-build-script-fixes-source-check.mjs',
+  'scripts/wp09/wp09-r09-rtc-room-authority-source-check.mjs',
+  'scripts/start-local-full-real.mjs',
+]);
+
 const excludedDirectories = new Set([
   '.git',
   'node_modules',
@@ -104,7 +127,20 @@ const protectedDigest = () => {
     relative(root, left).localeCompare(relative(root, right)),
   )) {
     const rel = relative(root, absolute).replaceAll('\\', '/');
-    if (wp09AddedFiles.has(rel)) continue;
+    if (wp09AddedFiles.has(rel) || postWp09AddedFiles.has(rel)) continue;
+    const postWp09Modified = postWp09ModifiedFiles.get(rel);
+    if (postWp09Modified) {
+      const currentDigest = createHash('sha256')
+        .update(readFileSync(absolute))
+        .digest('hex');
+      if (currentDigest !== postWp09Modified.approved)
+        fail(`approved WP09 R05 file changed unexpectedly: ${rel}`);
+      hash.update(rel);
+      hash.update('\0');
+      hash.update(Buffer.from(postWp09Modified.baseline, 'hex'));
+      count += 1;
+      continue;
+    }
     const wp09Modified = wp09ModifiedFiles.get(rel);
     if (wp09Modified) {
       const currentDigest = createHash('sha256')

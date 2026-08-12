@@ -39,6 +39,24 @@ export class ApiError extends Error {
   }
 }
 
+export interface CreateLiveRoomInput {
+  title: string;
+  category?: string;
+  audioQuality?: string;
+  description?: string;
+  language?: string;
+  coverUrl?: string;
+  clubId?: string;
+  scheduledRoomId?: string;
+  isLocked?: boolean;
+  isPremium?: boolean;
+  isTicketRequired?: boolean;
+  ticketPriceAmount?: number;
+  isSubscriberOnly?: boolean;
+  isVerifiedOnly?: boolean;
+  isInviteOnly?: boolean;
+}
+
 export class CreatorApiService {
   private static instance: CreatorApiService;
   private baseUrl: string;
@@ -543,7 +561,7 @@ export class CreatorApiService {
         title: r.title || r.name || 'Untitled Audio Room',
         category: r.category || 'Audio Lounge',
         status: (r.status as any) || (r.isLive ? 'live' : 'offline'),
-        currentListeners: r.currentListeners || r.listenersCount || 0,
+        currentListeners: r.currentListeners ?? r.listenerCount ?? r.listenersCount ?? 0,
         peakListeners: r.peakListeners || 0,
         audioQuality: r.audioQuality || '324kbps Ultra HD',
         startedAt: r.startedAt,
@@ -578,7 +596,7 @@ export class CreatorApiService {
   }
 
   async createRoom(
-    data: Partial<LiveRoomSummary>,
+    data: CreateLiveRoomInput,
     signal?: AbortSignal,
   ): Promise<LiveRoomSummary> {
     return this.request<LiveRoomSummary>('/rooms', {

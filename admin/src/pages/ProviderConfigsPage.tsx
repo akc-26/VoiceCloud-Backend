@@ -53,7 +53,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
-import { adminService, ProviderConfigData } from '../services/admin.service';
+import {
+  adminService,
+  CreateProviderConfigRequest,
+  ProviderConfigData,
+  UpdateProviderConfigRequest,
+} from '../services/admin.service';
 import { useNotificationsStore } from '../store/notifications.store';
 
 const CATEGORIES = [
@@ -65,7 +70,42 @@ const CATEGORIES = [
   { id: 'sms', label: 'SMS Gateway', icon: <SmsIcon /> },
   { id: 'ai', label: 'Generative AI', icon: <PsychologyIcon /> },
   { id: 'maps', label: 'Maps & Geo', icon: <MapIcon /> },
+
 ];
+
+const DEFAULT_PROVIDER_TYPE: Record<string, string> = {
+  rtc: 'agora',
+  storage: 'minio',
+  payment: 'razorpay',
+  firebase: 'firebase',
+  email: 'smtp',
+  sms: 'twilio',
+  ai: 'gemini',
+  maps: 'google_maps',
+};
+
+const isMaskedSecretValue = (value: unknown): boolean =>
+  typeof value === 'string' && value.includes('••••');
+
+const omitMaskedSecrets = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(omitMaskedSecrets);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, child]) => !isMaskedSecretValue(child))
+        .map(([key, child]) => [key, omitMaskedSecrets(child)]),
+    );
+  }
+  return value;
+};
+
+const extractApiErrorMessage = (error: any, fallback: string): string => {
+  const message = error?.response?.data?.message;
+  if (Array.isArray(message)) return message.join(', ');
+  return typeof message === 'string' && message.trim() ? message : fallback;
+};
 
 export const ProviderConfigsPage: React.FC = () => {
   const addToast = useNotificationsStore((state) => state.addToast);
@@ -144,7 +184,7 @@ export const ProviderConfigsPage: React.FC = () => {
     } else {
       setSelectedProvider({
         category: activeTab,
-        providerType: activeTab === 'storage' ? 'minio' : activeTab === 'payment' ? 'razorpay' : 'agora',
+        providerType: DEFAULT_PROVIDER_TYPE[activeTab] || 'custom',
         name: 'New Custom Provider Profile',
         isEnabled: true,
         isActive: false,
@@ -169,15 +209,35 @@ export const ProviderConfigsPage: React.FC = () => {
         return;
       }
 
-      const payload = {
-        ...selectedProvider,
-        config: parsedConfig,
-      };
+      const safeConfig = omitMaskedSecrets(parsedConfig) as Record<string, any>;
 
       if (selectedProvider.id) {
+        const payload: UpdateProviderConfigRequest = {
+          name: selectedProvider.name,
+          config: safeConfig,
+          isEnabled: selectedProvider.isEnabled,
+          isActive: selectedProvider.isActive,
+          isSandbox: selectedProvider.isSandbox,
+          priority: selectedProvider.priority,
+          notes: selectedProvider.notes,
+          tags: selectedProvider.tags,
+        };
         await adminService.updateProviderConfig(selectedProvider.id, payload);
         addToast('success', 'Provider profile updated successfully');
       } else {
+        const payload: CreateProviderConfigRequest = {
+          category: selectedProvider.category || activeTab,
+          providerType:
+            selectedProvider.providerType || DEFAULT_PROVIDER_TYPE[activeTab] || 'custom',
+          name: selectedProvider.name || 'New Custom Provider Profile',
+          config: safeConfig,
+          isEnabled: selectedProvider.isEnabled,
+          isActive: selectedProvider.isActive,
+          isSandbox: selectedProvider.isSandbox,
+          priority: selectedProvider.priority,
+          notes: selectedProvider.notes,
+          tags: selectedProvider.tags,
+        };
         await adminService.createProviderConfig(payload);
         addToast('success', 'Provider profile created successfully');
       }
@@ -185,7 +245,10 @@ export const ProviderConfigsPage: React.FC = () => {
       setEditModalOpen(false);
       fetchProviders();
     } catch (err) {
-      addToast('error', 'Failed to save provider configuration');
+      addToast(
+        'error',
+        extractApiErrorMessage(err, 'Failed to save provider configuration'),
+      );
     }
   };
 
@@ -565,6 +628,12 @@ export const ProviderConfigsPage: React.FC = () => {
                 label="Provider Type (e.g. agora, s3, stripe, twilio)"
                 value={selectedProvider?.providerType || ''}
                 onChange={(e) => setSelectedProvider({ ...selectedProvider, providerType: e.target.value })}
+                disabled={Boolean(selectedProvider?.id)}
+                helperText={
+                  selectedProvider?.id
+                    ? 'Provider type is immutable for an existing profile; create a new profile to change it.'
+                    : undefined
+                }
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>

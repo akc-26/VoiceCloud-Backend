@@ -336,23 +336,23 @@ export class StorageService {
     data: Buffer,
     mimeType?: string,
   ): Promise<string> {
-    const driver = await this.storageFactory.getActiveDriver();
+    const driver = await this.storageFactory.getPrivateDriver();
     await driver.writePrivate(key, data, mimeType);
     return driver.providerType;
   }
 
   async readPrivateObject(key: string): Promise<Buffer> {
-    const driver = await this.storageFactory.getActiveDriver();
+    const driver = await this.storageFactory.getPrivateDriver();
     return driver.readPrivate(key);
   }
 
   async existsPrivateObject(key: string): Promise<boolean> {
-    const driver = await this.storageFactory.getActiveDriver();
+    const driver = await this.storageFactory.getPrivateDriver();
     return driver.existsPrivate(key);
   }
 
   async deletePrivateObject(key: string): Promise<boolean> {
-    const driver = await this.storageFactory.getActiveDriver();
+    const driver = await this.storageFactory.getPrivateDriver();
     return driver.deletePrivate(key);
   }
 

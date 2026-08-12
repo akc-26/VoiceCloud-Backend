@@ -35,6 +35,28 @@ describe('StorageFactory', () => {
     expect(s3Driver.configure).not.toHaveBeenCalled();
   });
 
+  it('always isolates private objects to the confined local private driver', async () => {
+    delete process.env.STORAGE_DRIVER;
+
+    const dynamicConfigService = {
+      getActiveProviderConfig: jest.fn().mockResolvedValue({
+        providerType: 'minio',
+        config: { endpoint: 'http://localhost:9000' },
+      }),
+    };
+    const localDriver = { providerType: 'local' };
+    const s3Driver = { providerType: 's3-compatible', configure: jest.fn() };
+    const factory = new StorageFactory(
+      dynamicConfigService as unknown as DynamicConfigService,
+      localDriver as unknown as LocalStorageDriver,
+      s3Driver as unknown as S3StorageDriver,
+    );
+
+    await expect(factory.getPrivateDriver()).resolves.toBe(localDriver);
+    expect(dynamicConfigService.getActiveProviderConfig).not.toHaveBeenCalled();
+    expect(s3Driver.configure).not.toHaveBeenCalled();
+  });
+
   it('uses the active provider profile when no local override is set', async () => {
     delete process.env.STORAGE_DRIVER;
 

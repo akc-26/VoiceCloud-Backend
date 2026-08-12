@@ -5,12 +5,14 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { StorageService } from '../storage/storage.service';
+import { User } from '../users/entities/user.entity';
 import { PrivateDocumentCategory } from '../storage/enums/private-document-category.enum';
 import {
   PrivateAssetValidationStatus,
@@ -74,6 +76,18 @@ export class HostVerificationAssetService {
   ): Promise<HostVerificationAssetResponseDto> {
     if (!ownerUserId) {
       throw new Error('Authenticated owner user ID is required');
+    }
+
+    const manager = this.assetRepository.manager;
+    if (manager?.getRepository) {
+      const ownerExists = await manager.getRepository(User).exists({
+        where: { id: ownerUserId },
+      });
+      if (!ownerExists) {
+        throw new UnauthorizedException(
+          'Authenticated account no longer exists in the active database. Please sign in again.',
+        );
+      }
     }
 
     const limitConfig = MAX_SIZE_CONFIG[category];

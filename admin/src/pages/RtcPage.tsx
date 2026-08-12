@@ -15,6 +15,7 @@ import {
   TableRow,
   Paper,
   Divider,
+  CircularProgress,
 } from '@mui/material';
 import SettingsInputComponentIcon from '@mui/icons-material/SettingsInputComponent';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
@@ -25,6 +26,9 @@ import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 
 import { useNotificationsStore } from '../store/notifications.store';
+import { adminService, ProviderConfigData } from '../services/admin.service';
+
+type RtcProvider = 'agora' | 'livekit' | 'zegocloud' | 'default_mock';
 
 interface RtcStats {
   activeRoomsCount: number;
@@ -43,25 +47,112 @@ interface RtcStats {
 export const RtcPage: React.FC = () => {
   const addToast = useNotificationsStore((state) => state.addToast);
 
-  const [activeProvider, setActiveProvider] = useState<'agora' | 'livekit' | 'zegocloud' | 'default_mock'>('agora');
+  const [activeProvider, setActiveProvider] = useState<RtcProvider>('agora');
+  const [rtcProviders, setRtcProviders] = useState<ProviderConfigData[]>([]);
+  const [isLoadingProvider, setIsLoadingProvider] = useState(true);
+  const [switchingProvider, setSwitchingProvider] = useState<RtcProvider | null>(null);
   const [stats, setStats] = useState<RtcStats>({
-    activeRoomsCount: 4,
-    connectedParticipantsCount: 28,
+    activeRoomsCount: 0,
+    connectedParticipantsCount: 0,
     activeProvider: 'agora',
     providerStatus: 'operational',
-    averageRtt: 38,
-    averagePacketLoss: 0.4,
-    recordingStatus: 'recording',
-    activeRecordingsCount: 2,
+    averageRtt: 0,
+    averagePacketLoss: 0,
+    recordingStatus: 'idle',
+    activeRecordingsCount: 0,
     connectionFailures: 0,
-    reconnectionCount: 1,
-    activeSpeakersCount: 6,
+    reconnectionCount: 0,
+    activeSpeakersCount: 0,
   });
 
-  const handleProviderSwitch = (provider: 'agora' | 'livekit' | 'zegocloud') => {
-    setActiveProvider(provider);
-    setStats((prev) => ({ ...prev, activeProvider: provider }));
-    addToast('success', `Switched active RTC engine provider to ${provider.toUpperCase()}`);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRtcState = async () => {
+      setIsLoadingProvider(true);
+      try {
+        const [providers, monitoring] = await Promise.all([
+          adminService.getProviderConfigs(),
+          adminService.getRtcMonitoringStats(),
+        ]);
+        if (cancelled) return;
+
+        const rtc = providers.filter((provider) => provider.category === 'rtc');
+        const active = rtc.find(
+          (provider) => provider.isActive && provider.isEnabled,
+        );
+        const resolvedProvider = (
+          active?.providerType || monitoring.activeProvider || 'agora'
+        ).toLowerCase() as RtcProvider;
+
+        setRtcProviders(rtc);
+        setActiveProvider(resolvedProvider);
+        setStats({ ...monitoring, activeProvider: resolvedProvider });
+      } catch (error) {
+        if (!cancelled) {
+          addToast(
+            'error',
+            error instanceof Error
+              ? error.message
+              : 'Failed to load persisted RTC configuration',
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoadingProvider(false);
+      }
+    };
+
+    void loadRtcState();
+    return () => {
+      cancelled = true;
+    };
+  }, [addToast]);
+
+  const handleProviderSwitch = async (
+    provider: Exclude<RtcProvider, 'default_mock'>,
+  ) => {
+    if (provider === activeProvider || switchingProvider) return;
+
+    const providerConfig = rtcProviders.find(
+      (item) => item.providerType.toLowerCase() === provider,
+    );
+    if (!providerConfig) {
+      addToast(
+        'error',
+        `RTC provider profile for ${provider.toUpperCase()} is not configured`,
+      );
+      return;
+    }
+
+    setSwitchingProvider(provider);
+    try {
+      await adminService.setActiveProviderConfig(providerConfig.id);
+      const monitoring = await adminService.getRtcMonitoringStats();
+      const persistedProvider = monitoring.activeProvider.toLowerCase() as RtcProvider;
+
+      setRtcProviders((current) =>
+        current.map((item) => ({
+          ...item,
+          isActive: item.id === providerConfig.id,
+          isEnabled: item.id === providerConfig.id ? true : item.isEnabled,
+        })),
+      );
+      setActiveProvider(persistedProvider);
+      setStats({ ...monitoring, activeProvider: persistedProvider });
+      addToast(
+        'success',
+        `Active RTC engine persisted as ${persistedProvider.toUpperCase()}`,
+      );
+    } catch (error) {
+      addToast(
+        'error',
+        error instanceof Error
+          ? error.message
+          : 'Failed to persist RTC provider selection',
+      );
+    } finally {
+      setSwitchingProvider(null);
+    }
   };
 
   return (
@@ -146,7 +237,13 @@ export const RtcPage: React.FC = () => {
               <Button
                 variant={activeProvider === 'agora' ? 'contained' : 'outlined'}
                 fullWidth
-                onClick={() => handleProviderSwitch('agora')}
+                onClick={() => void handleProviderSwitch('agora')}
+                disabled={isLoadingProvider || switchingProvider !== null}
+                startIcon={
+                  switchingProvider === 'agora' ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : undefined
+                }
               >
                 {activeProvider === 'agora' ? 'Active Provider' : 'Switch To Agora'}
               </Button>
@@ -167,7 +264,13 @@ export const RtcPage: React.FC = () => {
               <Button
                 variant={activeProvider === 'livekit' ? 'contained' : 'outlined'}
                 fullWidth
-                onClick={() => handleProviderSwitch('livekit')}
+                onClick={() => void handleProviderSwitch('livekit')}
+                disabled={isLoadingProvider || switchingProvider !== null}
+                startIcon={
+                  switchingProvider === 'livekit' ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : undefined
+                }
               >
                 {activeProvider === 'livekit' ? 'Active Provider' : 'Switch To LiveKit'}
               </Button>
@@ -188,7 +291,13 @@ export const RtcPage: React.FC = () => {
               <Button
                 variant={activeProvider === 'zegocloud' ? 'contained' : 'outlined'}
                 fullWidth
-                onClick={() => handleProviderSwitch('zegocloud')}
+                onClick={() => void handleProviderSwitch('zegocloud')}
+                disabled={isLoadingProvider || switchingProvider !== null}
+                startIcon={
+                  switchingProvider === 'zegocloud' ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : undefined
+                }
               >
                 {activeProvider === 'zegocloud' ? 'Active Provider' : 'Switch To ZegoCloud'}
               </Button>

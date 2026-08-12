@@ -15,6 +15,17 @@ export class StorageFactory {
     private readonly s3Driver: S3StorageDriver,
   ) {}
 
+  /**
+   * Private verification documents are intentionally isolated from the
+   * public/provider-backed media driver. The accepted private-storage
+   * architecture requires PRIVATE_STORAGE_PATH confinement and 0600/0700
+   * filesystem permissions, while S3-compatible private operations are not
+   * implemented by this product yet.
+   */
+  async getPrivateDriver(): Promise<IStorageDriver> {
+    return this.localDriver;
+  }
+
   async getActiveDriver(): Promise<IStorageDriver> {
     const configuredDriver = process.env.STORAGE_DRIVER?.trim().toLowerCase();
 
