@@ -106,12 +106,14 @@ export interface LiveRoomSummary {
   id: string;
   title: string;
   category: string;
-  status: 'offline' | 'scheduled' | 'live' | 'paused';
+  status: 'offline' | 'scheduled' | 'live' | 'paused' | 'ended';
   currentListeners: number;
   peakListeners: number;
   audioQuality: string;
   startedAt?: string;
   scheduledFor?: string;
+  isPrivate?: boolean;
+  isInviteOnly?: boolean;
 }
 
 export interface CreatorPlan {

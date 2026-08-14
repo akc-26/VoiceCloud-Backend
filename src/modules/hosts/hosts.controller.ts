@@ -166,7 +166,12 @@ export class HostsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async search(@Query() dto: SearchHostsDto) {
     const hosts = await this.hostsService.searchHosts(dto);
-    return hosts.map((h) => MapperUtils.toPublicHostDto(h));
+    return hosts.map((h) => ({
+      ...MapperUtils.toPublicHostDto(h),
+      userName: (h as any).userName,
+      username: (h as any).username,
+      displayName: (h as any).displayName,
+    }));
   }
 
   @Get('progression')
@@ -424,7 +429,12 @@ export class HostsController {
     const hosts = await this.hostsService.getTopHosts(
       limit ? Number(limit) : 10,
     );
-    return hosts.map((h) => MapperUtils.toPublicHostDto(h));
+    return hosts.map((h) => ({
+      ...MapperUtils.toPublicHostDto(h),
+      userName: (h as any).userName,
+      username: (h as any).username,
+      displayName: (h as any).displayName,
+    }));
   }
 
   // ==========================================
@@ -538,7 +548,12 @@ export class HostsController {
   @ApiResponse({ status: 403, description: 'Forbidden: Admin access required' })
   async getApplications(@Query('status') status?: HostVerificationStatus) {
     const apps = await this.hostsService.getApplications(status);
-    return apps.map((app) => MapperUtils.toAdminHostDto(app, true));
+    return apps.map((app) => ({
+      ...MapperUtils.toAdminHostDto(app, true),
+      userName: (app as any).userName,
+      username: (app as any).username,
+      displayName: (app as any).displayName,
+    }));
   }
 
   @Get('admin/applications/:hostId/verification-assets')

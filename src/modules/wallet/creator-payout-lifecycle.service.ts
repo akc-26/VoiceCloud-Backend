@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import {
   PayoutMethod,
   PayoutStatus,
@@ -416,10 +416,45 @@ export class CreatorPayoutLifecycleService {
     );
   }
 
-  async list(status?: PayoutStatus): Promise<CreatorPayoutRequest[]> {
-    return this.dataSource.getRepository(CreatorPayoutRequest).find({
-      where: status ? { status } : {},
-      order: { createdAt: 'DESC' },
+  async list(
+    status?: PayoutStatus,
+    search?: string,
+    method?: PayoutMethod,
+  ) {
+    const repository = this.dataSource.getRepository(CreatorPayoutRequest);
+    const qb = repository.createQueryBuilder('payout')
+      .leftJoin(User, 'creator', 'creator.id = payout.creatorId');
+    if (status) qb.andWhere('payout.status = :status', { status });
+    if (method) qb.andWhere('payout.payoutMethod = :method', { method });
+    if (search?.trim()) {
+      qb.andWhere('(creator.username ILIKE :search OR creator.displayName ILIKE :search OR creator.email ILIKE :search)', { search: `%${search.trim()}%` });
+    }
+    qb.orderBy('payout.createdAt', 'DESC');
+    const payouts = await qb.getMany();
+    return this.enrichAdminPayouts(payouts);
+  }
+
+  async getAdminById(id: string) {
+    const payout = await this.dataSource.getRepository(CreatorPayoutRequest).findOne({ where: { id } });
+    if (!payout) throw new NotFoundException(`Payout request with ID '${id}' not found`);
+    return (await this.enrichAdminPayouts([payout]))[0];
+  }
+
+  private async enrichAdminPayouts(payouts: CreatorPayoutRequest[]) {
+    const userIds = [...new Set(payouts.flatMap((payout) => [payout.creatorId, payout.reviewedBy]).filter(Boolean))] as string[];
+    const users = userIds.length
+      ? await this.dataSource.getRepository(User).find({ where: { id: In(userIds) } })
+      : [];
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    return payouts.map((payout) => {
+      const creator = userMap.get(payout.creatorId);
+      const reviewer = payout.reviewedBy ? userMap.get(payout.reviewedBy) : undefined;
+      return {
+        ...payout,
+        creatorName: creator?.displayName || creator?.username || payout.creatorId,
+        creatorUsername: creator?.username || null,
+        reviewerName: reviewer?.displayName || reviewer?.username || null,
+      };
     });
   }
 

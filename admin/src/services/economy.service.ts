@@ -14,6 +14,8 @@ export interface AdminWalletOverview {
 export interface AdminWalletTransaction {
   id: string;
   userId: string;
+  userName?: string;
+  username?: string | null;
   transactionType: string;
   amount: number;
   currency: string;
@@ -23,6 +25,13 @@ export interface AdminWalletTransaction {
   referenceType?: string | null;
   referenceId?: string | null;
   description?: string | null;
+  method?: string | null;
+  metadata?: Record<string, unknown> | null;
+  balanceType?: string | null;
+  balanceBefore?: number | null;
+  balanceAfter?: number | null;
+  operationKey?: string | null;
+  operationGroupId?: string | null;
   remarks?: string | null;
   createdAt: string;
 }
@@ -30,6 +39,8 @@ export interface AdminWalletTransaction {
 export interface AdminCreatorPayout {
   id: string;
   creatorId: string;
+  creatorName?: string;
+  creatorUsername?: string | null;
   diamondAmount: number;
   payoutAmount: number;
   payoutMethod: string;
@@ -38,6 +49,10 @@ export interface AdminCreatorPayout {
   createdAt: string;
   reviewedAt?: string | null;
   settledAt?: string | null;
+  reviewerName?: string | null;
+  reviewedBy?: string | null;
+  accountDetails?: Record<string, unknown> | null;
+  updatedAt?: string;
 }
 
 export const economyAdminService = {
@@ -46,7 +61,7 @@ export const economyAdminService = {
     return res.data;
   },
 
-  async getTransactions(params: { page?: number; limit?: number } = {}) {
+  async getTransactions(params: { page?: number; limit?: number; search?: string; method?: string } = {}) {
     const res = await api.get('/admin/wallet/transactions', { params });
     return res.data as {
       data: AdminWalletTransaction[];
@@ -57,11 +72,19 @@ export const economyAdminService = {
     };
   },
 
-  async getCreatorPayouts(status?: AdminCreatorPayout['status']) {
-    const res = await api.get('/admin/wallet/creator/payouts', {
-      params: status ? { status } : undefined,
-    });
+  async getTransaction(id: string) {
+    const res = await api.get(`/admin/wallet/transactions/${id}`);
+    return res.data as AdminWalletTransaction;
+  },
+
+  async getCreatorPayouts(params: { status?: AdminCreatorPayout['status']; search?: string; method?: string } = {}) {
+    const res = await api.get('/admin/wallet/creator/payouts', { params });
     return res.data as AdminCreatorPayout[];
+  },
+
+  async getCreatorPayout(id: string) {
+    const res = await api.get(`/admin/wallet/creator/payouts/${id}`);
+    return res.data as AdminCreatorPayout;
   },
 
   async approveCreatorPayout(id: string) {

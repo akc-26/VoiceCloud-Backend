@@ -13,7 +13,20 @@ export interface UserItem {
   charmLevel?: number;
   charmExp?: number;
   badges?: string[];
+  phoneNumber?: string;
+  country?: string;
+  preferredLanguage?: string;
+  isCreatorEnabled?: boolean;
+  verificationStatus?: string;
+  followersCount?: number;
+  followingCount?: number;
+  popularityScore?: number;
+  bio?: string;
+  gender?: string;
+  isVerified?: boolean;
+  isVip?: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface BadgeItem {
@@ -30,14 +43,29 @@ export interface VisitorLogItem {
   id: string;
   targetUserId: string;
   visitorUserId: string;
+  targetUserName?: string;
+  targetUsername?: string | null;
+  visitorUserName?: string;
+  visitorUsername?: string | null;
   isAnonymous: boolean;
   visitCount: number;
   visitedAt: string;
 }
 
 export const usersService = {
-  async getUsers(params?: { page?: number; limit?: number; search?: string }) {
+  async getUsers(params?: { page?: number; limit?: number; search?: string; role?: string }) {
     const res = await api.get('/admin/users', { params });
+    return res.data;
+  },
+
+
+  async createUser(data: { username: string; displayName: string; email: string; password: string; role: 'USER' | 'CREATOR'; phoneNumber?: string; country?: string; preferredLanguage?: string }) {
+    const res = await api.post('/admin/users', data);
+    return res.data as UserItem;
+  },
+
+  async resetPassword(id: string, password: string) {
+    const res = await api.post(`/admin/users/${id}/reset-password`, { password });
     return res.data;
   },
 
@@ -68,6 +96,17 @@ export const usersService = {
 
   async getBadges() {
     const res = await api.get('/admin/badges');
+    return res.data;
+  },
+
+
+  async updateBadge(id: string, data: Partial<Pick<BadgeItem, 'name' | 'description' | 'iconUrl' | 'category' | 'isActive'>>) {
+    const res = await api.patch(`/admin/badges/${id}`, data);
+    return res.data as BadgeItem;
+  },
+
+  async deleteBadge(id: string) {
+    const res = await api.delete(`/admin/badges/${id}`);
     return res.data;
   },
 

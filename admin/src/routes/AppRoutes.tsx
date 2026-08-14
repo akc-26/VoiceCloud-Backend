@@ -13,8 +13,12 @@ import { NotFoundPage } from '../pages/NotFoundPage';
 
 import { DashboardPage } from '../pages/DashboardPage';
 import { UsersPage } from '../pages/UsersPage';
+import { UserDetailPage } from '../pages/UserDetailPage';
 import { RoomsPage } from '../pages/RoomsPage';
+import { RoomDetailPage } from '../pages/RoomDetailPage';
 import { WalletPage } from '../pages/WalletPage';
+import { WalletTransactionDetailPage } from '../pages/WalletTransactionDetailPage';
+import { WalletPayoutDetailPage } from '../pages/WalletPayoutDetailPage';
 import { GiftsPage } from '../pages/GiftsPage';
 import { VipPage } from '../pages/VipPage';
 import { HostsPage } from '../pages/HostsPage';
@@ -56,8 +60,12 @@ export const AppRoutes: React.FC = () => {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/users/:id" element={<UserDetailPage />} />
           <Route path="/rooms" element={<RoomsPage />} />
+          <Route path="/rooms/:id" element={<RoomDetailPage />} />
           <Route path="/wallet" element={<WalletPage />} />
+          <Route path="/wallet/transactions/:id" element={<WalletTransactionDetailPage />} />
+          <Route path="/wallet/payouts/:id" element={<WalletPayoutDetailPage />} />
           <Route path="/gifts" element={<GiftsPage />} />
           <Route path="/vip" element={<VipPage />} />
           <Route path="/hosts" element={<HostsPage />} />

@@ -35,7 +35,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { PayoutStatus, UserRole } from '../../common/enums';
+import { PayoutMethod, PayoutStatus, UserRole } from '../../common/enums';
 
 @ApiTags('Admin Wallet')
 @Controller('admin/wallet')
@@ -65,6 +65,12 @@ export class AdminWalletController {
   @ApiResponse({ status: 200, description: 'Ledger retrieved successfully' })
   async getLedger(@Query() query: LedgerQueryDto) {
     return this.walletService.getLedger(query);
+  }
+
+  @Get('transactions/:id')
+  @ApiOperation({ summary: 'Get complete wallet transaction details for Admin' })
+  async getLedgerEntry(@Param('id') id: string) {
+    return this.walletService.getLedgerEntryAdmin(id);
   }
 
   @Post('transactions/credit')
@@ -129,8 +135,18 @@ export class AdminWalletController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List creator payout requests for Admin review' })
-  async listCreatorPayouts(@Query('status') status?: PayoutStatus) {
-    return this.creatorPayoutLifecycleService.list(status);
+  async listCreatorPayouts(
+    @Query('status') status?: PayoutStatus,
+    @Query('search') search?: string,
+    @Query('method') method?: PayoutMethod,
+  ) {
+    return this.creatorPayoutLifecycleService.list(status, search, method);
+  }
+
+  @Get('creator/payouts/:id')
+  @ApiOperation({ summary: 'Get complete Creator payout details for Admin' })
+  async getCreatorPayout(@Param('id') id: string) {
+    return this.creatorPayoutLifecycleService.getAdminById(id);
   }
 
   @Post('creator/payouts/:id/approve')

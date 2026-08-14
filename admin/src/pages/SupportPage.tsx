@@ -15,10 +15,8 @@ interface TicketItem {
 }
 
 export const SupportPage: React.FC = () => {
-  const [tickets] = useState<TicketItem[]>([
-    { id: 'ticket-501', user: 'alex_pro', subject: 'Coin Recharge Failed On Stripe', category: 'Billing', status: 'pending', createdAt: '2026-07-24 12:10' },
-    { id: 'ticket-502', user: 'sarah_voice', subject: 'Host Payout Tax Verification Document', category: 'Host Payout', status: 'completed', createdAt: '2026-07-23 15:40' },
-  ]);
+  const [tickets] = useState<TicketItem[]>([]);
+
 
   const columns: Column<TicketItem>[] = [
     { id: 'id', label: 'Ticket ID' },
@@ -42,7 +40,7 @@ export const SupportPage: React.FC = () => {
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 800 }}>Support Ticket Desk</Typography>
-        <Typography variant="body2" color="text.secondary">Assist users with coin recharge issues, account recovery, host payouts, and platform inquiries</Typography>
+        <Typography variant="body2" color="text.secondary">Support ticket data is shown only when backed by a persisted ticket service. No fabricated tickets are displayed.</Typography>
       </Box>
 
       <DataTable columns={columns} rows={tickets} />

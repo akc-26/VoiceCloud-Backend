@@ -284,7 +284,9 @@ export class WalletService {
     const limit = query.limit || 10;
     const skip = (page - 1) * limit;
 
-    const qb = this.walletTransactionRepository.createQueryBuilder('tx');
+    const qb = this.walletTransactionRepository
+      .createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.user', 'user');
     qb.where('tx.userId = :userId', { userId });
 
     if (query.transactionType) {
@@ -860,8 +862,15 @@ export class WalletService {
 
     if (query.search) {
       qb.andWhere(
-        '(tx.remarks ILIKE :search OR tx.referenceId ILIKE :search OR tx.id ILIKE :search)',
+        '(tx.remarks ILIKE :search OR tx.description ILIKE :search OR tx.referenceId ILIKE :search OR CAST(tx.id AS text) ILIKE :search OR user.username ILIKE :search OR user.displayName ILIKE :search OR user.email ILIKE :search)',
         { search: `%${query.search}%` },
+      );
+    }
+
+    if (query.method) {
+      qb.andWhere(
+        '(tx.source ILIKE :method OR tx.referenceType ILIKE :method OR tx.transactionType ILIKE :method)',
+        { method: `%${query.method}%` },
       );
     }
 
@@ -871,13 +880,43 @@ export class WalletService {
     qb.skip(skip).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+    const mapped = data.map((tx) => ({
+      ...tx,
+      user: undefined,
+      userName: tx.user?.displayName || tx.user?.username || tx.userId,
+      username: tx.user?.username || null,
+      method:
+        (tx.metadata as any)?.paymentMethod ||
+        tx.source ||
+        tx.referenceType ||
+        tx.transactionType,
+    }));
 
     return {
-      data,
+      data: mapped,
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getLedgerEntryAdmin(id: string) {
+    const tx = await this.walletTransactionRepository.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+    if (!tx) throw new NotFoundException(`Wallet transaction '${id}' not found`);
+    return {
+      ...tx,
+      user: undefined,
+      userName: tx.user?.displayName || tx.user?.username || tx.userId,
+      username: tx.user?.username || null,
+      method:
+        (tx.metadata as any)?.paymentMethod ||
+        tx.source ||
+        tx.referenceType ||
+        tx.transactionType,
     };
   }
 

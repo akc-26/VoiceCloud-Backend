@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class QueryAdminUsersDto {
@@ -9,6 +9,12 @@ export class QueryAdminUsersDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by registered user role', enum: ['USER', 'CREATOR', 'ADMIN'] })
+  @IsOptional()
+  @IsString()
+  @IsIn(['USER', 'CREATOR', 'ADMIN'])
+  role?: string;
 
   @ApiPropertyOptional({ description: 'Page number', default: 1 })
   @IsOptional()

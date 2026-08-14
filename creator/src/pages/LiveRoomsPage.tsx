@@ -55,6 +55,7 @@ export const LiveRoomsPage: React.FC = () => {
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('Audio Lounge');
   const [newQuality, setNewQuality] = useState('324kbps Ultra HD');
+  const [newAccess, setNewAccess] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
 
   const roomsQuery = useQuery({
     queryKey: ['creator', 'rooms'],
@@ -69,6 +70,7 @@ export const LiveRoomsPage: React.FC = () => {
       void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
       setIsCreateOpen(false);
       setNewTitle('');
+      setNewAccess('PUBLIC');
     },
   });
 
@@ -123,6 +125,7 @@ export const LiveRoomsPage: React.FC = () => {
       title,
       category: newCategory,
       audioQuality: newQuality,
+      isPrivate: newAccess === 'PRIVATE',
     });
   };
 
@@ -227,6 +230,12 @@ export const LiveRoomsPage: React.FC = () => {
                         }
                         label={room.category || 'Audio Lounge'}
                         color="primary"
+                        variant="outlined"
+                        size="small"
+                      />
+                      <Chip
+                        label={room.isPrivate ? 'Private' : 'Public'}
+                        color={room.isPrivate ? 'warning' : 'success'}
                         variant="outlined"
                         size="small"
                       />
@@ -515,6 +524,17 @@ export const LiveRoomsPage: React.FC = () => {
               <MenuItem value="Podcast">Podcast</MenuItem>
               <MenuItem value="Music & Jam">Music & Jam</MenuItem>
               <MenuItem value="Talk Show">Talk Show</MenuItem>
+            </TextField>
+            <TextField
+              select
+              label="Room Access"
+              fullWidth
+              value={newAccess}
+              onChange={(e) => setNewAccess(e.target.value as 'PUBLIC' | 'PRIVATE')}
+              helperText="Private rooms are invite-only and are not listed in public room discovery."
+            >
+              <MenuItem value="PUBLIC">Public</MenuItem>
+              <MenuItem value="PRIVATE">Private (Invite Only)</MenuItem>
             </TextField>
             <TextField
               select

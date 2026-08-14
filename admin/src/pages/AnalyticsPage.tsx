@@ -1,49 +1,26 @@
-import React from 'react';
-import { Box, Typography, Grid } from '@mui/material';
-
-import { AnalyticsAreaChart, AnalyticsBarChart, AnalyticsPieChart } from '../components/common/Charts';
+import React, { useEffect, useState } from 'react';
+import { Box, Card, CardContent, Typography } from '@mui/material';
+import { adminService } from '../services/admin.service';
+import { giftsAdminService, GiftRevenueSummary } from '../services/gifts.service';
 
 export const AnalyticsPage: React.FC = () => {
-  const dauData = [
-    { day: 'Mon', DAU: 12400 },
-    { day: 'Tue', DAU: 13100 },
-    { day: 'Wed', DAU: 12800 },
-    { day: 'Thu', DAU: 14200 },
-    { day: 'Fri', DAU: 16800 },
-    { day: 'Sat', DAU: 19500 },
-    { day: 'Sun', DAU: 18200 },
+  const [stats, setStats] = useState<any>(null);
+  const [revenue, setRevenue] = useState<GiftRevenueSummary | null>(null);
+  useEffect(() => {
+    Promise.all([
+      adminService.getDashboardStats().catch(() => null),
+      giftsAdminService.getRevenue('weekly').catch(() => null),
+    ]).then(([dashboard, giftRevenue]) => { setStats(dashboard); setRevenue(giftRevenue); });
+  }, []);
+  const cards = [
+    ['Registered Users', stats?.totalUsers ?? 0],
+    ['Total Rooms', stats?.totalRooms ?? 0],
+    ['Live Rooms', stats?.liveRooms ?? 0],
+    ['Verified Hosts', stats?.totalHosts ?? 0],
+    ['Wallet Transactions', stats?.totalWalletTransactions ?? stats?.totalWalletTx ?? 0],
+    ['Gift Transactions (weekly)', revenue?.totalTransactions ?? 0],
+    ['Gift Coin Volume (weekly)', revenue?.totalCoinsVolume ?? 0],
+    ['Platform Gift Revenue (weekly)', revenue?.platformNetRevenue ?? 0],
   ];
-
-  const giftCategoryRevenue = [
-    { name: 'SVGA Luxury Cars', value: 45 },
-    { name: 'Voice Crowns', value: 30 },
-    { name: 'Microphones', value: 15 },
-    { name: 'Other Gifts', value: 10 },
-  ];
-
-  return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Platform Analytics & Intelligence</Typography>
-        <Typography variant="body2" color="text.secondary">Deep dive into daily active users (DAU), voice room retention, gift monetization metrics, and user engagement</Typography>
-      </Box>
-
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 8 }}>
-          <AnalyticsAreaChart
-            title="Weekly Daily Active Users (DAU)"
-            data={dauData}
-            dataKey="DAU"
-            xAxisKey="day"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <AnalyticsPieChart
-            title="Gift Store Revenue Breakdown"
-            data={giftCategoryRevenue}
-          />
-        </Grid>
-      </Grid>
-    </Box>
-  );
+  return <Box><Box sx={{mb:3}}><Typography variant="h4" fontWeight={800}>Platform Analytics & Intelligence</Typography><Typography color="text.secondary">Current persisted platform and monetization metrics. Historical charts are shown only when a real time-series source is available.</Typography></Box><Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',sm:'repeat(2,1fr)',lg:'repeat(4,1fr)'},gap:2}}>{cards.map(([label,value])=><Card key={String(label)}><CardContent><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h4" fontWeight={800}>{Number(value).toLocaleString()}</Typography></CardContent></Card>)}</Box></Box>;
 };

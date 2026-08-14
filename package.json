@@ -143,7 +143,8 @@
     "lint:wp08:03:04:semantic": "eslint \"src/modules/gifts/gifts.controller.ts\" \"src/modules/gifts/gifts.service.ts\" \"src/modules/gifts/admin-gift-catalog.spec.ts\" \"src/modules/notifications/notifications.controller.ts\" \"src/modules/notifications/notifications.service.ts\" \"src/modules/notifications/admin-notification-delivery.spec.ts\" \"src/common/events/events.gateway.ts\" \"src/common/events/notification-realtime-isolation.spec.ts\" \"src/database/data-source.ts\" \"src/database/typeorm-migration-discovery.spec.ts\" --no-cache --rule \"prettier/prettier: off\"",
     "lint:consolidated-ui-white-label:semantic": "eslint \"admin/src/pages/DashboardPage.tsx\" \"admin/src/pages/LoginPage.tsx\" \"admin/src/pages/BackupManagementPage.tsx\" \"creator/src/components/layout/CreatorTopBar.tsx\" \"creator/src/components/layout/CreatorBreadcrumbs.tsx\" \"creator/src/pages/DashboardPage.tsx\" \"creator/src/pages/LoginPage.tsx\" \"website/src/App.tsx\" --no-cache --rule \"prettier/prettier: off\"",
     "lint:wp09:semantic": "eslint \"src/main.ts\" \"src/config/env-validator.ts\" \"src/config/validation.schema.ts\" \"src/common/http/production-http-hardening.ts\" \"src/modules/admin/admin.controller.ts\" \"src/modules/backup/backup.controller.ts\" \"src/modules/backup/backup.service.ts\" \"src/modules/backup/restore.service.ts\" \"src/modules/rankings/rankings.controller.ts\" \"src/modules/referral/controllers/admin-referral.controller.ts\" \"src/modules/rtc/rtc.controller.ts\" \"src/modules/store/controllers/admin-store.controller.ts\" --no-cache --rule \"prettier/prettier: off\"",
-    "wp09:regression-check": "node scripts/wp09/wp09-regression-build-check.mjs"
+    "wp09:regression-check": "node scripts/wp09/wp09-regression-build-check.mjs",
+    "wp09:r10:source-check": "node scripts/wp09/wp09-r10-qa-part1-source-check.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

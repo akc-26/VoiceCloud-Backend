@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -26,6 +27,9 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SettingsIcon from '@mui/icons-material/Settings';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 import { DataTable, Column } from '../components/common/DataTable';
 import { SearchBar } from '../components/common/SearchBar';
@@ -39,6 +43,7 @@ import { useNotificationsStore } from '../store/notifications.store';
 
 export const UsersPage: React.FC = () => {
   const addToast = useNotificationsStore((state) => state.addToast);
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState(0);
 
@@ -51,6 +56,8 @@ export const UsersPage: React.FC = () => {
   const [limit, setLimit] = useState(10);
   const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({ username: '', displayName: '', email: '', password: '', role: 'USER' as 'USER' | 'CREATOR', phoneNumber: '', country: '', preferredLanguage: 'en' });
 
   // Dialogs
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -69,6 +76,7 @@ export const UsersPage: React.FC = () => {
   const [newBadgeCategory, setNewBadgeCategory] = useState('wealth');
   const [badgeDialogOpen, setBadgeDialogOpen] = useState(false);
   const [badgeToAssign, setBadgeToAssign] = useState('');
+  const [editingBadge, setEditingBadge] = useState<BadgeItem | null>(null);
 
   // Settings State
   const [userSettings, setUserSettings] = useState<any>(null);
@@ -80,7 +88,7 @@ export const UsersPage: React.FC = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const data = await usersService.getUsers({ page, limit, search });
+      const data = await usersService.getUsers({ page, limit, search, role: roleFilter || undefined });
       if (data?.data) {
         setUsers(data.data);
         setTotalUsers(data.total || data.data.length);
@@ -123,7 +131,52 @@ export const UsersPage: React.FC = () => {
     if (activeTab === 0) fetchUsers();
     if (activeTab === 1) fetchBadges();
     if (activeTab === 2) fetchVisitorLogs();
-  }, [activeTab, page, limit, search]);
+  }, [activeTab, page, limit, search, roleFilter]);
+
+  const handleCreateUser = async () => {
+    try {
+      await usersService.createUser({
+        ...createUserForm,
+        phoneNumber: createUserForm.phoneNumber || undefined,
+        country: createUserForm.country || undefined,
+      });
+      addToast('success', `Created ${createUserForm.role === 'CREATOR' ? 'Creator' : 'Standard User'} account @${createUserForm.username}`);
+      setCreateUserOpen(false);
+      setCreateUserForm({ username: '', displayName: '', email: '', password: '', role: 'USER', phoneNumber: '', country: '', preferredLanguage: 'en' });
+      await fetchUsers();
+    } catch (error: any) {
+      addToast('error', error?.response?.data?.message || error?.message || 'Failed to create user');
+    }
+  };
+
+  const handleSaveBadge = async () => {
+    if (!editingBadge) return;
+    try {
+      await usersService.updateBadge(editingBadge.id, {
+        name: editingBadge.name,
+        description: editingBadge.description,
+        iconUrl: editingBadge.iconUrl,
+        category: editingBadge.category,
+        isActive: editingBadge.isActive,
+      });
+      addToast('success', `Updated badge ${editingBadge.name}`);
+      setEditingBadge(null);
+      await fetchBadges();
+    } catch (error: any) {
+      addToast('error', error?.response?.data?.message || 'Failed to update badge');
+    }
+  };
+
+  const handleDeleteBadge = async (badge: BadgeItem) => {
+    if (!window.confirm(`Delete global badge "${badge.name}"? Existing user assignments will also be removed.`)) return;
+    try {
+      await usersService.deleteBadge(badge.id);
+      addToast('success', `Deleted badge ${badge.name}`);
+      await fetchBadges();
+    } catch (error: any) {
+      addToast('error', error?.response?.data?.message || 'Failed to delete badge');
+    }
+  };
 
   const handleBanToggle = async () => {
     if (!userToBan) return;
@@ -252,8 +305,11 @@ export const UsersPage: React.FC = () => {
       align: 'right',
       render: (row) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <IconButton size="small" onClick={() => { setSelectedUser(row); handleInspectSettings(row.id); }}>
+          <IconButton size="small" aria-label="View full user details" onClick={() => navigate(`/users/${row.id}`)}>
             <VisibilityIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" aria-label="Manage user settings" onClick={() => { setSelectedUser(row); void handleInspectSettings(row.id); }}>
+            <SettingsIcon fontSize="small" />
           </IconButton>
           <Button
             size="small"
@@ -274,13 +330,12 @@ export const UsersPage: React.FC = () => {
 
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          User & Social Identity Management
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Manage profiles, wealth/charm levels, badges, visitor history, and privacy settings
-        </Typography>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 800 }}>User & Social Identity Management</Typography>
+          <Typography variant="body2" color="text.secondary">Manage registered Standard Users and Creators, levels, badges, visitor history, and privacy settings. Guest and SUPER_ADMIN accounts are intentionally excluded.</Typography>
+        </Box>
+        <Button variant="contained" startIcon={<PersonAddIcon />} onClick={() => setCreateUserOpen(true)}>Create User</Button>
       </Box>
 
       <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val)} sx={{ mb: 3 }}>
@@ -309,8 +364,8 @@ export const UsersPage: React.FC = () => {
                   label: 'Role',
                   options: [
                     { label: 'Standard User', value: 'USER' },
-                    { label: 'Host', value: 'HOST' },
-                    { label: 'VIP Member', value: 'VIP' },
+                    { label: 'Creator', value: 'CREATOR' },
+                    { label: 'Admin', value: 'ADMIN' },
                   ],
                 },
               ]}
@@ -327,11 +382,9 @@ export const UsersPage: React.FC = () => {
 
       {activeTab === 1 && (
         <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Badges Catalog</Typography>
-            <Button variant="contained" startIcon={<EmojiEventsIcon />} onClick={() => setBadgeDialogOpen(true)}>
-              Create Badge
-            </Button>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, gap: 2, flexWrap: 'wrap' }}>
+            <Box><Typography variant="h6" sx={{ fontWeight: 700 }}>Global Badges Catalog</Typography><Typography variant="body2" color="text.secondary">Global badges are reusable recognition labels assigned to user profiles for achievements, VIP/Creator status, events, wealth/charm milestones, and system recognition. Badge codes are stored on the user and rendered wherever profile badges are displayed.</Typography></Box>
+            <Button variant="contained" startIcon={<EmojiEventsIcon />} onClick={() => setBadgeDialogOpen(true)}>Create Badge</Button>
           </Box>
           <Grid container spacing={2}>
             {badges.map((badge) => (
@@ -344,6 +397,10 @@ export const UsersPage: React.FC = () => {
                     </Box>
                     <Chip label={badge.code} size="small" sx={{ mb: 1 }} />
                     <Typography variant="body2" color="text.secondary">{badge.description || 'No description'}</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                      <Button size="small" startIcon={<EditIcon />} onClick={() => setEditingBadge({ ...badge })}>Edit</Button>
+                      <Button size="small" color="error" startIcon={<DeleteIcon />} onClick={() => void handleDeleteBadge(badge)}>Delete</Button>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
@@ -386,8 +443,8 @@ export const UsersPage: React.FC = () => {
           <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Profile Visitor Logs</Typography>
           <DataTable
             columns={[
-              { id: 'targetUserId', label: 'Target User' },
-              { id: 'visitorUserId', label: 'Visitor' },
+              { id: 'targetUserName', label: 'Target User', render: (row) => row.targetUserName || row.targetUsername || 'Unknown User' },
+              { id: 'visitorUserName', label: 'Visitor', render: (row) => row.isAnonymous ? 'Anonymous Visitor' : (row.visitorUserName || row.visitorUsername || 'Unknown User') },
               {
                 id: 'isAnonymous',
                 label: 'Type',
@@ -400,7 +457,7 @@ export const UsersPage: React.FC = () => {
                 ),
               },
               { id: 'visitCount', label: 'Visits' },
-              { id: 'visitedAt', label: 'Last Visited' },
+              { id: 'visitedAt', label: 'Last Visited', render: (row) => new Date(row.visitedAt).toLocaleString() },
             ]}
             rows={visitorLogs}
             isLoading={loading}
@@ -491,6 +548,29 @@ export const UsersPage: React.FC = () => {
           </Box>
         )}
       </DrawerPanels>
+
+      <Dialog open={createUserOpen} onClose={() => setCreateUserOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Create Registered User Account</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1, display: 'grid', gap: 2 }}>
+            <TextField select label="User Type" value={createUserForm.role} onChange={(e) => setCreateUserForm({ ...createUserForm, role: e.target.value as 'USER' | 'CREATOR' })}><MenuItem value="USER">Standard User</MenuItem><MenuItem value="CREATOR">Creator</MenuItem></TextField>
+            <TextField label="Username" required value={createUserForm.username} onChange={(e) => setCreateUserForm({ ...createUserForm, username: e.target.value })} />
+            <TextField label="Display Name" required value={createUserForm.displayName} onChange={(e) => setCreateUserForm({ ...createUserForm, displayName: e.target.value })} />
+            <TextField label="Email" type="email" required value={createUserForm.email} onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })} />
+            <TextField label="Initial Password" type="password" required helperText="Minimum 8 characters. The user can later change/reset it through the normal auth flow." value={createUserForm.password} onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })} />
+            <TextField label="Phone Number" value={createUserForm.phoneNumber} onChange={(e) => setCreateUserForm({ ...createUserForm, phoneNumber: e.target.value })} />
+            <TextField label="Country" value={createUserForm.country} onChange={(e) => setCreateUserForm({ ...createUserForm, country: e.target.value })} />
+            <TextField label="Preferred Language" value={createUserForm.preferredLanguage} onChange={(e) => setCreateUserForm({ ...createUserForm, preferredLanguage: e.target.value })} />
+          </Box>
+        </DialogContent>
+        <DialogActions><Button onClick={() => setCreateUserOpen(false)}>Cancel</Button><Button variant="contained" onClick={() => void handleCreateUser()} disabled={!createUserForm.username.trim() || !createUserForm.displayName.trim() || !createUserForm.email.trim() || createUserForm.password.length < 8}>Create Account</Button></DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(editingBadge)} onClose={() => setEditingBadge(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Global Badge</DialogTitle>
+        <DialogContent>{editingBadge && <Box sx={{ pt: 1, display: 'grid', gap: 2 }}><TextField label="Badge Code" value={editingBadge.code} disabled helperText="Badge code is immutable because users reference this identifier." /><TextField label="Display Name" value={editingBadge.name} onChange={(e) => setEditingBadge({ ...editingBadge, name: e.target.value })} /><TextField multiline rows={3} label="Description" value={editingBadge.description || ''} onChange={(e) => setEditingBadge({ ...editingBadge, description: e.target.value })} /><TextField label="Icon URL" value={editingBadge.iconUrl || ''} onChange={(e) => setEditingBadge({ ...editingBadge, iconUrl: e.target.value })} /><TextField select label="Category" value={editingBadge.category} onChange={(e) => setEditingBadge({ ...editingBadge, category: e.target.value })}><MenuItem value="wealth">Wealth</MenuItem><MenuItem value="charm">Charm</MenuItem><MenuItem value="event">Event</MenuItem><MenuItem value="vip">VIP</MenuItem><MenuItem value="creator">Creator</MenuItem><MenuItem value="system">System</MenuItem></TextField><FormControlLabel control={<Switch checked={editingBadge.isActive} onChange={(e) => setEditingBadge({ ...editingBadge, isActive: e.target.checked })} />} label="Active / Assignable" /></Box>}</DialogContent>
+        <DialogActions><Button onClick={() => setEditingBadge(null)}>Cancel</Button><Button variant="contained" onClick={() => void handleSaveBadge()}>Save Changes</Button></DialogActions>
+      </Dialog>
 
       {/* Adjust Level Dialog */}
       <Dialog open={levelDialogOpen} onClose={() => setLevelDialogOpen(false)}>

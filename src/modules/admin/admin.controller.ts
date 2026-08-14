@@ -58,12 +58,17 @@ import { QueryAuditLogsDto } from './dto/audit-log.dto';
 import { QueryAdminUsersDto } from './dto/query-admin-users.dto';
 import {
   AdminAdjustLevelDto,
+  AdminCreateUserDto,
+  AdminResetPasswordDto,
   CreateBadgeDto,
+  UpdateBadgeDto,
 } from '../users/dto/admin-user-management.dto';
 import { ProfileVisitorsService } from '../users/visitors.service';
 import { ChatService } from '../chat/chat.service';
 import { ChatQueryDto } from '../chat/dto/chat-query.dto';
 import { ResolveReportDto } from '../chat/dto/report-message.dto';
+import { RoomsService } from '../rooms/rooms.service';
+import { QueryRoomDto } from '../rooms/dto/query-room.dto';
 
 interface RequestWithUser extends Request {
   user?: {
@@ -89,7 +94,27 @@ export class AdminController {
     private readonly usersService: AdminUsersService,
     private readonly visitorsService: ProfileVisitorsService,
     private readonly chatService: ChatService,
+    private readonly roomsService: RoomsService,
   ) {}
+
+  // Room Operations
+  @Get('rooms')
+  @ApiOperation({ summary: 'Get all rooms for Admin, including restricted/private rooms' })
+  async getAdminRooms(@Query() query: QueryRoomDto) {
+    return this.roomsService.findAllAdmin(query);
+  }
+
+  @Get('rooms/:id')
+  @ApiOperation({ summary: 'Get complete room details for Admin' })
+  async getAdminRoom(@Param('id') id: string) {
+    return this.roomsService.findOneAdmin(id);
+  }
+
+  @Post('rooms/:id/terminate')
+  @ApiOperation({ summary: 'Force-end an active room while preserving its history' })
+  async terminateAdminRoom(@Param('id') id: string) {
+    return this.roomsService.adminTerminateRoom(id);
+  }
 
   // User Management
   @Get('users')
@@ -118,6 +143,18 @@ export class AdminController {
     return this.visitorsService.adminGetVisitorStats();
   }
 
+  @Get('auth/history')
+  @ApiOperation({ summary: 'Get platform authentication history with human-readable user names' })
+  async getAuthenticationHistory(@Query('limit') limit = 50) {
+    return this.usersService.getAuthenticationHistory(+limit);
+  }
+
+  @Post('users')
+  @ApiOperation({ summary: 'Create a registered Standard User or Creator account' })
+  async createUser(@Body() dto: AdminCreateUserDto) {
+    return this.usersService.createUser(dto);
+  }
+
   @Get('users/:id')
   @ApiOperation({ summary: 'Get user details by ID for admin' })
   async getUserById(@Param('id') id: string) {
@@ -128,6 +165,12 @@ export class AdminController {
   @ApiOperation({ summary: 'Update user profile/status for admin' })
   async updateUser(@Param('id') id: string, @Body() body: any) {
     return this.usersService.updateUser(id, body);
+  }
+
+  @Post('users/:id/reset-password')
+  @ApiOperation({ summary: 'Directly reset a registered user password and clear lockout state' })
+  async resetUserPassword(@Param('id') id: string, @Body() dto: AdminResetPasswordDto) {
+    return this.usersService.resetPassword(id, dto);
   }
 
   @Delete('users/:id')
@@ -158,6 +201,18 @@ export class AdminController {
   @ApiOperation({ summary: 'List all global badges' })
   async getAllBadges() {
     return this.usersService.getAllBadges();
+  }
+
+  @Patch('badges/:id')
+  @ApiOperation({ summary: 'Edit global badge definition' })
+  async updateBadge(@Param('id') id: string, @Body() dto: UpdateBadgeDto) {
+    return this.usersService.updateBadge(id, dto);
+  }
+
+  @Delete('badges/:id')
+  @ApiOperation({ summary: 'Delete global badge definition and remove assigned references' })
+  async deleteBadge(@Param('id') id: string) {
+    return this.usersService.deleteBadge(id);
   }
 
   @Post('users/:id/badges')

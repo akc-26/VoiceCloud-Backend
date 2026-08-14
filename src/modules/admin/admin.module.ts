@@ -8,6 +8,7 @@ import { AppVersion } from './entities/app-version.entity';
 import { User } from '../users/entities/user.entity';
 import { Badge } from '../users/entities/badge.entity';
 import { UserSettings } from '../users/entities/user-settings.entity';
+import { UserConnectionHistory } from '../users/entities/user-connection-history.entity';
 
 import { AdminProvidersService } from './admin-providers.service';
 import { ProviderTestConnectionService } from './provider-test-connection.service';
@@ -27,6 +28,7 @@ import { CommonModule } from '../../common/common.module';
 import { UsersModule } from '../users/users.module';
 import { ChatModule } from '../chat/chat.module';
 import { SystemSettingsModule } from './system-settings/system-settings.module';
+import { RoomsModule } from '../rooms/rooms.module';
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
       User,
       Badge,
       UserSettings,
+      UserConnectionHistory,
     ]),
     RedisModule,
     EventsModule,
@@ -46,6 +49,7 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
     UsersModule,
     ChatModule,
     SystemSettingsModule,
+    RoomsModule,
   ],
   controllers: [PublicConfigController, PublicCmsController, AdminController],
   providers: [
@@ -59,6 +63,7 @@ import { SystemSettingsModule } from './system-settings/system-settings.module';
   ],
   exports: [
     SystemSettingsModule,
+    RoomsModule,
     AdminProvidersService,
     ProviderTestConnectionService,
     AdminCmsService,

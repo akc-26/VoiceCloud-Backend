@@ -24,6 +24,7 @@ import { ScheduledRoom } from './entities/scheduled-room.entity';
 import { ScheduledRoomStatus, VisibilityType } from '../../common/enums';
 import { HostsService } from '../hosts/hosts.service';
 import { HostVerificationStatus } from '../hosts/entities/host-profile.entity';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class RoomsService {
@@ -89,8 +90,9 @@ export class RoomsService {
           }
         }
 
+        const { isPrivate, ...roomInput } = dto;
         const room = roomRepository.create({
-          ...dto,
+          ...roomInput,
           clubId: scheduled?.clubId ?? dto.clubId,
           category: dto.category ?? scheduled?.category,
           language: dto.language ?? scheduled?.language,
@@ -101,6 +103,7 @@ export class RoomsService {
             scheduled?.isPremium
           ),
           isInviteOnly: !!(
+            isPrivate ||
             dto.isInviteOnly ||
             scheduled?.isInviteOnly ||
             (scheduled && scheduled.visibility !== VisibilityType.PUBLIC)
@@ -176,6 +179,92 @@ export class RoomsService {
     };
   }
 
+  async findMine(userId: string, queryDto: QueryRoomDto) {
+    return this.findAllInternal({ ...queryDto, hostId: userId }, false);
+  }
+
+  async findAllAdmin(queryDto: QueryRoomDto) {
+    return this.findAllInternal(queryDto, true);
+  }
+
+  async findOneAdmin(id: string) {
+    const room = await this.findOne(id);
+    const userRepository = this.dataSource.getRepository(User);
+    const host = await userRepository.findOne({ where: { id: room.hostId } });
+    return this.toAdminRoomView(room, host || undefined);
+  }
+
+  private async findAllInternal(queryDto: QueryRoomDto, includeRestricted: boolean) {
+    const page = queryDto.page || 1;
+    const limit = queryDto.limit || 10;
+    const skip = (page - 1) * limit;
+    const qb = this.roomRepository.createQueryBuilder('room');
+
+    if (!includeRestricted) {
+      // Creator-owned listing must include the Creator's private rooms. Public
+      // discovery retains restricted-room filtering in findAll().
+    }
+
+    if (queryDto.search) {
+      qb.andWhere(
+        '(LOWER(room.title) LIKE LOWER(:search) OR LOWER(room.description) LIKE LOWER(:search))',
+        { search: `%${queryDto.search}%` },
+      );
+    }
+    if (queryDto.category) {
+      qb.andWhere('LOWER(room.category) = LOWER(:category)', { category: queryDto.category });
+    }
+    if (queryDto.status) {
+      qb.andWhere('room.status = :status', { status: queryDto.status });
+    }
+    if (queryDto.hostId) {
+      qb.andWhere('room.hostId = :hostId', { hostId: queryDto.hostId });
+    }
+    if (queryDto.isLive !== undefined) {
+      qb.andWhere('room.isLive = :isLive', { isLive: queryDto.isLive });
+    }
+
+    qb.orderBy('room.createdAt', 'DESC').skip(skip).take(limit);
+    const [rooms, total] = await qb.getManyAndCount();
+    const userRepository = this.dataSource.getRepository(User);
+    const hostIds = [...new Set(rooms.map((room) => room.hostId).filter(Boolean))];
+    const hosts = hostIds.length
+      ? await userRepository.createQueryBuilder('user').where('user.id IN (:...hostIds)', { hostIds }).getMany()
+      : [];
+    const hostMap = new Map(hosts.map((host) => [host.id, host]));
+    const data = rooms.map((room) => this.toAdminRoomView(room, hostMap.get(room.hostId)));
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) || 1 };
+  }
+
+  private toAdminRoomView(room: Room, host?: User) {
+    return {
+      ...room,
+      hostName: host?.displayName || host?.username || room.hostId,
+      hostUsername: host?.username || null,
+      isPrivate: !!(room.isInviteOnly || room.isLocked || room.clubId),
+      participantCount: Number(room.listenerCount || 0) + Number(room.speakerCount || 0),
+    };
+  }
+
+  async adminTerminateRoom(id: string) {
+    const room = await this.findOne(id);
+    const current = this.roomLifecycleService.normalize(room.status);
+    if (current === RoomLifecycleStatus.LIVE || current === RoomLifecycleStatus.PAUSED) {
+      this.roomLifecycleService.applyEnd(room);
+      const saved = await this.roomRepository.save(room);
+      await this.realtimeRoomStateService.closeRoom(id);
+      this.broadcastLifecycleEvent(saved, 'room.ended', 'room_ended', {
+        roomId: id,
+        hostId: room.hostId,
+        endedAt: room.endedAt,
+        status: 'ended',
+        endedBy: 'ADMIN',
+      });
+      return saved;
+    }
+    return room;
+  }
+
   async findOne(id: string): Promise<Room> {
     const room = await this.roomRepository.findOne({ where: { id } });
     if (!room) {
@@ -194,7 +283,11 @@ export class RoomsService {
       throw new ForbiddenException('Only the host can update this room');
     }
 
-    Object.assign(room, dto);
+    const { isPrivate, ...updateData } = dto;
+    Object.assign(room, updateData);
+    if (isPrivate !== undefined) {
+      room.isInviteOnly = isPrivate;
+    }
     const updated = await this.roomRepository.save(room);
 
     this.broadcastLifecycleEvent(updated, 'room.updated', 'room_updated', updated);
@@ -222,6 +315,42 @@ export class RoomsService {
 
   async startRoom(id: string, userId: string): Promise<Room> {
     await this.assertApprovedHost(userId);
+    const existing = await this.findOne(id);
+    if (this.roomLifecycleService.normalize(existing.status) === RoomLifecycleStatus.ENDED) {
+      if (existing.hostId !== userId) {
+        throw new ForbiddenException('Only the host can restart this broadcast');
+      }
+      const restarted = this.roomRepository.create({
+        title: existing.title,
+        description: existing.description,
+        hostId: existing.hostId,
+        coverUrl: existing.coverUrl,
+        isLocked: existing.isLocked,
+        isLive: false,
+        status: RoomLifecycleStatus.OFFLINE,
+        audioQuality: existing.audioQuality,
+        startedAt: null,
+        endedAt: null,
+        language: existing.language,
+        category: existing.category,
+        listenerCount: 0,
+        speakerCount: 0,
+        giftActivity: 0,
+        popularityScore: existing.popularityScore || 100,
+        scheduledRoomId: null,
+        clubId: existing.clubId,
+        isPremium: existing.isPremium,
+        isTicketRequired: existing.isTicketRequired,
+        isSubscriberOnly: existing.isSubscriberOnly,
+        isInviteOnly: existing.isInviteOnly,
+        isVerifiedOnly: existing.isVerifiedOnly,
+        ticketPriceAmount: existing.ticketPriceAmount,
+        currency: existing.currency,
+      });
+      const savedRestart = await this.roomRepository.save(restarted);
+      this.broadcastLifecycleEvent(savedRestart, 'room.created', 'room_created', savedRestart);
+      return this.startRoom(savedRestart.id, userId);
+    }
     const updated = await this.transitionRoom(id, userId, 'start');
     await this.realtimeRoomStateService.openRoom(updated);
     const room = updated;
@@ -401,11 +530,9 @@ export class RoomsService {
       startedAt: room.startedAt,
       endedAt: room.endedAt,
       durationSeconds,
-      replayAudioUrl:
-        room.coverUrl ||
-        'https://assets.voicecloud.app/replays/sample_replay.mp3',
-      listenerPeak: room.listenerCount || 420,
-      totalGifts: room.giftActivity || 1250,
+      replayAudioUrl: null,
+      listenerPeak: room.listenerCount || 0,
+      totalGifts: room.giftActivity || 0,
     };
   }
 

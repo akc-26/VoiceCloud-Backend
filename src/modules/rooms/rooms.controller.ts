@@ -57,6 +57,16 @@ export class RoomsController {
     return this.roomsService.findAll(queryDto);
   }
 
+  @Get('mine')
+  @ApiOperation({ summary: 'List rooms owned by the authenticated Creator/Host' })
+  @ApiResponse({ status: 200, description: 'Creator-owned rooms retrieved.' })
+  async findMine(
+    @CurrentUser('userId') userId: string,
+    @Query() queryDto: QueryRoomDto,
+  ) {
+    return this.roomsService.findMine(userId, queryDto);
+  }
+
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Get room details by ID' })

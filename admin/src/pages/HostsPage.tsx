@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -27,8 +28,11 @@ import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import HistoryIcon from '@mui/icons-material/History';
 import StarsIcon from '@mui/icons-material/Stars';
 import DescriptionIcon from '@mui/icons-material/Description';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import { DataTable, Column } from '../components/common/DataTable';
+import { SearchBar } from '../components/common/SearchBar';
+import { Pagination } from '../components/common/Pagination';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
@@ -43,7 +47,11 @@ import {
 
 export const HostsPage: React.FC = () => {
   const addToast = useNotificationsStore((state) => state.addToast);
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
   const [applications, setApplications] = useState<HostProfileData[]>([]);
   const [activeHosts, setActiveHosts] = useState<HostProfileData[]>([]);
@@ -104,6 +112,35 @@ export const HostsPage: React.FC = () => {
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, search, limit]);
+
+  const matchesSearch = (values: Array<string | number | null | undefined>) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return values.some((value) => String(value ?? '').toLowerCase().includes(term));
+  };
+
+  const filteredApplications = useMemo(
+    () => applications.filter((row) => matchesSearch([row.userName, row.username, row.displayName, row.realName, row.country, row.status])),
+    [applications, search],
+  );
+  const filteredActiveHosts = useMemo(
+    () => activeHosts.filter((row) => matchesSearch([row.userName, row.username, row.displayName, row.realName, row.country, row.status])),
+    [activeHosts, search],
+  );
+  const filteredEarnings = useMemo(
+    () => (earningsData?.earningsList || []).filter((row) => matchesSearch([row.userName, row.username, row.displayName])),
+    [earningsData, search],
+  );
+  const filteredTopHosts = useMemo(
+    () => topHosts.filter((row) => matchesSearch([row.userName, row.username, row.displayName, row.realName, row.country])),
+    [topHosts, search],
+  );
+
+  const paginate = <T,>(rows: T[]) => rows.slice((page - 1) * limit, page * limit);
 
   const handleApprove = async (host: HostProfileData) => {
     try {
@@ -187,9 +224,10 @@ export const HostsPage: React.FC = () => {
       );
       addToast(
         'success',
-        `Granted ${rewardAmount} Diamond reward to @${rewardDialogHost.realName}`,
+        `Granted and credited ${rewardAmount} Diamonds to ${rewardDialogHost.userName || rewardDialogHost.realName}`,
       );
       setRewardDialogHost(null);
+      await fetchAllData();
     } catch (err: any) {
       addToast(
         'error',
@@ -226,10 +264,10 @@ export const HostsPage: React.FC = () => {
           <RecordVoiceOverIcon color="primary" />
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {row.realName}
+              {row.userName || row.displayName || row.realName}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              ID: {row.idNumber}
+              {row.username ? `@${row.username}` : row.realName}
             </Typography>
           </Box>
         </Box>
@@ -257,6 +295,9 @@ export const HostsPage: React.FC = () => {
       align: 'right',
       render: (row) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+          <IconButton size="small" color="primary" onClick={() => navigate(`/users/${row.userId}`)} title="View complete user details">
+            <VisibilityIcon />
+          </IconButton>
           <IconButton
             size="small"
             color="primary"
@@ -306,10 +347,10 @@ export const HostsPage: React.FC = () => {
           <RecordVoiceOverIcon color="primary" />
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {row.realName}
+              {row.userName || row.displayName || row.realName}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              User ID: {row.userId}
+              {row.username ? `@${row.username}` : row.realName}
             </Typography>
           </Box>
         </Box>
@@ -348,6 +389,7 @@ export const HostsPage: React.FC = () => {
       align: 'right',
       render: (row) => (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+          <IconButton size="small" color="primary" onClick={() => navigate(`/users/${row.userId}`)} title="View complete user details"><VisibilityIcon /></IconButton>
           <IconButton
             size="small"
             color="primary"
@@ -495,18 +537,25 @@ export const HostsPage: React.FC = () => {
             </Tabs>
           </Box>
 
+          <Box sx={{ mb: 2, maxWidth: 520 }}>
+            <SearchBar value={search} onChange={setSearch} placeholder="Search by user name, username, host name, country or status..." />
+          </Box>
+
           {/* Tab 0: Verification Applications */}
           {activeTab === 0 && (
             <Box>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
                 Verification Applications Queue
               </Typography>
-              {applications.length > 0 ? (
-                <DataTable
-                  columns={applicationColumns}
-                  rows={applications}
-                  loading={loading}
-                />
+              {filteredApplications.length > 0 ? (
+                <>
+                  <DataTable
+                    columns={applicationColumns}
+                    rows={paginate(filteredApplications)}
+                    loading={loading}
+                  />
+                  <Pagination page={page} limit={limit} total={filteredApplications.length} onPageChange={setPage} onLimitChange={setLimit} />
+                </>
               ) : (
                 <EmptyState
                   title="No Applications Pending"
@@ -522,12 +571,15 @@ export const HostsPage: React.FC = () => {
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
                 Active & Suspended Host Directory
               </Typography>
-              {activeHosts.length > 0 ? (
-                <DataTable
-                  columns={activeHostColumns}
-                  rows={activeHosts}
-                  loading={loading}
-                />
+              {filteredActiveHosts.length > 0 ? (
+                <>
+                  <DataTable
+                    columns={activeHostColumns}
+                    rows={paginate(filteredActiveHosts)}
+                    loading={loading}
+                  />
+                  <Pagination page={page} limit={limit} total={filteredActiveHosts.length} onPageChange={setPage} onLimitChange={setLimit} />
+                </>
               ) : (
                 <EmptyState
                   title="No Hosts Found"
@@ -544,18 +596,19 @@ export const HostsPage: React.FC = () => {
                 Host Earnings & Settlement Withdrawals Overview
               </Typography>
               {earningsData?.earningsList &&
-              earningsData.earningsList.length > 0 ? (
+              filteredEarnings.length > 0 ? (
+                <>
                 <DataTable
                   columns={[
                     {
-                      id: 'hostProfileId',
-                      label: 'Host ID',
-                      render: (row) => row.hostProfileId,
-                    },
-                    {
-                      id: 'userId',
-                      label: 'User ID',
-                      render: (row) => row.userId,
+                      id: 'userName',
+                      label: 'Host User',
+                      render: (row) => (
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>{row.userName || row.displayName || row.username || 'Unknown User'}</Typography>
+                          {row.username && <Typography variant="caption" color="text.secondary">@{row.username}</Typography>}
+                        </Box>
+                      ),
                     },
                     {
                       id: 'lifetimeEarnings',
@@ -579,28 +632,22 @@ export const HostsPage: React.FC = () => {
                       id: 'actions',
                       label: 'Actions',
                       align: 'right',
-                      render: (row) =>
-                        Number(row.pendingSettlements) > 0 ? (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            onClick={() =>
-                              setSettlementDialog({
-                                hostProfileId: row.hostProfileId,
-                                amount: Number(row.pendingSettlements),
-                              })
-                            }
-                          >
-                            Complete Payout
-                          </Button>
-                        ) : (
-                          <Chip label="Settled" color="default" size="small" />
-                        ),
+                      render: (row) => (
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          <IconButton size="small" onClick={() => navigate(`/users/${row.userId}`)} title="View complete user details"><VisibilityIcon /></IconButton>
+                          {Number(row.pendingSettlements) > 0 ? (
+                            <Button size="small" variant="contained" color="success" onClick={() => setSettlementDialog({ hostProfileId: row.hostProfileId, amount: Number(row.pendingSettlements) })}>Complete Payout</Button>
+                          ) : (
+                            <Chip label="Settled" color="default" size="small" />
+                          )}
+                        </Box>
+                      ),
                     },
                   ]}
-                  rows={earningsData.earningsList}
+                  rows={paginate(filteredEarnings)}
                 />
+                <Pagination page={page} limit={limit} total={filteredEarnings.length} onPageChange={setPage} onLimitChange={setLimit} />
+                </>
               ) : (
                 <EmptyState
                   title="No Earnings Records"
@@ -616,7 +663,8 @@ export const HostsPage: React.FC = () => {
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>
                 Top Performing Hosts Leaderboard
               </Typography>
-              {topHosts.length > 0 ? (
+              {filteredTopHosts.length > 0 ? (
+                <>
                 <DataTable
                   columns={[
                     {
@@ -628,7 +676,7 @@ export const HostsPage: React.FC = () => {
                         >
                           <StarsIcon color="warning" />
                           <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                            {row.realName}
+                            {row.userName || row.displayName || row.realName}
                           </Typography>
                         </Box>
                       ),
@@ -660,12 +708,19 @@ export const HostsPage: React.FC = () => {
                     {
                       id: 'followersCount',
                       label: 'Followers',
-                      render: (row) =>
-                        (row.followersCount || 0).toLocaleString(),
+                      render: (row) => (row.followersCount || 0).toLocaleString(),
+                    },
+                    {
+                      id: 'actions',
+                      label: 'Actions',
+                      align: 'right',
+                      render: (row) => <IconButton size="small" onClick={() => navigate(`/users/${row.userId}`)} title="View complete user details"><VisibilityIcon /></IconButton>,
                     },
                   ]}
-                  rows={topHosts}
+                  rows={paginate(filteredTopHosts)}
                 />
+                <Pagination page={page} limit={limit} total={filteredTopHosts.length} onPageChange={setPage} onLimitChange={setLimit} />
+                </>
               ) : (
                 <EmptyState
                   title="No Top Hosts"

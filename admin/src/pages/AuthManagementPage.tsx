@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -32,6 +33,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import BlockIcon from '@mui/icons-material/Block';
 import KeyIcon from '@mui/icons-material/Key';
 import LockClockIcon from '@mui/icons-material/LockClock';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import { useNotificationsStore } from '../store/notifications.store';
 import { api } from '../services/api';
@@ -47,6 +49,7 @@ interface SystemSetting {
 
 export const AuthManagementPage: React.FC = () => {
   const addToast = useNotificationsStore((state) => state.addToast);
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -102,32 +105,11 @@ export const AuthManagementPage: React.FC = () => {
 
   const fetchHistory = async () => {
     try {
-      const res = await api.get('/auth/history?limit=20');
+      const res = await api.get('/admin/auth/history?limit=50');
       setRecentHistory(res.data || []);
-    } catch {
-      // Demo history fallback
-      setRecentHistory([
-        {
-          id: '1',
-          userId: '11111111-1111-1111-1111-111111111111',
-          action: 'LOGIN',
-          loginMethod: 'PHONE_OTP',
-          ipAddress: '192.168.1.45',
-          country: 'United States',
-          platform: 'Android',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          userId: '22222222-2222-2222-2222-222222222222',
-          action: 'LOGIN',
-          loginMethod: 'GOOGLE',
-          ipAddress: '172.56.21.90',
-          country: 'Canada',
-          platform: 'Android',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-      ]);
+    } catch (err: any) {
+      setRecentHistory([]);
+      addToast('error', err?.response?.data?.message || 'Failed to load authentication history');
     }
   };
 
@@ -136,34 +118,33 @@ export const AuthManagementPage: React.FC = () => {
     fetchHistory();
   }, []);
 
-  const handleSaveSetting = async (key: string, value: string) => {
-    try {
-      await api.put(`/admin/settings/${key}`, { value });
-      addToast('success', `Setting '${key}' updated successfully`);
-    } catch {
-      addToast('success', `Setting '${key}' updated (local)`);
-    }
-  };
-
   const handleSaveAll = async () => {
-    await handleSaveSetting('jwt_expiration', jwtExpiration);
-    await handleSaveSetting('jwt_refresh_expiration', jwtRefreshExpiration);
-    await handleSaveSetting('allow_guest_login', String(allowGuestLogin));
-    await handleSaveSetting('allow_google_login', String(allowGoogleLogin));
-    await handleSaveSetting('allow_phone_login', String(allowPhoneLogin));
-    await handleSaveSetting(
-      'require_referral_code',
-      String(requireReferralCode),
-    );
-    await handleSaveSetting('max_devices_per_user', maxDevicesPerUser);
-    await handleSaveSetting('otp_timeout', otpTimeout);
-    await handleSaveSetting('otp_retry_count', otpRetryCount);
-    await handleSaveSetting('failed_login_lockout_attempts', lockoutAttempts);
-    await handleSaveSetting('failed_login_lockout_duration', lockoutDuration);
-    addToast(
-      'success',
-      'All Authentication Platform settings saved successfully',
-    );
+    setLoading(true);
+    try {
+      const updates: Array<[string, string]> = [
+        ['jwt_expiration', jwtExpiration],
+        ['jwt_refresh_expiration', jwtRefreshExpiration],
+        ['allow_guest_login', String(allowGuestLogin)],
+        ['allow_google_login', String(allowGoogleLogin)],
+        ['allow_phone_login', String(allowPhoneLogin)],
+        ['require_referral_code', String(requireReferralCode)],
+        ['max_devices_per_user', maxDevicesPerUser],
+        ['otp_timeout', otpTimeout],
+        ['otp_retry_count', otpRetryCount],
+        ['failed_login_lockout_attempts', lockoutAttempts],
+        ['failed_login_lockout_duration', lockoutDuration],
+      ];
+      await Promise.all(updates.map(([key, value]) => api.patch(`/admin/settings/${key}`, { value })));
+      addToast('success', 'Authentication Platform settings saved successfully');
+      await fetchSettings();
+    } catch (err: any) {
+      const message = Array.isArray(err?.response?.data?.message)
+        ? err.response.data.message.join(', ')
+        : err?.response?.data?.message || err?.message || 'Failed to save authentication settings';
+      addToast('error', message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -199,6 +180,7 @@ export const AuthManagementPage: React.FC = () => {
           color="primary"
           onClick={handleSaveAll}
           size="large"
+          disabled={loading}
         >
           Save Changes
         </Button>
@@ -503,7 +485,7 @@ export const AuthManagementPage: React.FC = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>User ID</TableCell>
+                    <TableCell>User</TableCell>
                     <TableCell>Action</TableCell>
                     <TableCell>Method</TableCell>
                     <TableCell>IP Address</TableCell>
@@ -514,7 +496,7 @@ export const AuthManagementPage: React.FC = () => {
                 <TableBody>
                   {recentHistory.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell>{row.userId}</TableCell>
+                      <TableCell><Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><Box><Typography variant="body2" sx={{ fontWeight: 600 }}>{row.userName || row.username || 'Unknown User'}</Typography>{row.username && <Typography variant="caption" color="text.secondary">@{row.username}</Typography>}</Box><Tooltip title="View complete user details"><IconButton size="small" onClick={() => navigate(`/users/${row.userId}`)}><VisibilityIcon fontSize="small" /></IconButton></Tooltip></Box></TableCell>
                       <TableCell>
                         <Chip
                           label={row.action}

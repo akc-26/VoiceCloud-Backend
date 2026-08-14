@@ -242,7 +242,21 @@ export class ProfileVisitorsService {
 
     query.orderBy('v.visitedAt', 'DESC').skip(skip).take(limit);
 
-    const [data, total] = await query.getManyAndCount();
+    const [records, total] = await query.getManyAndCount();
+    const userIds = [...new Set(records.flatMap((record) => [record.targetUserId, record.visitorUserId]).filter(Boolean))];
+    const users = userIds.length ? await this.userRepository.findBy({ id: In(userIds) }) : [];
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const data = records.map((record) => {
+      const target = userMap.get(record.targetUserId);
+      const visitor = userMap.get(record.visitorUserId);
+      return {
+        ...record,
+        targetUserName: target?.displayName || target?.username || 'Unknown User',
+        targetUsername: target?.username || null,
+        visitorUserName: record.isAnonymous ? 'Anonymous Visitor' : visitor?.displayName || visitor?.username || 'Unknown User',
+        visitorUsername: record.isAnonymous ? null : visitor?.username || null,
+      };
+    });
     return {
       data,
       total,

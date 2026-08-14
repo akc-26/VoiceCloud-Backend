@@ -55,6 +55,7 @@ export interface CreateLiveRoomInput {
   isSubscriberOnly?: boolean;
   isVerifiedOnly?: boolean;
   isInviteOnly?: boolean;
+  isPrivate?: boolean;
 }
 
 export class CreatorApiService {
@@ -553,46 +554,21 @@ export class CreatorApiService {
    * Endpoint: GET /api/v1/rooms
    */
   async getRooms(signal?: AbortSignal): Promise<LiveRoomSummary[]> {
-    try {
-      const res = await this.request<any>('/rooms', { signal });
-      const rooms = Array.isArray(res) ? res : res.data || [];
-      return rooms.map((r: any) => ({
-        id: r.id || `room-${Math.random().toString(36).substr(2, 5)}`,
-        title: r.title || r.name || 'Untitled Audio Room',
-        category: r.category || 'Audio Lounge',
-        status: (r.status as any) || (r.isLive ? 'live' : 'offline'),
-        currentListeners: r.currentListeners ?? r.listenerCount ?? r.listenersCount ?? 0,
-        peakListeners: r.peakListeners || 0,
-        audioQuality: r.audioQuality || '324kbps Ultra HD',
-        startedAt: r.startedAt,
-        scheduledFor: r.scheduledFor,
-      }));
-    } catch {
-      return [
-        {
-          id: 'room-101',
-          title: 'Late Night Audio Lounge & Chill Beats',
-          category: 'Audio Lounge',
-          status: 'live',
-          currentListeners: 342,
-          peakListeners: 580,
-          audioQuality: '324kbps Ultra HD',
-          startedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-        },
-        {
-          id: 'room-102',
-          title: 'Creator Q&A & Voice Podcast Session',
-          category: 'Podcast',
-          status: 'scheduled',
-          currentListeners: 0,
-          peakListeners: 0,
-          audioQuality: '256kbps HD Voice',
-          scheduledFor: new Date(
-            Date.now() + 1000 * 60 * 60 * 24,
-          ).toISOString(),
-        },
-      ];
-    }
+    const res = await this.request<any>('/rooms/mine?limit=100', { signal });
+    const rooms = Array.isArray(res) ? res : res?.data || [];
+    return rooms.map((r: any) => ({
+      id: r.id,
+      title: r.title || r.name || 'Untitled Audio Room',
+      category: r.category || 'Audio Lounge',
+      status: (r.status as any) || (r.isLive ? 'live' : 'offline'),
+      currentListeners: r.currentListeners ?? r.listenerCount ?? r.listenersCount ?? 0,
+      peakListeners: r.peakListeners || 0,
+      audioQuality: r.audioQuality || '324kbps Ultra HD',
+      startedAt: r.startedAt,
+      scheduledFor: r.scheduledFor,
+      isPrivate: r.isPrivate ?? !!(r.isInviteOnly || r.isLocked || r.clubId),
+      isInviteOnly: r.isInviteOnly,
+    }));
   }
 
   async createRoom(

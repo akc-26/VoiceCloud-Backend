@@ -1,63 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Typography, Card, CardContent, Switch, FormControlLabel, Grid, Chip } from '@mui/material';
 import FlagIcon from '@mui/icons-material/Flag';
-
 import { useNotificationsStore } from '../store/notifications.store';
-
-interface FeatureFlag {
-  key: string;
-  name: string;
-  description: string;
-  isEnabled: boolean;
-  category: string;
-}
-
+import { adminService } from '../services/admin.service';
+interface FeatureFlag { id: string; key: string; name?: string; description?: string; isEnabled: boolean; category?: string; }
 export const FeatureFlagsPage: React.FC = () => {
-  const addToast = useNotificationsStore((state) => state.addToast);
-
-  const [flags, setFlags] = useState<FeatureFlag[]>([
-    { key: 'enable_ai_noise_cancelling', name: 'AI Noise Suppression', description: 'Enable real-time AI audio background noise filter for voice rooms', isEnabled: true, category: 'Audio RTC' },
-    { key: 'enable_gift_svga_animations', name: 'SVGA Gift Animations', description: 'Render high-framerate vector animations for luxury room gifts', isEnabled: true, category: 'Economy' },
-    { key: 'enable_host_agencies', name: 'Host Agency Guilds', description: 'Allow talent agencies to sign verified hosts and take revenue cuts', isEnabled: true, category: 'Talent' },
-    { key: 'enable_registration', name: 'New User Registration', description: 'Allow new guest account registration and phone auth signup', isEnabled: true, category: 'Auth' },
-  ]);
-
-  const handleToggle = (key: string, current: boolean) => {
-    setFlags((prev) => prev.map((f) => (f.key === key ? { ...f, isEnabled: !current } : f)));
-    addToast('info', `Toggled feature flag "${key}" to ${!current ? 'ENABLED' : 'DISABLED'}`);
-  };
-
-  return (
-    <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>Feature Flag Control Console</Typography>
-        <Typography variant="body2" color="text.secondary">Dynamically toggle platform modules, experimental voice features, and emergency kill switches</Typography>
-      </Box>
-
-      <Grid container spacing={2.5}>
-        {flags.map((flag) => (
-          <Grid size={{ xs: 12, md: 6 }} key={flag.key}>
-            <Card elevation={0}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <FlagIcon color="primary" />
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{flag.name}</Typography>
-                  </Box>
-                  <Chip label={flag.category} size="small" variant="outlined" />
-                </Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {flag.description}
-                </Typography>
-                <FormControlLabel
-                  control={<Switch checked={flag.isEnabled} onChange={() => handleToggle(flag.key, flag.isEnabled)} color="primary" />}
-                  label={<Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{flag.isEnabled ? 'Active (ENABLED)' : 'Disabled'}</Typography>}
-                />
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-    </Box>
-  );
+ const addToast=useNotificationsStore(s=>s.addToast); const [flags,setFlags]=useState<FeatureFlag[]>([]); const [loading,setLoading]=useState(false);
+ const load=async()=>{setLoading(true); try{const data=await adminService.getFeatureFlags(); setFlags(Array.isArray(data)?data:(data?.data||[]));}catch(e:any){addToast('error',e?.response?.data?.message||'Failed to load feature flags');}finally{setLoading(false)}};
+ useEffect(()=>{void load()},[]);
+ const handleToggle=async(flag:FeatureFlag)=>{try{const updated=await adminService.updateFeatureFlag(flag.id,!flag.isEnabled); setFlags(prev=>prev.map(f=>f.id===flag.id?{...f,...updated}:f)); addToast('success',`${flag.key} ${!flag.isEnabled?'enabled':'disabled'}`);}catch(e:any){addToast('error',e?.response?.data?.message||'Feature flag update failed')}};
+ return <Box><Box sx={{mb:3}}><Typography variant="h4" sx={{fontWeight:800}}>Feature Flag Control Console</Typography><Typography variant="body2" color="text.secondary">Backend-persisted platform feature flags. No sample flags are injected by the Admin UI.</Typography></Box>{!loading&&flags.length===0&&<Typography color="text.secondary">No feature flags are configured.</Typography>}<Grid container spacing={2.5}>{flags.map(flag=><Grid size={{xs:12,md:6}} key={flag.id}><Card elevation={0}><CardContent><Box sx={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',mb:1}}><Box sx={{display:'flex',alignItems:'center',gap:1}}><FlagIcon color="primary"/><Typography variant="h6" sx={{fontWeight:700}}>{flag.name||flag.key}</Typography></Box><Chip label={flag.category||'General'} size="small" variant="outlined"/></Box><Typography variant="body2" color="text.secondary" sx={{mb:2}}>{flag.description||'No description provided.'}</Typography><FormControlLabel control={<Switch checked={flag.isEnabled} onChange={()=>void handleToggle(flag)} />} label={flag.isEnabled?'Active (ENABLED)':'Disabled'}/></CardContent></Card></Grid>)}</Grid></Box>;
 };

@@ -3,6 +3,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { verifyR10BaselineIntegrity } from '../wp09/wp09-r10-baseline-integrity.mjs';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const acceptedParentBranch = 'VoiceCloud-Backend-VC-PH08-WP08-04-05-R02';
 const acceptedParentCommit = '6ce1634c292645cb521c8d178adb0a7680ab77bb';
@@ -170,15 +172,20 @@ const protectedDigest = () => {
   return { digest: hash.digest('hex'), count };
 };
 
-const protectedState = protectedDigest();
-if (protectedState.count !== protectedParentFileCount)
-  fail(
-    `protected parent file count changed: expected ${protectedParentFileCount}, received ${protectedState.count}`,
-  );
-if (protectedState.digest !== protectedParentDigest)
-  fail(
-    'source outside the approved WP08-04-06 presentation/tooling delta changed',
-  );
+const r10ProtectedState = verifyR10BaselineIntegrity(root, 'Consolidated UI / white-label R10 baseline integrity');
+let legacyProtectedState = null;
+if (!r10ProtectedState) {
+  legacyProtectedState = protectedDigest();
+  const protectedState = legacyProtectedState;
+  if (protectedState.count !== protectedParentFileCount)
+    fail(
+      `protected parent file count changed: expected ${protectedParentFileCount}, received ${protectedState.count}`,
+    );
+  if (protectedState.digest !== protectedParentDigest)
+    fail(
+      'source outside the approved WP08-04-06 presentation/tooling delta changed',
+    );
+}
 
 const lockfile = readFileSync(join(root, 'package-lock.json'));
 if (sha256(lockfile) !== protectedPackageLockSha256)
@@ -378,7 +385,9 @@ console.log(`Accepted parent branch: ${acceptedParentBranch}`);
 console.log(`Accepted parent commit: ${acceptedParentCommit}`);
 console.log(`Accepted parent archive SHA-256: ${acceptedParentArchiveSha256}`);
 console.log(
-  `${protectedState.count} parent-controlled files remain byte-identical outside the approved presentation/tooling delta.`,
+  r10ProtectedState
+    ? `${r10ProtectedState.checkedBaseline} R09 baseline files remain content-identical after cross-platform EOL normalization outside the approved R10 delta.`
+    : `${legacyProtectedState.count} parent-controlled files remain byte-identical outside the approved presentation/tooling delta.`,
 );
 console.log('package-lock.json retains its protected LF-byte identity.');
 console.log(

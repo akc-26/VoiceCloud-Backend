@@ -4,6 +4,9 @@ export interface HostProfileData {
   id: string;
   userId: string;
   realName: string;
+  userName?: string;
+  username?: string;
+  displayName?: string;
   idNumber: string;
   bio?: string;
   languages?: string[];
@@ -50,6 +53,9 @@ export interface HostEarningsData {
     id: string;
     hostProfileId: string;
     userId: string;
+    userName?: string;
+    username?: string | null;
+    displayName?: string | null;
     dailyEarnings: number;
     weeklyEarnings: number;
     monthlyEarnings: number;

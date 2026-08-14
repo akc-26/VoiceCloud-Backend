@@ -1,88 +1,9 @@
-import React, { useState } from 'react';
-import { Box, Typography, Button, Chip } from '@mui/material';
-import CampaignIcon from '@mui/icons-material/Campaign';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-
 import { DataTable, Column } from '../components/common/DataTable';
-import { StatusBadge } from '../components/common/StatusBadge';
-import { ModalForms } from '../components/common/ModalForms';
-import { FormBuilder, FormField } from '../components/common/FormBuilder';
+import { adminService } from '../services/admin.service';
 import { useNotificationsStore } from '../store/notifications.store';
-
-interface Announcement {
-  id: string;
-  title: string;
-  targetAudience: string;
-  priority: string;
-  status: string;
-  createdAt: string;
-}
-
-export const AnnouncementsPage: React.FC = () => {
-  const addToast = useNotificationsStore((state) => state.addToast);
-
-  const [announcements, setAnnouncements] = useState<Announcement[]>([
-    { id: 'ann-1', title: 'Scheduled Platform System Upgrade v2.0', targetAudience: 'Global All Users', priority: 'HIGH', status: 'published', createdAt: '2026-07-24' },
-    { id: 'ann-2', title: 'Host Weekly Bonus Diamond Competition', targetAudience: 'Verified Hosts', priority: 'MEDIUM', status: 'published', createdAt: '2026-07-23' },
-  ]);
-
-  const [modalOpen, setModalOpen] = useState(false);
-
-  const formFields: FormField[] = [
-    { name: 'title', label: 'Announcement Title', type: 'text', required: true, gridSpan: 12 },
-    { name: 'targetAudience', label: 'Audience Group', type: 'select', options: [{ label: 'Global All Users', value: 'Global All Users' }, { label: 'Verified Hosts', value: 'Verified Hosts' }, { label: 'VIP Members', value: 'VIP Members' }], gridSpan: 6 },
-    { name: 'priority', label: 'Priority', type: 'select', options: [{ label: 'HIGH', value: 'HIGH' }, { label: 'MEDIUM', value: 'MEDIUM' }, { label: 'LOW', value: 'LOW' }], gridSpan: 6 },
-    { name: 'content', label: 'Message Body', type: 'textarea', required: true, gridSpan: 12 },
-  ];
-
-  const handleCreate = (data: any) => {
-    const newAnn: Announcement = {
-      id: `ann-${Date.now()}`,
-      title: data.title,
-      targetAudience: data.targetAudience || 'Global All Users',
-      priority: data.priority || 'MEDIUM',
-      status: 'published',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setAnnouncements((prev) => [newAnn, ...prev]);
-    addToast('success', `Broadcasted announcement "${newAnn.title}"`);
-    setModalOpen(false);
-  };
-
-  const columns: Column<Announcement>[] = [
-    {
-      id: 'title',
-      label: 'Title',
-      render: (row) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <CampaignIcon color="primary" />
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>{row.title}</Typography>
-        </Box>
-      ),
-    },
-    { id: 'targetAudience', label: 'Audience' },
-    { id: 'priority', label: 'Priority', render: (row) => <Chip label={row.priority} size="small" color={row.priority === 'HIGH' ? 'error' : 'info'} /> },
-    { id: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-    { id: 'createdAt', label: 'Date' },
-  ];
-
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>System Announcements</Typography>
-          <Typography variant="body2" color="text.secondary">Broadcast platform news, event notices, maintenance windows, and host updates</Typography>
-        </Box>
-        <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={() => setModalOpen(true)}>
-          New Broadcast
-        </Button>
-      </Box>
-
-      <DataTable columns={columns} rows={announcements} />
-
-      <ModalForms open={modalOpen} title="New System Broadcast Announcement" onClose={() => setModalOpen(false)}>
-        <FormBuilder fields={formFields} onSubmit={handleCreate} submitText="Publish Announcement" />
-      </ModalForms>
-    </Box>
-  );
-};
+type Announcement={id:string;title:string;content:string;targetAudience:string;priority:string;isActive:boolean;createdAt:string};
+const blank={title:'',content:'',targetAudience:'GLOBAL',priority:'MEDIUM',isActive:true};
+export const AnnouncementsPage:React.FC=()=>{const addToast=useNotificationsStore(s=>s.addToast);const[rows,setRows]=useState<Announcement[]>([]);const[open,setOpen]=useState(false);const[editing,setEditing]=useState<Announcement|null>(null);const[form,setForm]=useState<any>(blank);const load=useCallback(async()=>{try{const r=await adminService.getAnnouncements({page:1,limit:100});setRows(r.data||[])}catch(e:any){addToast('error',e?.response?.data?.message||'Failed to load announcements')}},[addToast]);useEffect(()=>{void load()},[load]);const save=async()=>{try{if(editing)await adminService.updateAnnouncement(editing.id,form);else await adminService.createAnnouncement(form);setOpen(false);setEditing(null);setForm(blank);await load();addToast('success','Announcement saved')}catch(e:any){addToast('error',e?.response?.data?.message||'Failed to save announcement')}};const cols:Column<Announcement>[]=[{id:'title',label:'Title',render:r=><Box><Typography fontWeight={700}>{r.title}</Typography><Typography variant="caption" color="text.secondary">{r.content}</Typography></Box>},{id:'targetAudience',label:'Audience'},{id:'priority',label:'Priority',render:r=><Chip size="small" label={r.priority}/>},{id:'isActive',label:'Status',render:r=><Chip size="small" label={r.isActive?'ACTIVE':'INACTIVE'} color={r.isActive?'success':'default'}/>},{id:'createdAt',label:'Created',render:r=>new Date(r.createdAt).toLocaleString()},{id:'actions',label:'Actions',render:r=><Box><Button size="small" onClick={()=>{setEditing(r);setForm({title:r.title,content:r.content,targetAudience:r.targetAudience,priority:r.priority,isActive:r.isActive});setOpen(true)}}>Edit</Button><Button size="small" color="error" onClick={async()=>{await adminService.deleteAnnouncement(r.id);await load()}}>Delete</Button></Box>}];return <Box><Box sx={{display:'flex',justifyContent:'space-between',mb:3}}><Box><Typography variant="h4" fontWeight={800}>System Announcements</Typography><Typography color="text.secondary">Persisted platform announcements.</Typography></Box><Button variant="contained" startIcon={<AddIcon/>} onClick={()=>{setEditing(null);setForm(blank);setOpen(true)}}>New Broadcast</Button></Box><DataTable columns={cols} rows={rows}/><Dialog open={open} onClose={()=>setOpen(false)} fullWidth><DialogTitle>{editing?'Edit Announcement':'New Announcement'}</DialogTitle><DialogContent sx={{display:'grid',gap:2,pt:'12px !important'}}><TextField label="Title" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/><TextField label="Message" multiline minRows={4} value={form.content} onChange={e=>setForm({...form,content:e.target.value})}/><FormControl><InputLabel>Audience</InputLabel><Select label="Audience" value={form.targetAudience} onChange={e=>setForm({...form,targetAudience:e.target.value})}>{['GLOBAL','VIP','AGENCY','HOST'].map(x=><MenuItem key={x} value={x}>{x}</MenuItem>)}</Select></FormControl><FormControl><InputLabel>Priority</InputLabel><Select label="Priority" value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}>{['LOW','MEDIUM','HIGH','URGENT'].map(x=><MenuItem key={x} value={x}>{x}</MenuItem>)}</Select></FormControl></DialogContent><DialogActions><Button onClick={()=>setOpen(false)}>Cancel</Button><Button variant="contained" onClick={()=>void save()}>Save</Button></DialogActions></Dialog></Box>};

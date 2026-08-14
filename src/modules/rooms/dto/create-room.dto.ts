@@ -54,6 +54,14 @@ export class CreateRoomDto {
   @IsUUID()
   scheduledRoomId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Private room access. Internally mapped to invite-only access.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPrivate?: boolean;
+
   @ApiPropertyOptional({ description: 'Is room locked', default: false })
   @IsOptional()
   @IsBoolean()

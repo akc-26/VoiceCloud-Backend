@@ -60,6 +60,11 @@ export class LedgerQueryDto {
   @IsString()
   search?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by payment/source method' })
+  @IsOptional()
+  @IsString()
+  method?: string;
+
   @ApiPropertyOptional({
     description: 'Sort order',
     enum: ['ASC', 'DESC'],

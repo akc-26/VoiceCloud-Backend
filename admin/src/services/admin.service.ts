@@ -266,6 +266,37 @@ export const adminService = {
     return res.data;
   },
 
+  async updateCmsPage(id: string, data: Record<string, any>) {
+    const res = await api.patch(`/admin/cms/${id}`, data);
+    return res.data;
+  },
+
+
+  // Referral & Invite administration
+  async getReferralCampaigns(params?: Record<string, any>) { const res = await api.get('/admin/referrals/campaigns', { params }); return res.data; },
+  async createReferralCampaign(data: Record<string, any>) { const res = await api.post('/admin/referrals/campaigns', data); return res.data; },
+  async updateReferralCampaign(id: string, data: Record<string, any>) { const res = await api.patch(`/admin/referrals/campaigns/${id}`, data); return res.data; },
+  async deleteReferralCampaign(id: string) { const res = await api.delete(`/admin/referrals/campaigns/${id}`); return res.data; },
+  async getReferralFraudLogs(params?: Record<string, any>) { const res = await api.get('/admin/referrals/fraud-logs', { params }); return res.data; },
+  async executeReferralFraudAction(data: Record<string, any>) { const res = await api.post('/admin/referrals/fraud/action', data); return res.data; },
+  async getReferralBlacklist(params?: Record<string, any>) { const res = await api.get('/admin/referrals/blacklist', { params }); return res.data; },
+  async addReferralBlacklist(data: Record<string, any>) { const res = await api.post('/admin/referrals/blacklist', data); return res.data; },
+  async removeReferralBlacklist(id: string) { const res = await api.delete(`/admin/referrals/blacklist/${id}`); return res.data; },
+  async grantReferralReward(data: Record<string, any>) { const res = await api.post('/admin/referrals/grant-reward', data); return res.data; },
+  async getReferralAnalytics() { const res = await api.get('/admin/referrals/analytics'); return res.data; },
+
+  // Persisted announcements
+  async getAnnouncements(params?: Record<string, any>) { const res = await api.get('/announcements/admin', { params }); return res.data; },
+  async createAnnouncement(data: Record<string, any>) { const res = await api.post('/announcements', data); return res.data; },
+  async updateAnnouncement(id: string, data: Record<string, any>) { const res = await api.put(`/announcements/${id}`, data); return res.data; },
+  async deleteAnnouncement(id: string) { const res = await api.delete(`/announcements/${id}`); return res.data; },
+
+  // Persisted moderation/reporting
+  async getModerationReports(params?: Record<string, any>) { const res = await api.get('/moderation/reports', { params }); return res.data; },
+  async approveModerationReport(id: string, resolutionNotes?: string) { const res = await api.patch(`/moderation/reports/${id}/approve`, { resolutionNotes }); return res.data; },
+  async dismissModerationReport(id: string, resolutionNotes?: string) { const res = await api.patch(`/moderation/reports/${id}/dismiss`, { resolutionNotes }); return res.data; },
+  async getModerationAuditLogs(params?: Record<string, any>) { const res = await api.get('/moderation/audit-logs', { params }); return res.data; },
+
   // Infrastructure Backup & Disaster Recovery API
   async getBackups() {
     const res = await api.get('/admin/backups');

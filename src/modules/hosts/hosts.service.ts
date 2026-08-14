@@ -8,7 +8,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   HostProfile,
   HostVerificationStatus,
@@ -42,6 +42,7 @@ import {
 } from './host-state-transition.service';
 import { HostFinancialAuthorityService } from './host-financial-authority.service';
 import { HostRewardAuthorityService } from './host-reward-authority.service';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class HostsService {
@@ -75,6 +76,9 @@ export class HostsService {
     private readonly hostFinancialAuthorityService?: HostFinancialAuthorityService,
     @Optional()
     private readonly hostRewardAuthorityService?: HostRewardAuthorityService,
+    @Optional()
+    @InjectRepository(User)
+    private readonly userRepository?: Repository<User>,
   ) {}
 
   // ==========================================
@@ -536,14 +540,11 @@ export class HostsService {
   // Admin Methods for Applications
   async getApplications(
     status?: HostVerificationStatus,
-  ): Promise<HostProfile[]> {
-    if (status) {
-      return await this.hostRepository.find({
-        where: { status },
-        order: { createdAt: 'DESC' },
-      });
-    }
-    return await this.hostRepository.find({ order: { createdAt: 'DESC' } });
+  ): Promise<Array<HostProfile & { userName?: string; username?: string; displayName?: string }>> {
+    const profiles = status
+      ? await this.hostRepository.find({ where: { status }, order: { createdAt: 'DESC' } })
+      : await this.hostRepository.find({ order: { createdAt: 'DESC' } });
+    return this.enrichHostProfilesWithUsers(profiles);
   }
 
   async approveHost(id: string, adminId = 'ADMIN'): Promise<HostProfile> {
@@ -1038,10 +1039,32 @@ export class HostsService {
   }
 
   async getEarningsOverviewAdmin() {
-    if (this.hostFinancialAuthorityService) {
-      return this.hostFinancialAuthorityService.getEarningsOverviewAdmin();
-    }
+    const overview = this.hostFinancialAuthorityService
+      ? await this.hostFinancialAuthorityService.getEarningsOverviewAdmin()
+      : await this.getLegacyEarningsOverviewAdmin();
 
+    const userIds = [...new Set(overview.earningsList.map((row) => row.userId).filter(Boolean))];
+    const users = userIds.length
+      && this.userRepository
+      ? await this.userRepository.find({ where: { id: In(userIds) } })
+      : [];
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    return {
+      ...overview,
+      earningsList: overview.earningsList.map((row) => {
+        const user = userMap.get(row.userId);
+        return {
+          ...row,
+          userName: user?.displayName || user?.username || row.userId,
+          username: user?.username || null,
+          displayName: user?.displayName || null,
+        };
+      }),
+    };
+  }
+
+  private async getLegacyEarningsOverviewAdmin() {
     const allEarnings = await this.earningsRepository.find();
     const totalLifetime = allEarnings.reduce(
       (acc, e) => acc + Number(e.lifetimeEarnings),
@@ -1101,12 +1124,15 @@ export class HostsService {
     return await this.getOrCreatePerformance(host.id, userId);
   }
 
-  async getTopHosts(limit = 10): Promise<HostProfile[]> {
-    return await this.hostRepository.find({
+  async getTopHosts(
+    limit = 10,
+  ): Promise<Array<HostProfile & { userName?: string; username?: string; displayName?: string }>> {
+    const profiles = await this.hostRepository.find({
       where: { status: HostVerificationStatus.APPROVED },
       order: { performanceScore: 'DESC', hostLevel: 'DESC' },
       take: limit,
     });
+    return this.enrichHostProfilesWithUsers(profiles);
   }
 
   // ==========================================
@@ -1287,14 +1313,43 @@ export class HostsService {
     });
     const saved = await this.rewardRepository.save(reward);
 
+    if (!this.hostRewardAuthorityService) {
+      throw new ConflictException(
+        'Host reward financial authority is unavailable; bonus was created but cannot be settled to the wallet',
+      );
+    }
+    const settled = await this.hostRewardAuthorityService.claim(
+      host.userId,
+      saved.id,
+    );
+
     await this.logAuditNote(
       host.id,
       adminId,
-      `Granted reward '${rewardName}' of ${amount} ${currency}`,
-      'REWARD_GRANTED',
+      `Granted and settled reward '${rewardName}' of ${amount} ${currency} to the authoritative wallet`,
+      'REWARD_GRANTED_AND_SETTLED',
     );
 
-    return saved;
+    return settled;
+  }
+
+  private async enrichHostProfilesWithUsers(
+    profiles: HostProfile[],
+  ): Promise<Array<HostProfile & { userName?: string; username?: string; displayName?: string }>> {
+    const userIds = [...new Set(profiles.map((profile) => profile.userId).filter(Boolean))];
+    const users = userIds.length
+      && this.userRepository
+      ? await this.userRepository.find({ where: { id: In(userIds) } })
+      : [];
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    return profiles.map((profile) => {
+      const user = userMap.get(profile.userId);
+      return Object.assign(profile, {
+        userName: user?.displayName || user?.username || profile.realName || profile.userId,
+        username: user?.username || undefined,
+        displayName: user?.displayName || undefined,
+      });
+    });
   }
 
   // ==========================================
