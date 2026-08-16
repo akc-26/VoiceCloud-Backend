@@ -99,8 +99,8 @@ export const RankingsPage: React.FC = () => {
         const res = await rankingsAdminService.getCacheStatus();
         setCacheStatus(res);
       }
-    } catch {
-      // Fallbacks
+    } catch (error: any) {
+      addToast('error', error?.message || 'Failed to load ranking data');
     } finally {
       setLoading(false);
     }

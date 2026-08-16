@@ -64,57 +64,33 @@ export class GoogleAuthService {
 
     const isFirebaseReady = await this.initializeFirebaseAdmin();
 
-    if (isFirebaseReady && getApps().length > 0) {
-      try {
-        const decodedToken = await getAuth().verifyIdToken(idToken);
-        return {
-          googleId: decodedToken.uid || decodedToken.sub,
-          email:
-            decodedToken.email || `google_${decodedToken.uid}@voicecloud.app`,
-          displayName:
-            decodedToken.name ||
-            decodedToken.email?.split('@')[0] ||
-            `User_${decodedToken.uid.slice(-6)}`,
-          avatarUrl: decodedToken.picture,
-          emailVerified: !!decodedToken.email_verified,
-        };
-      } catch (err) {
-        this.logger.warn(
-          `Firebase ID token verification failed, checking direct JWT payload fallback: ${(err as Error).message}`,
-        );
-      }
+    if (!isFirebaseReady || getApps().length === 0) {
+      this.logger.error(
+        'Google sign-in rejected because Firebase Admin verification is not configured.',
+      );
+      throw new UnauthorizedException(
+        'Google authentication provider is not configured',
+      );
     }
 
-    // Direct Google JWT Token payload parsing / fallback
     try {
-      const parts = idToken.split('.');
-      if (parts.length === 3) {
-        const payloadJson = Buffer.from(parts[1], 'base64').toString('utf8');
-        const payload = JSON.parse(payloadJson) as {
-          sub: string;
-          email?: string;
-          name?: string;
-          picture?: string;
-          email_verified?: boolean;
-        };
-
-        if (payload.sub) {
-          return {
-            googleId: payload.sub,
-            email: payload.email || `google_${payload.sub}@voicecloud.app`,
-            displayName:
-              payload.name ||
-              payload.email?.split('@')[0] ||
-              `GoogleUser_${payload.sub.slice(-6)}`,
-            avatarUrl: payload.picture,
-            emailVerified: !!payload.email_verified,
-          };
-        }
-      }
-    } catch {
-      // Fallthrough
+      const decodedToken = await getAuth().verifyIdToken(idToken);
+      return {
+        googleId: decodedToken.uid || decodedToken.sub,
+        email:
+          decodedToken.email || `google_${decodedToken.uid}@voicecloud.app`,
+        displayName:
+          decodedToken.name ||
+          decodedToken.email?.split('@')[0] ||
+          `User_${decodedToken.uid.slice(-6)}`,
+        avatarUrl: decodedToken.picture,
+        emailVerified: !!decodedToken.email_verified,
+      };
+    } catch (err) {
+      this.logger.warn(
+        `Firebase ID token verification failed: ${(err as Error).message}`,
+      );
+      throw new UnauthorizedException('Invalid Google ID token');
     }
-
-    throw new UnauthorizedException('Invalid Google ID token');
   }
 }

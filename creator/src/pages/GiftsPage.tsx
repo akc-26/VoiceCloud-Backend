@@ -103,7 +103,7 @@ export const GiftsPage: React.FC = () => {
                         {g.giftName || g.name || 'Virtual Gift'}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {g.roomName || 'Live Audio Room'}
+                        {g.roomName || g.roomId || '—'}
                       </Typography>
                     </Box>
                   </Box>
@@ -120,10 +120,10 @@ export const GiftsPage: React.FC = () => {
                       color="primary.main"
                       sx={{ fontWeight: 800 }}
                     >
-                      🪙 {(g.coinValue ?? 500).toLocaleString()} Coins
+                      🪙 {Number(g.totalCoins ?? g.coinValue ?? 0).toLocaleString()} Coins
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      From {g.senderName || g.sender || '@supporter'}
+                      From {g.senderName || g.sender?.displayName || g.senderId || '—'}
                     </Typography>
                   </Box>
                 </CardContent>

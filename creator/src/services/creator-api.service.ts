@@ -1,4 +1,3 @@
-import { BRAND_CONFIG } from '@shared/branding';
 /**
  * Production-Ready API Abstraction Layer for Creator Studio
  * Endpoint Base: /api/v1
@@ -10,6 +9,9 @@ import {
   CreatorProfile,
   LiveRoomSummary,
   CreatorPlan,
+  CreatorPlanInput,
+  CreatorFollower,
+  CreatorFollowersPage,
   CreatorSubscriber,
   PayoutRequest,
   CreatorAnalytics,
@@ -289,44 +291,9 @@ export class CreatorApiService {
   async getDashboardSummary(
     signal?: AbortSignal,
   ): Promise<BackendCreatorDashboardResponse> {
-    try {
-      return await this.request<BackendCreatorDashboardResponse>(
-        '/creator/dashboard',
-        { signal },
-      );
-    } catch (err) {
-      // Fallback response for unauthenticated / mock session
-      return {
-        creatorProfile: {
-          id: 'user-vc-creator-001',
-          username: BRAND_CONFIG.defaults.officialCreatorUsername,
-          displayName: BRAND_CONFIG.defaults.officialCreatorDisplayName,
-          avatarUrl:
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
-          isVerified: true,
-          tier: 'Elite',
-          level: 24,
-        },
-        plansSummary: {
-          totalPlans: 2,
-          activePlans: 2,
-        },
-        subscriberCount: 840,
-        earningsSummary: {
-          estimatedRecurringRevenue: 1140.0,
-          totalLifetimePayouts: 1250.0,
-          pendingPayouts: 500.0,
-          lifetimeEarnings: 2840.5,
-        },
-        payoutSummary: {
-          totalRequests: 2,
-          pendingRequests: 1,
-          completedRequests: 1,
-        },
-        latestSubscriptions: [],
-        latestPayoutRequests: [],
-      };
-    }
+    return this.request<BackendCreatorDashboardResponse>('/creator/dashboard', {
+      signal,
+    });
   }
 
   /**
@@ -334,30 +301,7 @@ export class CreatorApiService {
    * Endpoint: GET /api/v1/users/profile/me
    */
   async getMyProfile(signal?: AbortSignal): Promise<UserProfileResponse> {
-    try {
-      return await this.request<UserProfileResponse>('/users/profile/me', {
-        signal,
-      });
-    } catch {
-      return {
-        id: 'user-vc-creator-001',
-        username: BRAND_CONFIG.defaults.officialCreatorUsername,
-        displayName: BRAND_CONFIG.defaults.officialCreatorDisplayName,
-        avatarUrl:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80',
-        coverUrl:
-          'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80',
-        bio: `${BRAND_CONFIG.defaults.officialCreatorBio} Broadcasting high-fidelity podcasts, live music sessions, and voice lounge rooms.`,
-        isVerified: true,
-        level: 24,
-        creatorTier: 'Elite',
-        followersCount: 14250,
-        subscribersCount: 840,
-        walletCoins: 12500,
-        walletDiamonds: 84300,
-        joinedAt: '2025-01-15T00:00:00Z',
-      };
-    }
+    return this.request<UserProfileResponse>('/users/profile/me', { signal });
   }
 
   /**
@@ -431,14 +375,11 @@ export class CreatorApiService {
     limit = 5,
     signal?: AbortSignal,
   ): Promise<any[]> {
-    try {
-      return await this.request<any[]>(
-        `/gifts/history?role=receiver&limit=${limit}`,
-        { signal },
-      );
-    } catch {
-      return [];
-    }
+    const response = await this.request<any>(
+      `/gifts/history?role=receiver&limit=${limit}`,
+      { signal },
+    );
+    return Array.isArray(response) ? response : response?.data || [];
   }
 
   /**
@@ -446,29 +387,41 @@ export class CreatorApiService {
    * Endpoint: GET /api/v1/creator/plans
    */
   async getCreatorPlans(signal?: AbortSignal): Promise<CreatorPlan[]> {
-    try {
-      const res = await this.request<any>('/creator/plans', { signal });
-      return Array.isArray(res) ? res : res.data || [];
-    } catch {
-      return [
-        {
-          id: 'plan-01',
-          creatorId: 'creator-studio-001',
-          name: 'Silver Supporter',
-          description:
-            'Exclusive supporter badge, priority chat seat, custom chat bubble.',
-          priceCoins: 500,
-          perks: [
-            'Exclusive Supporter Badge',
-            'Priority Room Entry',
-            'Custom Chat Bubble',
-          ],
-          activeSubscribersCount: 520,
-          isActive: true,
-          createdAt: '2025-02-01T00:00:00Z',
-        },
-      ];
-    }
+    const res = await this.request<any>('/creator/plans?limit=100', { signal });
+    return Array.isArray(res) ? res : res?.data || [];
+  }
+
+  async createCreatorPlan(
+    data: CreatorPlanInput,
+    signal?: AbortSignal,
+  ): Promise<CreatorPlan> {
+    return this.request<CreatorPlan>('/creator/plans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      signal,
+    });
+  }
+
+  async updateCreatorPlan(
+    id: string,
+    data: Partial<CreatorPlanInput> & { status?: string },
+    signal?: AbortSignal,
+  ): Promise<CreatorPlan> {
+    return this.request<CreatorPlan>(`/creator/plans/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      signal,
+    });
+  }
+
+  async archiveCreatorPlan(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<CreatorPlan> {
+    return this.request<CreatorPlan>(`/creator/plans/${id}`, {
+      method: 'DELETE',
+      signal,
+    });
   }
 
   /**
@@ -476,12 +429,8 @@ export class CreatorApiService {
    * Endpoint: GET /api/v1/creator/subscribers
    */
   async getSubscribers(signal?: AbortSignal): Promise<CreatorSubscriber[]> {
-    try {
-      const res = await this.request<any>('/creator/subscribers', { signal });
-      return Array.isArray(res) ? res : res.data || [];
-    } catch {
-      return [];
-    }
+    const res = await this.request<any>('/creator/subscribers?limit=100', { signal });
+    return Array.isArray(res) ? res : res?.data || [];
   }
 
   /**
@@ -522,31 +471,14 @@ export class CreatorApiService {
     period: '24h' | '7d' | '30d' | '1y' = '30d',
     signal?: AbortSignal,
   ): Promise<CreatorAnalytics> {
-    try {
-      const res = await this.request<any>(`/analytics?period=${period}`, {
-        signal,
-      });
-      if (res && res.dailyMetrics) return res;
-      throw new Error('Fallback to analytics format');
-    } catch {
-      return {
-        period,
-        totalListenHours: 1240,
-        peakConcurrentListeners: 1850,
-        totalGiftsReceived: 3420,
-        netRevenueUsd: 2840.5,
-        listenerRetentionRate: 84.2,
-        dailyMetrics: [
-          { date: 'Jul 24', listeners: 1100, earnings: 85, newFollowers: 42 },
-          { date: 'Jul 25', listeners: 1350, earnings: 120, newFollowers: 68 },
-          { date: 'Jul 26', listeners: 1580, earnings: 145, newFollowers: 89 },
-          { date: 'Jul 27', listeners: 1420, earnings: 110, newFollowers: 55 },
-          { date: 'Jul 28', listeners: 1720, earnings: 195, newFollowers: 112 },
-          { date: 'Jul 29', listeners: 1850, earnings: 230, newFollowers: 135 },
-          { date: 'Jul 30', listeners: 1640, earnings: 180, newFollowers: 94 },
-        ],
-      };
+    const res = await this.request<CreatorAnalytics>(
+      `/analytics?period=${period}`,
+      { signal },
+    );
+    if (!res || !Array.isArray(res.dailyMetrics)) {
+      throw new ApiError('Analytics response is incomplete', 502, res);
     }
+    return res;
   }
 
   /**
@@ -690,37 +622,8 @@ export class CreatorApiService {
    * Endpoint: GET /api/v1/scheduled-rooms
    */
   async getScheduledRooms(signal?: AbortSignal): Promise<any[]> {
-    try {
-      const res = await this.request<any>('/scheduled-rooms', { signal });
-      return Array.isArray(res) ? res : res.data || [];
-    } catch {
-      return [
-        {
-          id: 'sch-1',
-          title: 'Weekly Creator VIP Broadcast',
-          scheduledStartTime: new Date(
-            Date.now() + 1000 * 60 * 60 * 24,
-          ).toISOString(),
-          date: 'Tomorrow, Aug 1, 2026',
-          time: '20:00 - 22:00 UTC',
-          attendees: 420,
-          rsvpCount: 420,
-          category: 'VIP Broadcast',
-        },
-        {
-          id: 'sch-2',
-          title: 'Live Acoustic Audio Session',
-          scheduledStartTime: new Date(
-            Date.now() + 1000 * 60 * 60 * 72,
-          ).toISOString(),
-          date: 'Friday, Aug 3, 2026',
-          time: '18:00 - 20:00 UTC',
-          attendees: 890,
-          rsvpCount: 890,
-          category: 'Public Stream',
-        },
-      ];
-    }
+    const res = await this.request<any>('/scheduled-rooms?limit=100', { signal });
+    return Array.isArray(res) ? res : res?.data || [];
   }
 
   async createScheduledRoom(
@@ -757,50 +660,81 @@ export class CreatorApiService {
    * Followers API
    * Endpoint: GET /api/v1/users/followers
    */
-  async getFollowers(signal?: AbortSignal): Promise<any[]> {
-    try {
-      const res = await this.request<any>('/users/followers', { signal });
-      return Array.isArray(res) ? res : res.data || [];
-    } catch {
-      return [
-        {
-          id: 'f-1',
-          name: 'Alex AudioNut',
-          handle: '@alex_audionut',
-          followedAt: '2026-07-29T10:00:00Z',
-          badge: 'Top Supporter',
-          avatarUrl: '',
-          isFollowingBack: true,
-        },
-        {
-          id: 'f-2',
-          name: 'Sarah Waves',
-          handle: '@sarah_waves',
-          followedAt: '2026-07-26T14:30:00Z',
-          badge: 'VIP Subscriber',
-          avatarUrl: '',
-          isFollowingBack: true,
-        },
-        {
-          id: 'f-3',
-          name: 'David Beats',
-          handle: '@david_beats',
-          followedAt: '2026-07-22T08:15:00Z',
-          badge: 'Regular Listener',
-          avatarUrl: '',
-          isFollowingBack: false,
-        },
-        {
-          id: 'f-4',
-          name: 'Elena Vox',
-          handle: '@elena_vox',
-          followedAt: '2026-07-15T19:00:00Z',
-          badge: 'Regular Listener',
-          avatarUrl: '',
-          isFollowingBack: false,
-        },
-      ];
-    }
+  async getFollowersPage(
+    params: { page?: number; limit?: number; search?: string; sortOrder?: 'ASC' | 'DESC' } = {},
+    signal?: AbortSignal,
+  ): Promise<CreatorFollowersPage> {
+    const query = new URLSearchParams();
+    query.set('page', String(params.page || 1));
+    query.set('limit', String(params.limit || 20));
+    if (params.search?.trim()) query.set('search', params.search.trim());
+    if (params.sortOrder) query.set('sortOrder', params.sortOrder);
+
+    const [followers, following] = await Promise.all([
+      this.request<any>(`/users/followers?${query.toString()}`, { signal }),
+      this.request<any>('/users/following?page=1&limit=1000', { signal }),
+    ]);
+
+    const followingUsers = Array.isArray(following)
+      ? following
+      : following?.data || [];
+    const followingIds = new Set(
+      followingUsers.map((user: any) => user?.id).filter(Boolean),
+    );
+    const followerUsers = Array.isArray(followers)
+      ? followers
+      : followers?.data || [];
+
+    const data: CreatorFollower[] = followerUsers.map((user: any) => ({
+      id: user.id,
+      userId: user.id,
+      name: user.displayName || user.username || 'Registered User',
+      handle: user.username ? `@${user.username}` : '',
+      avatarUrl: user.avatarUrl || '',
+      badge:
+        user.badges?.[0]?.name || (user.isVerified ? 'Verified' : 'Listener'),
+      verified: Boolean(user.isVerified),
+      isFollowingBack: followingIds.has(user.id),
+    }));
+
+    return {
+      data,
+      total: Number(followers?.total ?? data.length),
+      page: Number(followers?.page ?? params.page ?? 1),
+      limit: Number(followers?.limit ?? params.limit ?? 20),
+      totalPages: Number(followers?.totalPages ?? (data.length ? 1 : 0)),
+    };
+  }
+
+  async getFollowers(signal?: AbortSignal): Promise<CreatorFollower[]> {
+    const result = await this.getFollowersPage({ page: 1, limit: 20 }, signal);
+    return result.data;
+  }
+
+  async getFollowStats(
+    signal?: AbortSignal,
+  ): Promise<{
+    userId: string;
+    followersCount: number;
+    followingCount: number;
+    mutualCount: number;
+    popularityScore: number;
+  }> {
+    return this.request('/users/follow/stats', { signal });
+  }
+
+  async followUser(userId: string, signal?: AbortSignal): Promise<any> {
+    return this.request(`/users/${userId}/follow`, {
+      method: 'POST',
+      signal,
+    });
+  }
+
+  async unfollowUser(userId: string, signal?: AbortSignal): Promise<any> {
+    return this.request(`/users/${userId}/follow`, {
+      method: 'DELETE',
+      signal,
+    });
   }
 
   /**
@@ -849,19 +783,11 @@ export class CreatorApiService {
   async getStreamCredentials(
     signal?: AbortSignal,
   ): Promise<{ rtmpUrl: string; streamKey: string; audioBitrate: string }> {
-    try {
-      return await this.request<{
-        rtmpUrl: string;
-        streamKey: string;
-        audioBitrate: string;
-      }>('/creator/stream-credentials', { signal });
-    } catch {
-      return {
-        rtmpUrl: 'rtmps://live.voicecloud.app:443/live',
-        streamKey: 'live_vc_sk_8f93a1200bc4291e',
-        audioBitrate: '324',
-      };
-    }
+    return this.request<{
+      rtmpUrl: string;
+      streamKey: string;
+      audioBitrate: string;
+    }>('/creator/stream-credentials', { signal });
   }
 
   /**
@@ -871,18 +797,13 @@ export class CreatorApiService {
   async regenerateStreamKey(
     signal?: AbortSignal,
   ): Promise<{ streamKey: string }> {
-    try {
-      return await this.request<{ streamKey: string }>(
-        '/creator/stream-credentials/regenerate',
-        {
-          method: 'POST',
-          signal,
-        },
-      );
-    } catch {
-      const randomKey = `live_vc_sk_${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`;
-      return { streamKey: randomKey };
-    }
+    return this.request<{ streamKey: string }>(
+      '/creator/stream-credentials/regenerate',
+      {
+        method: 'POST',
+        signal,
+      },
+    );
   }
 
   /**
@@ -890,20 +811,7 @@ export class CreatorApiService {
    * Endpoint: GET /api/v1/users/settings
    */
   async getStudioSettings(signal?: AbortSignal): Promise<Record<string, any>> {
-    try {
-      return await this.request<Record<string, any>>('/users/settings', {
-        signal,
-      });
-    } catch {
-      return {
-        audioPreset: '324',
-        noiseSuppression: true,
-        micQueue: true,
-        toxicityFilter: true,
-        followersOnlyChat: false,
-        emailAlerts: true,
-      };
-    }
+    return this.request<Record<string, any>>('/users/settings', { signal });
   }
 
   /**
@@ -914,15 +822,11 @@ export class CreatorApiService {
     settings: Record<string, any>,
     signal?: AbortSignal,
   ): Promise<Record<string, any>> {
-    try {
-      return await this.request<Record<string, any>>('/users/settings', {
-        method: 'PATCH',
-        body: JSON.stringify(settings),
-        signal,
-      });
-    } catch {
-      return settings;
-    }
+    return this.request<Record<string, any>>('/users/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+      signal,
+    });
   }
 
   /**

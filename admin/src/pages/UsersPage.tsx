@@ -96,8 +96,10 @@ export const UsersPage: React.FC = () => {
         setUsers(data);
         setTotalUsers(data.length);
       }
-    } catch {
-      // Keep state fallback
+    } catch (error: any) {
+      setUsers([]);
+      setTotalUsers(0);
+      addToast('error', error?.message || 'Failed to load users');
     } finally {
       setLoading(false);
     }
@@ -109,8 +111,9 @@ export const UsersPage: React.FC = () => {
       if (Array.isArray(data)) {
         setBadges(data);
       }
-    } catch {
-      // Fallback
+    } catch (error: any) {
+      setBadges([]);
+      addToast('error', error?.message || 'Failed to load global badges');
     }
   };
 
@@ -122,8 +125,10 @@ export const UsersPage: React.FC = () => {
       }
       const stats = await usersService.getVisitorStats();
       setVisitorStats(stats);
-    } catch {
-      // Fallback
+    } catch (error: any) {
+      setVisitorLogs([]);
+      setVisitorStats(null);
+      addToast('error', error?.message || 'Failed to load visitor analytics');
     }
   };
 
@@ -243,8 +248,9 @@ export const UsersPage: React.FC = () => {
     try {
       const settings = await usersService.getUserSettings(userId);
       setUserSettings(settings);
-    } catch {
-      // Fallback default
+    } catch (error: any) {
+      setUserSettings(null);
+      addToast('error', error?.message || 'Failed to load user settings');
     }
   };
 

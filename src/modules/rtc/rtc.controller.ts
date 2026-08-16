@@ -63,6 +63,9 @@ export class RtcController {
 
   // 1. RTC Configuration
   @Get('config')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get active RTC configuration settings' })
   @ApiResponse({ status: 200, description: 'Active RTC configuration' })
   async getRtcConfig() {
@@ -70,7 +73,8 @@ export class RtcController {
   }
 
   @Patch('config')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update active RTC configuration settings' })
   @ApiResponse({ status: 200, description: 'RTC configuration updated' })
@@ -117,6 +121,8 @@ export class RtcController {
   }
 
   @Get('sessions/active')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get list of active voice sessions' })
   @ApiResponse({ status: 200, description: 'List of active voice sessions' })
   async getActiveSessions(@Query() query: QueryRtcSessionsDto) {
@@ -124,6 +130,8 @@ export class RtcController {
   }
 
   @Get('sessions/:sessionId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get voice session details and speaker history' })
   @ApiParam({ name: 'sessionId', description: 'Voice session ID' })
   @ApiResponse({ status: 200, description: 'Voice session details' })
@@ -282,9 +290,10 @@ export class RtcController {
   @ApiResponse({ status: 201, description: 'Recording job created' })
   async startRecording(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') userRole: string,
     @Body() dto: StartRecordingDto,
   ) {
-    return this.rtcService.startRecording(userId, dto);
+    return this.rtcService.startRecording(userId, dto, userRole);
   }
 
   @Post('recordings/:jobId/stop')
@@ -295,20 +304,29 @@ export class RtcController {
   @ApiResponse({ status: 200, description: 'Recording job stopped' })
   async stopRecording(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') userRole: string,
     @Param('jobId') jobId: string,
   ) {
-    return this.rtcService.stopRecording(userId, jobId);
+    return this.rtcService.stopRecording(userId, jobId, userRole);
   }
 
   @Get('recordings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'List recording jobs' })
   @ApiResponse({ status: 200, description: 'List of recording jobs' })
-  async getRecordingJobs(@Query('roomId') roomId?: string) {
-    return this.rtcService.getRecordingJobs(roomId);
+  async getRecordingJobs(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('role') userRole: string,
+    @Query('roomId') roomId?: string,
+  ) {
+    return this.rtcService.getRecordingJobs(userId, userRole, roomId);
   }
 
   // 7. Analytics
   @Get('analytics/room/:roomId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get RTC voice analytics for a room' })
   @ApiParam({ name: 'roomId', description: 'Room ID' })
   @ApiResponse({ status: 200, description: 'RTC room analytics' })
@@ -333,6 +351,8 @@ export class RtcController {
   }
 
   @Get('rooms/:roomId/quality-metrics')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Get aggregated room WebRTC quality metrics and adaptive recommendations',
@@ -344,6 +364,8 @@ export class RtcController {
   }
 
   @Get('rooms/:roomId/participants/:userId/quality')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get network score and quality metric for a specific participant',
   })
@@ -419,6 +441,8 @@ export class RtcController {
   }
 
   @Get('rooms/:roomId/participants')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get current RTC room active participants and presence state',
   })
@@ -450,9 +474,10 @@ export class RtcController {
   @ApiResponse({ status: 200, description: 'Recording job paused' })
   async pauseRecording(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') userRole: string,
     @Body() dto: PauseRecordingDto,
   ) {
-    return this.rtcService.pauseRecording(userId, dto);
+    return this.rtcService.pauseRecording(userId, dto, userRole);
   }
 
   @Post('recordings/resume')
@@ -462,9 +487,10 @@ export class RtcController {
   @ApiResponse({ status: 200, description: 'Recording job resumed' })
   async resumeRecording(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') userRole: string,
     @Body() dto: ResumeRecordingDto,
   ) {
-    return this.rtcService.resumeRecording(userId, dto);
+    return this.rtcService.resumeRecording(userId, dto, userRole);
   }
 
   @Get('admin/monitoring')

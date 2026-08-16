@@ -91,6 +91,37 @@ export class DynamicConfigService implements OnModuleInit {
   }
 
   /**
+   * Retrieves one enabled provider configuration by category and provider type.
+   * This is used by provider adapters that must validate against the exact
+   * gateway requested by a client rather than silently using the category's
+   * currently-active provider.
+   */
+  async getProviderConfig(
+    category: ProviderCategory,
+    providerType: string,
+  ): Promise<ProviderConfig | null> {
+    const normalizedType = providerType.trim().toLowerCase();
+    const provider = await this.providerRepo
+      .createQueryBuilder('provider')
+      .where('provider.category = :category', { category })
+      .andWhere('LOWER(provider.providerType) = :providerType', {
+        providerType: normalizedType,
+      })
+      .andWhere('provider.isEnabled = :enabled', { enabled: true })
+      .orderBy('provider.isActive', 'DESC')
+      .addOrderBy('provider.priority', 'ASC')
+      .getOne();
+
+    if (!provider) {
+      return null;
+    }
+
+    const result = { ...provider };
+    result.config = this.encryptionService.decryptConfig(provider.config || {});
+    return result;
+  }
+
+  /**
    * Invalidates cached provider config for a category (or all categories)
    */
   async invalidateCategoryCache(category?: ProviderCategory): Promise<void> {

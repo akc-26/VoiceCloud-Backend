@@ -18,6 +18,7 @@ import { RedisModule } from '../../redis/redis.module';
 import { SystemSettingsModule } from '../admin/system-settings/system-settings.module';
 import { RoomLifecycleService } from './room-lifecycle.service';
 import { HostsModule } from '../hosts/hosts.module';
+import { RoomAuthorityService } from './room-authority.service';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { HostsModule } from '../hosts/hosts.module';
     RoomTicketsService,
     SoundboardService,
     RoomLifecycleService,
+    RoomAuthorityService,
   ],
   exports: [
     RoomsService,
@@ -47,6 +49,7 @@ import { HostsModule } from '../hosts/hosts.module';
     RoomTicketsService,
     SoundboardService,
     RoomLifecycleService,
+    RoomAuthorityService,
     TypeOrmModule,
   ],
 })

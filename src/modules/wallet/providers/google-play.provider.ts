@@ -20,55 +20,30 @@ export class GooglePlayProvider implements IPaymentGatewayProvider {
       currency?: string;
     },
   ): Promise<ValidateReceiptResult> {
-    this.logger.log(
-      `Validating Google Play receipt mock: ${receipt ? receipt.slice(0, 15) : 'N/A'}`,
-    );
-    if (receipt && receipt.includes('FAIL')) {
-      return {
-        isValid: false,
-        transactionId: `gp_fail_${Date.now()}`,
-        amount: packageDetails?.price || 0,
-        currency: packageDetails?.currency || 'USD',
-        coins: 0,
-        bonusCoins: 0,
-        errorMessage: 'Invalid Google Play receipt token',
-      };
-    }
-
-    const txId = `gp_tx_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    this.logger.warn('Google Play purchase verification adapter is not configured; rejecting purchase instead of using mock validation');
     return {
-      isValid: true,
-      transactionId: txId,
+      isValid: false,
+      transactionId: receipt || '',
       amount: packageDetails?.price || 0,
       currency: packageDetails?.currency || 'USD',
-      coins: packageDetails?.coinAmount || 0,
-      bonusCoins: packageDetails?.bonusCoins || 0,
-      rawDetails: {
-        purchaseToken: receipt,
-        purchaseState: 0,
-        consumptionState: 1,
-        orderId: txId,
-      },
+      coins: 0,
+      bonusCoins: 0,
+      errorMessage: 'Google Play server-side purchase verification is not configured',
     };
   }
 
-  async verifySignature(data: string, signature: string): Promise<boolean> {
-    if (signature && signature.includes('INVALID')) {
-      return false;
-    }
-    return true;
+  async verifySignature(_data: string, _signature: string): Promise<boolean> {
+    return false;
   }
 
   async processRefund(
-    transactionId: string,
-    amount: number,
+    _transactionId: string,
+    _amount: number,
   ): Promise<RefundGatewayResult> {
-    this.logger.log(
-      `Processing Google Play refund mock for tx: ${transactionId}, amount: ${amount}`,
-    );
     return {
-      success: true,
-      refundTransactionId: `gp_ref_${Date.now()}`,
+      success: false,
+      refundTransactionId: '',
+      errorMessage: 'Google Play server-side refund integration is not configured',
     };
   }
 }

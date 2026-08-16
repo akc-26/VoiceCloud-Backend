@@ -96,8 +96,8 @@ export const AuthManagementPage: React.FC = () => {
         if (s.key === 'failed_login_lockout_duration')
           setLockoutDuration(s.value);
       });
-    } catch {
-      // Fallback or demo state
+    } catch (error: any) {
+      addToast('error', error?.message || 'Failed to load authentication settings');
     } finally {
       setLoading(false);
     }

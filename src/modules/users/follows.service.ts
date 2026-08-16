@@ -209,7 +209,7 @@ export class FollowsService {
 
     const [follows, total] = await this.followRepository.findAndCount({
       where: { followingId: userId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: query.sortOrder === 'ASC' ? 'ASC' : 'DESC' },
       skip,
       take: limit,
     });
@@ -255,7 +255,7 @@ export class FollowsService {
 
     const [follows, total] = await this.followRepository.findAndCount({
       where: { followerId: userId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: query.sortOrder === 'ASC' ? 'ASC' : 'DESC' },
       skip,
       take: limit,
     });

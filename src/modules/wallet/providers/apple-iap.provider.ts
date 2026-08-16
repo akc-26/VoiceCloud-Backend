@@ -20,54 +20,30 @@ export class AppleIapProvider implements IPaymentGatewayProvider {
       currency?: string;
     },
   ): Promise<ValidateReceiptResult> {
-    this.logger.log(
-      `Validating Apple IAP receipt mock: ${receipt ? receipt.slice(0, 15) : 'N/A'}`,
-    );
-    if (receipt && receipt.includes('FAIL')) {
-      return {
-        isValid: false,
-        transactionId: `apple_fail_${Date.now()}`,
-        amount: packageDetails?.price || 0,
-        currency: packageDetails?.currency || 'USD',
-        coins: 0,
-        bonusCoins: 0,
-        errorMessage: 'Invalid Apple IAP receipt data',
-      };
-    }
-
-    const txId = `apple_tx_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    this.logger.warn('Apple IAP server verification adapter is not configured; rejecting purchase instead of using mock validation');
     return {
-      isValid: true,
-      transactionId: txId,
+      isValid: false,
+      transactionId: receipt || '',
       amount: packageDetails?.price || 0,
       currency: packageDetails?.currency || 'USD',
-      coins: packageDetails?.coinAmount || 0,
-      bonusCoins: packageDetails?.bonusCoins || 0,
-      rawDetails: {
-        environment: 'Sandbox',
-        originalTransactionId: txId,
-        productId: 'com.voicecloud.coins',
-      },
+      coins: 0,
+      bonusCoins: 0,
+      errorMessage: 'Apple App Store server-side transaction verification is not configured',
     };
   }
 
-  async verifySignature(data: string, signature: string): Promise<boolean> {
-    if (signature && signature.includes('INVALID')) {
-      return false;
-    }
-    return true;
+  async verifySignature(_data: string, _signature: string): Promise<boolean> {
+    return false;
   }
 
   async processRefund(
-    transactionId: string,
-    amount: number,
+    _transactionId: string,
+    _amount: number,
   ): Promise<RefundGatewayResult> {
-    this.logger.log(
-      `Processing Apple IAP refund mock for tx: ${transactionId}, amount: ${amount}`,
-    );
     return {
-      success: true,
-      refundTransactionId: `apple_ref_${Date.now()}`,
+      success: false,
+      refundTransactionId: '',
+      errorMessage: 'Apple App Store server-side refund integration is not configured',
     };
   }
 }

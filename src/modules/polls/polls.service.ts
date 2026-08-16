@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,6 +11,7 @@ import { PollVote } from './entities/poll-vote.entity';
 import { CreatePollDto } from './dto/create-poll.dto';
 import { VotePollDto } from './dto/vote-poll.dto';
 import { EventsGateway } from '../../common/events/events.gateway';
+import { RoomAuthorityService } from '../rooms/room-authority.service';
 
 @Injectable()
 export class PollsService {
@@ -23,9 +23,11 @@ export class PollsService {
     @InjectRepository(PollVote)
     private readonly voteRepository: Repository<PollVote>,
     private readonly eventsGateway: EventsGateway,
+    private readonly roomAuthorityService: RoomAuthorityService,
   ) {}
 
   async createPoll(userId: string, dto: CreatePollDto): Promise<Poll> {
+    await this.roomAuthorityService.assertManager(userId, dto.roomId);
     const expiresAt = dto.durationSeconds
       ? new Date(Date.now() + dto.durationSeconds * 1000)
       : null;
@@ -58,11 +60,7 @@ export class PollsService {
     if (!poll) {
       throw new NotFoundException('Poll not found');
     }
-    if (poll.creatorId !== userId) {
-      throw new ForbiddenException(
-        'Only the poll creator/host can start the poll',
-      );
-    }
+    await this.roomAuthorityService.assertManager(userId, poll.roomId);
 
     poll.status = PollStatus.ACTIVE;
     const updated = await this.pollRepository.save(poll);
@@ -79,11 +77,7 @@ export class PollsService {
     if (!poll) {
       throw new NotFoundException('Poll not found');
     }
-    if (poll.creatorId !== userId) {
-      throw new ForbiddenException(
-        'Only the poll creator/host can stop the poll',
-      );
-    }
+    await this.roomAuthorityService.assertManager(userId, poll.roomId);
 
     poll.status = PollStatus.STOPPED;
     const updated = await this.pollRepository.save(poll);
@@ -100,11 +94,7 @@ export class PollsService {
     if (!poll) {
       throw new NotFoundException('Poll not found');
     }
-    if (poll.creatorId !== userId) {
-      throw new ForbiddenException(
-        'Only the poll creator/host can delete the poll',
-      );
-    }
+    await this.roomAuthorityService.assertManager(userId, poll.roomId);
 
     await this.pollRepository.remove(poll);
     this.eventsGateway.broadcastToRoom(poll.roomId, 'poll:deleted', { pollId });

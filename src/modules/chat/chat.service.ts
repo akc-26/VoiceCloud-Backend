@@ -15,6 +15,7 @@ import { RedisService } from '../../redis/redis.service';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { QueueService } from '../../queue/queue.service';
 import { JOB_TYPES } from '../../queue/queue.constants';
+import { RoomAuthorityService } from '../rooms/room-authority.service';
 
 import { Conversation, ConversationType } from './entities/conversation.entity';
 import {
@@ -60,6 +61,7 @@ export class ChatService {
     private readonly voiceNoteRepo: Repository<VoiceNote>,
     private readonly storageService: StorageService,
     private readonly redisService: RedisService,
+    private readonly roomAuthorityService: RoomAuthorityService,
     @Optional() private readonly eventsGateway?: EventsGateway,
     @Optional() private readonly queueService?: QueueService,
   ) {}
@@ -928,6 +930,7 @@ export class ChatService {
     senderId: string,
     content: string,
   ) {
+    await this.roomAuthorityService.assertManager(senderId, roomId);
     const conversation = await this.getOrCreateRoomConversation(
       roomId,
       senderId,

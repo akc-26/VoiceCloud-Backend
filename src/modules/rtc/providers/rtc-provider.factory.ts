@@ -22,7 +22,31 @@ export class RtcProviderFactory {
     this.providers.set('agora', agoraProvider);
     this.providers.set('livekit', liveKitProvider);
     this.providers.set('zegocloud', zegoCloudProvider);
-    this.providers.set('default_mock', defaultMockProvider);
+    if (this.isMockAllowed()) {
+      this.providers.set('default_mock', defaultMockProvider);
+      this.logger.warn('RTC mock provider enabled for non-production development only');
+    }
+  }
+
+  private isMockAllowed(): boolean {
+    return (
+      process.env.NODE_ENV !== 'production' &&
+      process.env.ENABLE_RTC_MOCK_PROVIDER === 'true'
+    );
+  }
+
+  private resolveProvider(providerType: string): IRtcProvider {
+    const key = providerType.trim().toLowerCase();
+    if (key === 'default_mock' && !this.isMockAllowed()) {
+      throw new BadRequestException(
+        'The RTC mock provider is disabled. Configure a real RTC provider.',
+      );
+    }
+    const provider = this.providers.get(key);
+    if (!provider) {
+      throw new BadRequestException(`Unsupported RTC provider: ${providerType}`);
+    }
+    return provider;
   }
 
   async getActiveProvider(): Promise<IRtcProvider> {
@@ -31,19 +55,19 @@ export class RtcProviderFactory {
         ProviderCategory.RTC,
       );
 
-    if (activeConfig && this.providers.has(activeConfig.providerType)) {
-      return this.providers.get(activeConfig.providerType);
+    if (!activeConfig) {
+      throw new BadRequestException(
+        'No enabled RTC provider configuration is available',
+      );
     }
 
-    return this.agoraProvider;
+    return this.resolveProvider(activeConfig.providerType);
   }
 
   getProvider(providerType?: string): IRtcProvider {
-    const key = providerType ? providerType.toLowerCase() : 'agora';
-    const provider = this.providers.get(key);
-    if (!provider) {
-      return this.agoraProvider;
+    if (!providerType) {
+      throw new BadRequestException('RTC provider type is required');
     }
-    return provider;
+    return this.resolveProvider(providerType);
   }
 }

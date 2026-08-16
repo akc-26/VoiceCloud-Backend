@@ -23,6 +23,9 @@ import {
   DeviceBanDto,
 } from './dto/auto-moderation.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Security & Auto-Moderation Shield')
@@ -68,6 +71,8 @@ export class Phase18SecurityController {
   }
 
   @Post('device-security/ban')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Ban a device fingerprint ID permanently (Admin required)',

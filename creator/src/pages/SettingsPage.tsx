@@ -30,11 +30,18 @@ export const SettingsPage: React.FC = () => {
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-    void creatorApi.getStudioSettings().then((settings) => {
-      if (isMounted && settings) {
+    setIsLoading(true);
+    setLoadError(null);
+    void creatorApi
+      .getStudioSettings()
+      .then((settings) => {
+        if (!isMounted || !settings) return;
         if (settings.audioPreset) setAudioPreset(settings.audioPreset);
         if (typeof settings.noiseSuppression === 'boolean')
           setNoiseSuppression(settings.noiseSuppression);
@@ -46,8 +53,17 @@ export const SettingsPage: React.FC = () => {
           setFollowersOnlyChat(settings.followersOnlyChat);
         if (typeof settings.emailAlerts === 'boolean')
           setEmailAlerts(settings.emailAlerts);
-      }
-    });
+      })
+      .catch((error: Error) => {
+        if (isMounted) {
+          setLoadError(
+            error?.message || 'Studio settings could not be loaded from the server.',
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
     return () => {
       isMounted = false;
     };
@@ -55,6 +71,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveError(null);
     try {
       await creatorApi.updateStudioSettings({
         audioPreset,
@@ -66,6 +83,13 @@ export const SettingsPage: React.FC = () => {
       });
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
+    } catch (error) {
+      setIsSaved(false);
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : 'Studio preferences could not be saved to the server.',
+      );
     } finally {
       setIsSaving(false);
     }
@@ -87,6 +111,18 @@ export const SettingsPage: React.FC = () => {
       {isSaved && (
         <Alert severity="success" sx={{ borderRadius: 2 }}>
           Studio preferences updated successfully!
+        </Alert>
+      )}
+
+      {loadError && (
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          Settings could not be loaded: {loadError}
+        </Alert>
+      )}
+
+      {saveError && (
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          Settings were not saved: {saveError}
         </Alert>
       )}
 
@@ -230,7 +266,7 @@ export const SettingsPage: React.FC = () => {
               onClick={() => {
                 void handleSave();
               }}
-              disabled={isSaving}
+              disabled={isSaving || isLoading || Boolean(loadError)}
               sx={{ fontWeight: 700 }}
             >
               {isSaving ? 'Saving...' : 'Save Studio Preferences'}

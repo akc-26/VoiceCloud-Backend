@@ -29,41 +29,42 @@ import {
 
 export const HelpPage: React.FC = () => {
   const [isSupportOpen, setIsSupportOpen] = useState(false);
-  const [supportSubmitted, setSupportSubmitted] = useState(false);
+  const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const supportEmail = BRAND_CONFIG.contacts.supportEmail;
 
   const faqs = [
     {
       q: 'How do I start my first live audio room?',
-      a: 'Go to Live Rooms in the sidebar navigation, click "Create Audio Room", configure your room title and audio preset, then hit "Start Broadcast".',
+      a: 'Go to Live Rooms, create an audio room, configure its access and audio settings, then use Start Broadcast. Room lifecycle activation requires a verified Host account and a configured RTC provider.',
     },
     {
-      q: 'When do diamond earnings convert to payouts?',
-      a: 'Diamonds can be converted once you reach the current minimum payout threshold of 100 💎 ($0.50 USD) via the Creator Wallet page.',
+      q: 'When can I request a diamond payout?',
+      a: 'The current backend payout lifecycle requires at least 100 diamonds. The Creator Wallet shows the authoritative balance and calculated payout amount before a request is submitted.',
     },
     {
       q: 'How do subscription plans work for creators?',
-      a: 'Creators can define custom subscription plans with monthly coin pricing and exclusive perks like badges, priority room entry, and co-host mic access.',
+      a: 'Creators can create subscription plans with monthly pricing in USD, optional yearly pricing, and configured benefits. Active memberships are shown in the Subscribers directory.',
     },
     {
-      q: 'What are the recommended audio bitrates?',
-      a: 'We recommend 324kbps Ultra HD for music and lounge sessions, 256kbps HD for podcasts, and 128kbps for general talk shows.',
+      q: 'What audio presets can I configure?',
+      a: 'Studio Settings currently supports 324, 256, and 128 kbps audio presets. The effective media quality also depends on the active RTC provider and client media implementation.',
     },
   ];
 
   const handleSupportSubmit = () => {
     if (!message.trim()) return;
-    setSupportSubmitted(true);
-    setTimeout(() => {
-      setSupportSubmitted(false);
-      setIsSupportOpen(false);
-      setMessage('');
-    }, 2000);
+    const mailSubject =
+      subject.trim() || `${BRAND_CONFIG.products.creator.shortName} Support Request`;
+    const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(message.trim())}`;
+    window.location.href = mailto;
+    setIsSupportOpen(false);
+    setSubject('');
+    setMessage('');
   };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Header */}
       <Box
         sx={{
           display: 'flex',
@@ -78,8 +79,8 @@ export const HelpPage: React.FC = () => {
             Creator Help & Knowledge Base
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Find answers, broadcasting best practices, creator guidelines, and
-            platform support contacts.
+            Find product guidance and contact the configured platform support
+            address.
           </Typography>
         </Box>
         <Button
@@ -93,7 +94,13 @@ export const HelpPage: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Quick Action Cards */}
+      <Alert severity="info">
+        A persisted in-platform support-ticket backend is not currently present
+        in this release. Contact Support opens your mail client to{' '}
+        <strong>{supportEmail}</strong> instead of falsely reporting that a
+        platform ticket was created.
+      </Alert>
+
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, sm: 4 }}>
           <Card>
@@ -111,11 +118,11 @@ export const HelpPage: React.FC = () => {
                 color="text.secondary"
                 sx={{ display: 'block', mb: 2 }}
               >
-                Best practices for audio hosting, engagement, and audience
-                retention.
+                No published handbook URL is configured in the current product
+                source.
               </Typography>
-              <Button variant="outlined" size="small">
-                Read Handbook
+              <Button variant="outlined" size="small" disabled>
+                Not Published
               </Button>
             </CardContent>
           </Card>
@@ -137,10 +144,11 @@ export const HelpPage: React.FC = () => {
                 color="text.secondary"
                 sx={{ display: 'block', mb: 2 }}
               >
-                Platform rules, chat moderation rules, and safety compliance.
+                No published community-guidelines URL is configured in the
+                current product source.
               </Typography>
-              <Button variant="outlined" size="small">
-                View Guidelines
+              <Button variant="outlined" size="small" disabled>
+                Not Published
               </Button>
             </CardContent>
           </Card>
@@ -155,24 +163,25 @@ export const HelpPage: React.FC = () => {
                 style={{ marginBottom: 8 }}
               />
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                System Version Info
+                System Information
               </Typography>
               <Typography
                 variant="caption"
                 color="text.secondary"
                 sx={{ display: 'block', mb: 2 }}
               >
-                {BRAND_CONFIG.products.creator.fullName} | RTC Engine Active.
+                {BRAND_CONFIG.products.creator.fullName}. Runtime RTC media
+                availability depends on the configured provider and client
+                integration.
               </Typography>
               <Button variant="outlined" size="small" disabled>
-                Up to Date
+                Configuration Managed by Admin
               </Button>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* FAQ Section */}
       <Card>
         <CardContent sx={{ p: 3 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
@@ -204,7 +213,6 @@ export const HelpPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Contact Support Modal */}
       <Dialog
         open={isSupportOpen}
         onClose={() => setIsSupportOpen(false)}
@@ -215,42 +223,39 @@ export const HelpPage: React.FC = () => {
           Contact Creator Support
         </DialogTitle>
         <DialogContent dividers>
-          {supportSubmitted ? (
-            <Alert severity="success" sx={{ my: 2 }}>
-              Your ticket has been sent! Our support team will reach out to you
-              shortly.
-            </Alert>
-          ) : (
-            <Stack spacing={2.5} sx={{ mt: 1 }}>
-              <TextField
-                label="Subject"
-                placeholder="e.g. Question about payout request"
-                fullWidth
-              />
-              <TextField
-                label="Message / Issue Description"
-                multiline
-                rows={4}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                fullWidth
-              />
-            </Stack>
-          )}
+          <Alert severity="info" sx={{ mb: 2 }}>
+            This opens your default email application and addresses the message
+            to {supportEmail}.
+          </Alert>
+          <Stack spacing={2.5} sx={{ mt: 1 }}>
+            <TextField
+              label="Subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="e.g. Question about payout request"
+              fullWidth
+            />
+            <TextField
+              label="Message / Issue Description"
+              multiline
+              rows={4}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              fullWidth
+            />
+          </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2.5 }}>
           <Button onClick={() => setIsSupportOpen(false)}>Cancel</Button>
-          {!supportSubmitted && (
-            <Button
-              variant="contained"
-              startIcon={<Send size={16} />}
-              onClick={handleSupportSubmit}
-              disabled={!message.trim()}
-              sx={{ fontWeight: 700 }}
-            >
-              Submit Ticket
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            startIcon={<Send size={16} />}
+            onClick={handleSupportSubmit}
+            disabled={!message.trim()}
+            sx={{ fontWeight: 700 }}
+          >
+            Open Email Client
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -38,8 +38,9 @@ export class PaymentGatewayFactory {
     const provider = this.providersMap.get(type);
 
     if (!provider) {
-      // Fallback to Google Play provider for unknown / MOCK or general testing
-      return this.googlePlayProvider;
+      throw new BadRequestException(
+        `Unsupported or unavailable payment provider: ${String(providerType)}`,
+      );
     }
 
     return provider;

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
@@ -12,58 +12,58 @@ import {
   InputAdornment,
   MenuItem,
   Pagination,
+  Alert,
 } from '@mui/material';
-import {
-  UserCheck,
-  Search,
-  MessageSquare,
-  UserPlus,
-  Users,
-} from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { UserCheck, Search, UserPlus, Users } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { creatorApi } from '../services/creator-api.service';
-import { useCreatorProfileStore } from '../store/creator-profile.store';
 import { PageErrorState } from '../components/common/PageErrorState';
 import { EmptyState } from '../components/common/EmptyState';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 
 export const FollowersPage: React.FC = () => {
-  const profile = useCreatorProfileStore((state) => state.profile);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest');
   const [page, setPage] = useState(1);
+  const [actionError, setActionError] = useState<string | null>(null);
   const itemsPerPage = 8;
 
   const followersQuery = useQuery({
-    queryKey: ['creator', 'followers'],
-    queryFn: ({ signal }) => creatorApi.getFollowers(signal),
-    staleTime: 60 * 1000,
+    queryKey: ['creator', 'followers', page, search.trim(), sort],
+    queryFn: ({ signal }) =>
+      creatorApi.getFollowersPage(
+        {
+          page,
+          limit: itemsPerPage,
+          search: search.trim() || undefined,
+          sortOrder: sort === 'oldest' ? 'ASC' : 'DESC',
+        },
+        signal,
+      ),
+    staleTime: 30 * 1000,
     retry: 1,
   });
 
-  const followersList = followersQuery.data || [];
-
-  const filteredFollowers = useMemo(() => {
-    let result = [...followersList];
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (f) =>
-          f.name?.toLowerCase().includes(q) ||
-          f.handle?.toLowerCase().includes(q),
-      );
-    }
-    if (sort === 'oldest') {
-      result.reverse();
-    }
-    return result;
-  }, [followersList, search, sort]);
-
-  const totalPages = Math.ceil(filteredFollowers.length / itemsPerPage) || 1;
-  const paginatedFollowers = filteredFollowers.slice(
-    (page - 1) * itemsPerPage,
-    page * itemsPerPage,
-  );
+  const followMutation = useMutation({
+    mutationFn: async (item: { userId: string; isFollowingBack: boolean }) => {
+      if (item.isFollowingBack) {
+        return creatorApi.unfollowUser(item.userId);
+      }
+      return creatorApi.followUser(item.userId);
+    },
+    onSuccess: async () => {
+      setActionError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['creator', 'followers'] }),
+        queryClient.invalidateQueries({ queryKey: ['creator', 'audience'] }),
+        queryClient.invalidateQueries({ queryKey: ['creator', 'profile'] }),
+      ]);
+    },
+    onError: (error: Error) => {
+      setActionError(error?.message || 'The follow action could not be completed.');
+    },
+  });
 
   if (followersQuery.isLoading) {
     return (
@@ -88,9 +88,12 @@ export const FollowersPage: React.FC = () => {
     );
   }
 
+  const followers = followersQuery.data?.data || [];
+  const total = Number(followersQuery.data?.total || 0);
+  const totalPages = Math.max(1, Number(followersQuery.data?.totalPages || 0));
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Header & Controls */}
       <Box
         sx={{
           display: 'flex',
@@ -105,20 +108,12 @@ export const FollowersPage: React.FC = () => {
             Follower Insights & Directory
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Total Followers:{' '}
-            <strong>{(profile.followersCount ?? 0).toLocaleString()}</strong> |
-            Engage with listeners and supporters.
+            Total Followers: <strong>{total.toLocaleString()}</strong> | Search,
+            sort and manage follow-back relationships.
           </Typography>
         </Box>
 
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            flexWrap: 'wrap',
-          }}
-        >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
           <TextField
             placeholder="Search followers..."
             size="small"
@@ -142,7 +137,10 @@ export const FollowersPage: React.FC = () => {
             select
             size="small"
             value={sort}
-            onChange={(e) => setSort(e.target.value as any)}
+            onChange={(e) => {
+              setSort(e.target.value as 'newest' | 'oldest');
+              setPage(1);
+            }}
             sx={{ width: 140 }}
           >
             <MenuItem value="newest">Newest First</MenuItem>
@@ -151,8 +149,9 @@ export const FollowersPage: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Followers Grid */}
-      {filteredFollowers.length === 0 ? (
+      {actionError && <Alert severity="error">{actionError}</Alert>}
+
+      {followers.length === 0 ? (
         <EmptyState
           icon={<Users size={48} />}
           title="No Followers Found"
@@ -162,21 +161,17 @@ export const FollowersPage: React.FC = () => {
               : 'You do not have any followers yet.'
           }
           actionLabel={search ? 'Clear Search' : undefined}
-          onAction={() => setSearch('')}
+          onAction={() => {
+            setSearch('');
+            setPage(1);
+          }}
         />
       ) : (
         <>
           <Grid container spacing={2.5}>
-            {paginatedFollowers.map((item, idx) => (
-              <Grid key={item.id || idx} size={{ xs: 12, sm: 6, md: 3 }}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                  }}
-                >
+            {followers.map((item) => (
+              <Grid key={item.userId} size={{ xs: 12, sm: 6, md: 3 }}>
+                <Card sx={{ height: '100%' }}>
                   <CardContent sx={{ p: 2.5, textAlign: 'center' }}>
                     <Avatar
                       src={item.avatarUrl}
@@ -195,34 +190,17 @@ export const FollowersPage: React.FC = () => {
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                       {item.name}
                     </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', mb: 1 }}
-                    >
-                      {item.handle}
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                      {item.handle || 'No public username'}
                     </Typography>
 
                     <Chip
                       label={item.badge || 'Listener'}
-                      color={
-                        item.badge?.includes('VIP') ? 'secondary' : 'primary'
-                      }
+                      color={item.verified ? 'primary' : 'default'}
                       size="small"
                       variant="outlined"
-                      sx={{ mb: 1.5 }}
+                      sx={{ mb: 2 }}
                     />
-
-                    <Typography
-                      variant="caption"
-                      color="text.disabled"
-                      sx={{ display: 'block', mb: 2 }}
-                    >
-                      Followed{' '}
-                      {new Date(
-                        item.followedAt || Date.now(),
-                      ).toLocaleDateString()}
-                    </Typography>
 
                     <Button
                       variant={item.isFollowingBack ? 'outlined' : 'contained'}
@@ -230,15 +208,19 @@ export const FollowersPage: React.FC = () => {
                       size="small"
                       fullWidth
                       startIcon={
-                        item.isFollowingBack ? (
-                          <UserCheck size={16} />
-                        ) : (
-                          <UserPlus size={16} />
-                        )
+                        item.isFollowingBack ? <UserCheck size={16} /> : <UserPlus size={16} />
                       }
+                      onClick={() => {
+                        setActionError(null);
+                        followMutation.mutate({
+                          userId: item.userId,
+                          isFollowingBack: item.isFollowingBack,
+                        });
+                      }}
+                      disabled={followMutation.isPending}
                       sx={{ fontWeight: 700 }}
                     >
-                      {item.isFollowingBack ? 'Following' : 'Follow Back'}
+                      {item.isFollowingBack ? 'Unfollow' : 'Follow Back'}
                     </Button>
                   </CardContent>
                 </Card>
@@ -250,7 +232,7 @@ export const FollowersPage: React.FC = () => {
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
               <Pagination
                 count={totalPages}
-                page={page}
+                page={Math.min(page, totalPages)}
                 onChange={(_, p) => setPage(p)}
                 color="primary"
               />

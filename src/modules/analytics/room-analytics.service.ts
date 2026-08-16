@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, MoreThanOrEqual } from 'typeorm';
 import { Room } from '../rooms/entities/room.entity';
 import { RedisService } from '../../redis/redis.service';
 import {
@@ -16,43 +16,39 @@ export class RoomAnalyticsService {
     private readonly redisService: RedisService,
   ) {}
 
-  async getRealtimeRoomAnalytics(roomId: string, query: RoomAnalyticsQueryDto) {
+  private async requireRoom(roomId: string): Promise<Room> {
     const room = await this.roomRepository.findOne({ where: { id: roomId } });
-    if (!room) {
-      throw new NotFoundException(`Room with ID ${roomId} not found`);
-    }
+    if (!room) throw new NotFoundException(`Room with ID ${roomId} not found`);
+    return room;
+  }
 
-    // Fetch realtime state metrics from Redis
-    const peakViewersRaw = await this.redisService.get(
-      `room:${roomId}:peak_viewers`,
-    );
-    const totalAudioSecondsRaw = await this.redisService.get(
-      `room:${roomId}:audio_duration`,
-    );
-    const giftsTotalCoinsRaw = await this.redisService.get(
-      `room:${roomId}:total_gifts_coins`,
-    );
-    const chatCountRaw = await this.redisService.get(
-      `room:${roomId}:chat_count`,
-    );
+  private async redisNumber(key: string): Promise<number | null> {
+    const raw = await this.redisService.get(key);
+    if (raw === null || raw === undefined || raw === '') return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private calculateRoomDurationSeconds(room: Room): number {
+    if (!room.startedAt) return 0;
+    const end = room.endedAt ? new Date(room.endedAt) : room.isLive ? new Date() : null;
+    if (!end) return 0;
+    return Math.max(0, Math.floor((end.getTime() - new Date(room.startedAt).getTime()) / 1000));
+  }
+
+  async getRealtimeRoomAnalytics(roomId: string, query: RoomAnalyticsQueryDto) {
+    const room = await this.requireRoom(roomId);
+    const peakViewers = await this.redisNumber(`room:${roomId}:peak_viewers`);
+    const totalAudioSeconds = await this.redisNumber(`room:${roomId}:audio_duration`);
+    const giftsTotalCoins = await this.redisNumber(`room:${roomId}:total_gifts_coins`);
+    const chatCount = await this.redisNumber(`room:${roomId}:chat_count`);
 
     const currentListeners = room.listenerCount || 0;
-    const peakListeners = peakViewersRaw
-      ? parseInt(peakViewersRaw, 10)
-      : Math.max(currentListeners, 1);
-    const audioDurationSeconds = totalAudioSecondsRaw
-      ? parseInt(totalAudioSecondsRaw, 10)
-      : 3600;
-    const giftsTotalCoins = giftsTotalCoinsRaw
-      ? parseFloat(giftsTotalCoinsRaw)
-      : Number(room.giftActivity || 0);
-    const totalChatMessages = chatCountRaw ? parseInt(chatCountRaw, 10) : 42;
-
-    // Engagement score calculation formula (0 - 100)
-    // Formula: min(100, (currentListeners * 2) + (giftsTotalCoins / 10) + (totalChatMessages * 1.5))
-    const rawScore =
-      currentListeners * 2 + giftsTotalCoins / 10 + totalChatMessages * 1.5;
-    const engagementScore = Math.min(100, Math.round(rawScore));
+    const peakListeners = Math.max(currentListeners, peakViewers ?? currentListeners);
+    const audioDurationSeconds = totalAudioSeconds ?? this.calculateRoomDurationSeconds(room);
+    const giftsCoins = giftsTotalCoins ?? Number(room.giftActivity || 0);
+    const totalChatMessages = chatCount ?? 0;
+    const rawScore = currentListeners * 2 + giftsCoins / 10 + totalChatMessages * 1.5;
 
     return {
       roomId,
@@ -63,192 +59,121 @@ export class RoomAnalyticsService {
       metrics: {
         currentListeners,
         peakListeners,
-        speakerCount: room.speakerCount || 1,
+        speakerCount: room.speakerCount || 0,
         audioDurationSeconds,
         audioDurationFormatted: `${Math.floor(audioDurationSeconds / 3600)}h ${Math.floor((audioDurationSeconds % 3600) / 60)}m`,
         totalChatMessages,
-        giftsTotalCoins,
-        popularityScore: room.popularityScore || 100,
-        engagementScore,
+        giftsTotalCoins: giftsCoins,
+        popularityScore: room.popularityScore || 0,
+        engagementScore: Math.min(100, Math.round(rawScore)),
       },
-      listenerRetentionCurve: [
-        { minute: 0, count: Math.round(peakListeners * 0.4) },
-        { minute: 15, count: Math.round(peakListeners * 0.7) },
-        { minute: 30, count: peakListeners },
-        { minute: 45, count: currentListeners },
-      ],
+      // A retention curve must come from captured join/leave samples. Returning an
+      // empty series is intentional when no authoritative samples have been persisted.
+      listenerRetentionCurve: [],
+      dataCompleteness: {
+        retentionCurve: false,
+        peakListeners: peakViewers !== null,
+        chatMessages: chatCount !== null,
+        audioDuration: totalAudioSeconds !== null || !!room.startedAt,
+        gifts: giftsTotalCoins !== null || Number(room.giftActivity || 0) > 0,
+      },
       timestamp: new Date().toISOString(),
     };
   }
 
   async getSessionSummaryReport(roomId: string) {
-    const room = await this.roomRepository.findOne({ where: { id: roomId } });
-    if (!room) {
-      throw new NotFoundException(`Room with ID ${roomId} not found`);
-    }
-
+    const room = await this.requireRoom(roomId);
+    const peak = await this.redisNumber(`room:${roomId}:peak_viewers`);
     return {
       roomId,
       title: room.title,
       hostId: room.hostId,
       createdAt: room.createdAt,
       summary: {
-        totalUniqueVisitors: Math.max(room.listenerCount * 3, 25),
-        peakConcurrentViewers: Math.max(room.listenerCount, 10),
+        totalUniqueVisitors: room.listenerCount || 0,
+        peakConcurrentViewers: Math.max(room.listenerCount || 0, peak ?? 0),
         totalGiftsEarnedCoins: Number(room.giftActivity || 0),
-        topGiftItem: 'Superstar Rocket',
-        avgListenTimeMinutes: 24.5,
-        newFollowsGenerated: 8,
+        topGiftItem: null,
+        avgListenTimeMinutes: null,
+        newFollowsGenerated: null,
+      },
+      dataCompleteness: {
+        uniqueVisitors: false,
+        topGiftItem: false,
+        averageListenTime: false,
+        newFollows: false,
       },
     };
   }
 
   async getAudienceGrowth(roomId: string) {
-    const room = await this.roomRepository.findOne({ where: { id: roomId } });
-    if (!room) {
-      throw new NotFoundException(`Room ${roomId} not found`);
-    }
-
-    const baseCount = room.listenerCount || 5;
-    const timePoints = [0, 10, 20, 30, 40, 50, 60];
-
+    const room = await this.requireRoom(roomId);
     return {
       roomId,
       title: room.title,
-      growthTimeline: timePoints.map((minute) => ({
-        minute,
-        listenerCount: Math.round(baseCount * (0.3 + (minute / 60) * 0.7)),
-        newJoiners: Math.round(Math.random() * 8 + 2),
-        dropoffs: Math.round(Math.random() * 3 + 1),
-      })),
+      growthTimeline: [],
+      dataAvailable: false,
+      reason: 'Authoritative audience join/leave time-series samples have not been persisted for this room',
     };
   }
 
   async getListenerRetention(roomId: string) {
-    const room = await this.roomRepository.findOne({ where: { id: roomId } });
-    if (!room) {
-      throw new NotFoundException(`Room ${roomId} not found`);
-    }
-
-    const peak = Math.max(room.listenerCount || 10, 15);
-
+    const room = await this.requireRoom(roomId);
     return {
       roomId,
       title: room.title,
-      peakListeners: peak,
-      retentionData: [
-        { percentageTime: '0%', retentionPercentage: 100, count: peak },
-        {
-          percentageTime: '25%',
-          retentionPercentage: 88,
-          count: Math.round(peak * 0.88),
-        },
-        {
-          percentageTime: '50%',
-          retentionPercentage: 76,
-          count: Math.round(peak * 0.76),
-        },
-        {
-          percentageTime: '75%',
-          retentionPercentage: 68,
-          count: Math.round(peak * 0.68),
-        },
-        {
-          percentageTime: '100%',
-          retentionPercentage: 60,
-          count: Math.round(peak * 0.6),
-        },
-      ],
+      peakListeners: room.listenerCount || 0,
+      retentionData: [],
+      dataAvailable: false,
+      reason: 'Authoritative listener retention samples have not been persisted for this room',
     };
   }
 
   async getSpeakerActivity(roomId: string) {
-    const room = await this.roomRepository.findOne({ where: { id: roomId } });
-    if (!room) {
-      throw new NotFoundException(`Room ${roomId} not found`);
-    }
-
+    const room = await this.requireRoom(roomId);
     return {
       roomId,
       hostId: room.hostId,
-      speakerCount: room.speakerCount || 1,
-      speakers: [
-        {
-          userId: room.hostId,
-          role: 'host',
-          talkTimeSeconds: 1420,
-          talkPercentage: 65,
-          raiseHandCount: 0,
-          mutedCount: 1,
-        },
-        {
-          userId: 'co-host-uuid-1',
-          role: 'speaker',
-          talkTimeSeconds: 760,
-          talkPercentage: 35,
-          raiseHandCount: 2,
-          mutedCount: 3,
-        },
-      ],
+      speakerCount: room.speakerCount || 0,
+      speakers: [],
+      dataAvailable: false,
+      reason: 'Detailed speaker talk-time analytics are available only when RTC speaker-history aggregation has been persisted',
     };
   }
 
   async getGiftingHeatmap(roomId: string) {
-    const room = await this.roomRepository.findOne({ where: { id: roomId } });
-    if (!room) {
-      throw new NotFoundException(`Room ${roomId} not found`);
-    }
-
+    const room = await this.requireRoom(roomId);
     return {
       roomId,
       totalGiftsCoins: Number(room.giftActivity || 0),
-      hourlyHeatmap: Array.from({ length: 24 }).map((_, hour) => ({
-        hour,
-        giftCount:
-          hour >= 18 && hour <= 23
-            ? Math.round(Math.random() * 40 + 10)
-            : Math.round(Math.random() * 10),
-        coinsValue:
-          hour >= 18 && hour <= 23
-            ? Math.round(Math.random() * 2000 + 500)
-            : Math.round(Math.random() * 200),
-      })),
+      hourlyHeatmap: [],
+      dataAvailable: false,
+      reason: 'Hourly gift-event aggregation has not been persisted for this room',
     };
   }
 
   async getHourlyEngagement(roomId: string) {
-    const room = await this.roomRepository.findOne({ where: { id: roomId } });
-    if (!room) {
-      throw new NotFoundException(`Room ${roomId} not found`);
-    }
-
+    await this.requireRoom(roomId);
     return {
       roomId,
-      hourlyMetrics: Array.from({ length: 24 }).map((_, hour) => ({
-        hour,
-        chatMessages: Math.round(Math.random() * 120 + 10),
-        pollVotes: Math.round(Math.random() * 35),
-        quizAnswers: Math.round(Math.random() * 25),
-        reactions: Math.round(Math.random() * 200 + 30),
-      })),
+      hourlyMetrics: [],
+      dataAvailable: false,
+      reason: 'Hourly engagement-event aggregation has not been persisted for this room',
     };
   }
 
   async compareSessions(roomIds: string[]) {
     const rooms = await this.roomRepository.findBy({ id: In(roomIds) });
-    if (!rooms.length) {
-      throw new NotFoundException('No matching rooms found for comparison');
-    }
-
+    if (!rooms.length) throw new NotFoundException('No matching rooms found for comparison');
     return {
       totalSessionsCompared: rooms.length,
       comparison: rooms.map((r) => ({
         roomId: r.id,
         title: r.title,
         category: r.category,
-        peakListeners: r.listenerCount || 10,
+        peakListeners: r.listenerCount || 0,
         giftActivityCoins: Number(r.giftActivity || 0),
-        popularityScore: r.popularityScore || 100,
+        popularityScore: r.popularityScore || 0,
         createdAt: r.createdAt,
       })),
     };
@@ -258,31 +183,72 @@ export class RoomAnalyticsService {
     period: '24h' | '7d' | '30d' | '1y' = '30d',
     userId?: string,
   ) {
-    const days =
-      period === '24h' ? 1 : period === '7d' ? 7 : period === '1y' ? 365 : 30;
+    if (!userId) {
+      return this.emptyCreatorOverview(period, 'Creator identity is unavailable');
+    }
 
-    const dailyMetrics = Array.from({ length: Math.min(days, 30) }).map(
-      (_, idx) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (Math.min(days, 30) - 1 - idx));
-        const dateStr = d.toISOString().split('T')[0];
-        return {
-          date: dateStr,
-          listeners: Math.floor(120 + Math.random() * 350),
-          earnings: Math.floor(150 + Math.random() * 500),
-          newFollowers: Math.floor(10 + Math.random() * 45),
-        };
-      },
+    const days = period === '24h' ? 1 : period === '7d' ? 7 : period === '1y' ? 365 : 30;
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const rooms = await this.roomRepository.find({
+      where: { hostId: userId, createdAt: MoreThanOrEqual(since) },
+      order: { createdAt: 'ASC' },
+    });
+
+    const totalListenHours = rooms.reduce(
+      (sum, room) => sum + this.calculateRoomDurationSeconds(room) / 3600,
+      0,
+    );
+    const peakConcurrentListeners = rooms.reduce(
+      (max, room) => Math.max(max, room.listenerCount || 0),
+      0,
+    );
+    const totalGiftsReceived = rooms.reduce(
+      (sum, room) => sum + Number(room.giftActivity || 0),
+      0,
     );
 
+    // Revenue, follower acquisition, and listener-retention values are not
+    // derivable from Room rows alone. Do not manufacture them. The empty daily
+    // series causes Creator Studio to show its no-data state instead of charts
+    // filled with synthetic numbers.
     return {
       period,
-      totalListenHours: 428.5,
-      peakConcurrentListeners: 1240,
-      totalGiftsReceived: 8430,
-      netRevenueUsd: 1850.25,
-      listenerRetentionRate: 78.4,
-      dailyMetrics,
+      totalListenHours: Number(totalListenHours.toFixed(2)),
+      peakConcurrentListeners,
+      totalGiftsReceived,
+      netRevenueUsd: 0,
+      listenerRetentionRate: 0,
+      dailyMetrics: [],
+      dataCompleteness: {
+        roomDuration: true,
+        peakListeners: true,
+        gifts: true,
+        revenue: false,
+        followerAcquisition: false,
+        listenerRetention: false,
+      },
+    };
+  }
+
+  private emptyCreatorOverview(period: '24h' | '7d' | '30d' | '1y', reason: string) {
+    return {
+      period,
+      totalListenHours: 0,
+      peakConcurrentListeners: 0,
+      totalGiftsReceived: 0,
+      netRevenueUsd: 0,
+      listenerRetentionRate: 0,
+      dailyMetrics: [],
+      dataCompleteness: {
+        roomDuration: false,
+        peakListeners: false,
+        gifts: false,
+        revenue: false,
+        followerAcquisition: false,
+        listenerRetention: false,
+      },
+      reason,
     };
   }
 }

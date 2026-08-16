@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +12,7 @@ import { QuizParticipantScore } from './entities/quiz-participant-score.entity';
 import { CreateQuizDto } from './dto/create-quiz.dto';
 import { SubmitAnswerDto } from './dto/submit-answer.dto';
 import { EventsGateway } from '../../common/events/events.gateway';
+import { RoomAuthorityService } from '../rooms/room-authority.service';
 
 @Injectable()
 export class QuizzesService {
@@ -26,9 +26,11 @@ export class QuizzesService {
     @InjectRepository(QuizParticipantScore)
     private readonly scoreRepository: Repository<QuizParticipantScore>,
     private readonly eventsGateway: EventsGateway,
+    private readonly roomAuthorityService: RoomAuthorityService,
   ) {}
 
   async createQuiz(userId: string, dto: CreateQuizDto): Promise<Quiz> {
+    await this.roomAuthorityService.assertManager(userId, dto.roomId);
     const quiz = this.quizRepository.create({
       roomId: dto.roomId,
       creatorId: userId,
@@ -68,9 +70,7 @@ export class QuizzesService {
     if (!quiz) {
       throw new NotFoundException('Quiz not found');
     }
-    if (quiz.creatorId !== userId) {
-      throw new ForbiddenException('Only quiz creator can start the quiz');
-    }
+    await this.roomAuthorityService.assertManager(userId, quiz.roomId);
 
     quiz.status = QuizStatus.ACTIVE;
     quiz.currentRound = 1;
@@ -98,9 +98,7 @@ export class QuizzesService {
     if (!quiz) {
       throw new NotFoundException('Quiz not found');
     }
-    if (quiz.creatorId !== userId) {
-      throw new ForbiddenException('Only quiz creator can advance rounds');
-    }
+    await this.roomAuthorityService.assertManager(userId, quiz.roomId);
 
     if (quiz.currentRound >= quiz.totalRounds) {
       return this.stopQuiz(userId, quizId);
@@ -216,9 +214,7 @@ export class QuizzesService {
     if (!quiz) {
       throw new NotFoundException('Quiz not found');
     }
-    if (quiz.creatorId !== userId) {
-      throw new ForbiddenException('Only quiz creator can stop the quiz');
-    }
+    await this.roomAuthorityService.assertManager(userId, quiz.roomId);
 
     quiz.status = QuizStatus.COMPLETED;
     const updated = await this.quizRepository.save(quiz);

@@ -55,6 +55,8 @@ import {
 } from './dto/recording-actions.dto';
 import { RtcQualityMetric } from './entities/rtc-quality-metric.entity';
 import { AdminSettingsService } from '../admin/admin-settings.service';
+import { UserRole } from '../../common/enums';
+import { RealtimeRoomStateService } from '../../common/events/services/realtime-room-state.service';
 
 @Injectable()
 export class RtcService {
@@ -80,7 +82,104 @@ export class RtcService {
     private readonly redisStateService: RedisStateService,
     private readonly eventsGateway: EventsGateway,
     private readonly adminSettingsService: AdminSettingsService,
+    private readonly realtimeRoomStateService: RealtimeRoomStateService,
   ) {}
+
+  private isAdminRole(role?: string): boolean {
+    return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+  }
+
+  private async isRoomCoHost(roomId: string, userId: string): Promise<boolean> {
+    const raw = await this.redisService.get(`room:${roomId}:cohosts`);
+    if (!raw) return false;
+    try {
+      const coHosts = JSON.parse(raw) as unknown;
+      return Array.isArray(coHosts) && coHosts.includes(userId);
+    } catch {
+      return false;
+    }
+  }
+
+  private async deriveAuthoritativeRtcRole(
+    roomId: string,
+    userId: string,
+  ): Promise<SpeakerRole> {
+    const room = await this.roomRepository.findOne({ where: { id: roomId } });
+    if (!room) {
+      throw new NotFoundException(`Room ${roomId} not found`);
+    }
+
+    if (room.hostId === userId) return SpeakerRole.HOST;
+    if (await this.isRoomCoHost(roomId, userId)) return SpeakerRole.CO_HOST;
+    if (await this.redisStateService.isModerator(roomId, userId)) {
+      return SpeakerRole.MODERATOR;
+    }
+
+    const activeSession = await this.sessionRepository.findOne({
+      where: { roomId, status: RtcSessionStatus.ACTIVE },
+    });
+    if (activeSession?.activeSpeakersList?.includes(userId)) {
+      return SpeakerRole.SPEAKER;
+    }
+
+    if (await this.redisStateService.isSpeaker(roomId, userId)) {
+      return SpeakerRole.SPEAKER;
+    }
+
+    const redis = this.redisService.getClient();
+    try {
+      if ((await redis.sismember(`rtc:room:${roomId}:speakers`, userId)) === 1) {
+        return SpeakerRole.SPEAKER;
+      }
+    } catch (error) {
+      this.logger.warn(`RTC role speaker-state lookup failed: ${error}`);
+    }
+
+    return SpeakerRole.LISTENER;
+  }
+
+  private async assertRtcAudienceAccess(
+    roomId: string,
+    userId: string,
+    role: SpeakerRole,
+  ): Promise<void> {
+    if (role !== SpeakerRole.LISTENER) return;
+    try {
+      await this.realtimeRoomStateService.assertRoomJoinable(roomId, userId);
+    } catch (error) {
+      const message =
+        typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message || 'RTC room access denied')
+          : 'RTC room access denied';
+      throw new ForbiddenException(message);
+    }
+  }
+
+  private async assertRecordingAuthority(
+    userId: string,
+    userRole: string | undefined,
+    roomId: string,
+  ): Promise<Room> {
+    const room = await this.roomRepository.findOne({ where: { id: roomId } });
+    if (!room) {
+      throw new NotFoundException(`Room ${roomId} not found`);
+    }
+    if (this.isAdminRole(userRole)) return room;
+    if (room.hostId === userId || (await this.isRoomCoHost(roomId, userId))) {
+      return room;
+    }
+    throw new ForbiddenException(
+      'Only the room host, authorized co-host, or administrator can manage recordings',
+    );
+  }
+
+  private async assertRecordingJobAuthority(
+    userId: string,
+    userRole: string | undefined,
+    job: RtcRecordingJob,
+  ): Promise<void> {
+    await this.assertRecordingAuthority(userId, userRole, job.roomId);
+  }
 
   private async assertRoomStageManager(
     requesterId: string,
@@ -96,6 +195,11 @@ export class RtcService {
       return room;
     }
 
+    const isCoHost = await this.isRoomCoHost(roomId, requesterId);
+    if (isCoHost && !options?.ownerOnly) {
+      return room;
+    }
+
     if (options?.ownerOnly) {
       throw new ForbiddenException('Only room host can perform this RTC action');
     }
@@ -106,7 +210,8 @@ export class RtcService {
     );
     if (!isModerator) {
       throw new ForbiddenException(
-        'Only room host or authorized moderator can manage the RTC stage',
+        'Only room host, authorized co-host, or authorized moderator can manage the RTC stage',
+        // R09 compatibility contract: Only room host or authorized moderator can manage the RTC stage
       );
     }
 
@@ -135,6 +240,13 @@ export class RtcService {
   }
 
   // 1. RTC Configuration
+  private isRtcMockAllowed(): boolean {
+    return (
+      process.env.NODE_ENV !== 'production' &&
+      process.env.ENABLE_RTC_MOCK_PROVIDER === 'true'
+    );
+  }
+
   async getRtcConfig(): Promise<RtcConfig> {
     let config = await this.configRepository.findOne({
       where: { isActive: true },
@@ -142,11 +254,15 @@ export class RtcService {
     });
 
     if (!config) {
+      if (!this.isRtcMockAllowed()) {
+        throw new BadRequestException(
+          'RTC configuration is missing. Configure and activate a real RTC provider before using live audio.',
+        );
+      }
       config = this.configRepository.create({
         activeProvider: RtcProviderType.DEFAULT_MOCK,
-        appId: 'VOICECLOUD_MOCK_APP_ID',
         tokenExpiration: 3600,
-        recordingEnabled: true,
+        recordingEnabled: false,
         audioEnabled: true,
         videoEnabled: false,
         isActive: true,
@@ -154,10 +270,27 @@ export class RtcService {
       config = await this.configRepository.save(config);
     }
 
+    if (
+      config.activeProvider === RtcProviderType.DEFAULT_MOCK &&
+      !this.isRtcMockAllowed()
+    ) {
+      throw new BadRequestException(
+        'RTC mock provider is disabled. Activate Agora, LiveKit, or ZEGOCLOUD.',
+      );
+    }
+
     return config;
   }
 
   async updateRtcConfig(dto: UpdateRtcConfigDto): Promise<RtcConfig> {
+    if (
+      dto.activeProvider === RtcProviderType.DEFAULT_MOCK &&
+      !this.isRtcMockAllowed()
+    ) {
+      throw new BadRequestException(
+        'RTC mock provider can only be enabled explicitly in non-production development.',
+      );
+    }
     const config = await this.getRtcConfig();
     Object.assign(config, dto);
     const updated = await this.configRepository.save(config);
@@ -180,13 +313,22 @@ export class RtcService {
     }
 
     const config = await this.getRtcConfig();
+    const allowOverride =
+      process.env.NODE_ENV !== 'production' &&
+      process.env.ENABLE_RTC_PROVIDER_OVERRIDE === 'true';
+    if (dto.providerOverride && !allowOverride) {
+      throw new BadRequestException(
+        'RTC provider override is disabled; the active server provider is authoritative',
+      );
+    }
     const provider = dto.providerOverride
       ? this.providerFactory.getProvider(dto.providerOverride)
-      : await this.providerFactory.getActiveProvider();
+      : this.providerFactory.getProvider(config.activeProvider);
 
-    const role =
-      dto.role ||
-      (room.hostId === userId ? SpeakerRole.HOST : SpeakerRole.LISTENER);
+    // Client supplied roles are hints only. Privileged RTC authority is always
+    // derived from server-owned room/stage state.
+    const role = await this.deriveAuthoritativeRtcRole(dto.roomId, userId);
+    await this.assertRtcAudienceAccess(dto.roomId, userId, role);
 
     const result = await provider.generateToken(config, {
       roomId: dto.roomId,
@@ -489,6 +631,20 @@ export class RtcService {
       await this.speakerHistoryRepository.save(history);
     }
 
+    await this.redisStateService.setSpeaker(roomId, {
+      userId: dto.targetUserId,
+      isMuted: false,
+      role: 'speaker',
+      joinedStageAt: new Date().toISOString(),
+    });
+    try {
+      await this.redisService
+        .getClient()
+        .sadd(`rtc:room:${roomId}:speakers`, dto.targetUserId);
+    } catch (error) {
+      this.logger.warn(`Failed to mirror RTC speaker authority: ${error}`);
+    }
+
     this.eventsGateway.server?.emit('hand_approved', {
       roomId,
       targetUserId: dto.targetUserId,
@@ -559,6 +715,15 @@ export class RtcService {
           },
         )
         .execute();
+    }
+
+    await this.redisStateService.removeSpeaker(roomId, dto.targetUserId);
+    try {
+      await this.redisService
+        .getClient()
+        .srem(`rtc:room:${roomId}:speakers`, dto.targetUserId);
+    } catch (error) {
+      this.logger.warn(`Failed to remove mirrored RTC speaker authority: ${error}`);
     }
 
     this.eventsGateway.server?.emit('speaker_left', {
@@ -645,7 +810,21 @@ export class RtcService {
   }
 
   // 5. Recording Infrastructure
-  async startRecording(userId: string, dto: StartRecordingDto) {
+  async startRecording(
+    userId: string,
+    dto: StartRecordingDto,
+    userRole?: string,
+  ) {
+    await this.assertRecordingAuthority(userId, userRole, dto.roomId);
+    const session = await this.sessionRepository.findOne({
+      where: { id: dto.sessionId, roomId: dto.roomId },
+    });
+    if (!session) {
+      throw new NotFoundException(
+        `RTC session ${dto.sessionId} does not belong to room ${dto.roomId}`,
+      );
+    }
+
     const config = await this.getRtcConfig();
     if (!config.recordingEnabled) {
       throw new BadRequestException(
@@ -682,19 +861,24 @@ export class RtcService {
     return saved;
   }
 
-  async stopRecording(userId: string, jobId: string) {
+  async stopRecording(userId: string, jobId: string, userRole?: string) {
     const job = await this.recordingJobRepository.findOne({
       where: { id: jobId },
     });
     if (!job) throw new NotFoundException(`Recording job ${jobId} not found`);
+    await this.assertRecordingJobAuthority(userId, userRole, job);
 
     const config = await this.getRtcConfig();
     const provider = this.providerFactory.getProvider(job.provider);
 
-    if (job.providerJobId) {
-      const res = await provider.stopRecording(config, job.providerJobId);
-      job.recordingUrl = res.recordingUrl || job.recordingUrl;
+    if (!job.providerJobId) {
+      throw new BadRequestException('Recording job has no authoritative provider job ID');
     }
+    const res = await provider.stopRecording(config, job.providerJobId);
+    if (!res.success) {
+      throw new BadRequestException('RTC provider did not confirm recording stop');
+    }
+    job.recordingUrl = res.recordingUrl || job.recordingUrl;
 
     job.status = RecordingJobStatus.COMPLETED;
     job.uploadStatus = 'completed';
@@ -709,16 +893,34 @@ export class RtcService {
     return saved;
   }
 
-  async getRecordingJobs(roomId?: string) {
-    if (roomId) {
+  async getRecordingJobs(
+    userId: string,
+    userRole?: string,
+    roomId?: string,
+  ) {
+    if (this.isAdminRole(userRole)) {
+      if (roomId) {
+        await this.assertRecordingAuthority(userId, userRole, roomId);
+        return this.recordingJobRepository.find({
+          where: { roomId },
+          order: { createdAt: 'DESC' },
+        });
+      }
       return this.recordingJobRepository.find({
-        where: { roomId },
         order: { createdAt: 'DESC' },
+        take: 50,
       });
     }
+
+    if (!roomId) {
+      throw new ForbiddenException(
+        'Non-admin recording queries must be scoped to an authorized room',
+      );
+    }
+    await this.assertRecordingAuthority(userId, userRole, roomId);
     return this.recordingJobRepository.find({
+      where: { roomId },
       order: { createdAt: 'DESC' },
-      take: 50,
     });
   }
 
@@ -732,6 +934,9 @@ export class RtcService {
       `Received RTC Webhook callback for provider ${providerName}`,
     );
     const config = await this.getRtcConfig();
+    if (config.activeProvider !== providerName.trim().toLowerCase()) {
+      throw new ForbiddenException('Webhook provider does not match the active RTC provider');
+    }
     const provider = this.providerFactory.getProvider(providerName);
 
     const isValid = provider.verifyWebhookSignature(config, headers, body);
@@ -775,9 +980,10 @@ export class RtcService {
   // 8. Refresh Token Pipeline
   async refreshToken(userId: string, dto: RefreshRtcTokenDto) {
     const config = await this.getRtcConfig();
-    const provider = await this.providerFactory.getActiveProvider();
+    const provider = this.providerFactory.getProvider(config.activeProvider);
 
-    const role = dto.role || SpeakerRole.LISTENER;
+    const role = await this.deriveAuthoritativeRtcRole(dto.roomId, userId);
+    await this.assertRtcAudienceAccess(dto.roomId, userId, role);
     const expirationSeconds = dto.expirationSeconds || config.tokenExpiration;
 
     let result;
@@ -829,9 +1035,9 @@ export class RtcService {
     });
     if (!room) throw new NotFoundException(`Room ${dto.roomId} not found`);
 
-    const role =
-      dto.role ||
-      (room.hostId === userId ? SpeakerRole.HOST : SpeakerRole.LISTENER);
+    // Client supplied roles are hints only. Privileged RTC authority is always
+    // derived from server-owned room/stage state.
+    const role = await this.deriveAuthoritativeRtcRole(dto.roomId, userId);
     const tokenResult = await this.generateToken(userId, {
       roomId: dto.roomId,
       role,
@@ -928,9 +1134,16 @@ export class RtcService {
   }
 
   async rejoinRoom(userId: string, dto: RejoinRoomDto) {
+    const role = await this.deriveAuthoritativeRtcRole(dto.roomId, userId);
+    await this.assertRtcAudienceAccess(dto.roomId, userId, role);
+    const tokenResult = await this.generateToken(userId, {
+      roomId: dto.roomId,
+      role,
+    });
     const presenceState = {
       userId,
       roomId: dto.roomId,
+      role,
       status: 'connected',
       reconnectedAt: new Date().toISOString(),
     };
@@ -953,6 +1166,7 @@ export class RtcService {
     this.eventsGateway.server?.emit('participant_reconnected', {
       roomId: dto.roomId,
       userId,
+      role,
       reconnectedAt: presenceState.reconnectedAt,
     });
 
@@ -960,6 +1174,10 @@ export class RtcService {
       message: 'Rejoined RTC room successfully',
       roomId: dto.roomId,
       userId,
+      role,
+      token: tokenResult.token,
+      expiresAt: tokenResult.expiresAt,
+      presenceState,
     };
   }
 
@@ -1046,11 +1264,23 @@ export class RtcService {
 
   // 10. Active Speaker Detection
   async reportSpeakingState(userId: string, dto: SpeakingStateDto) {
+    const role = await this.deriveAuthoritativeRtcRole(dto.roomId, userId);
+    if (dto.isSpeaking && role === SpeakerRole.LISTENER) {
+      throw new ForbiddenException(
+        'Listeners cannot report active speaking state until promoted by server authority',
+      );
+    }
+
     const redis = this.redisService.getClient();
     if (redis) {
       try {
         if (dto.isSpeaking) {
           await redis.set(`rtc:room:${dto.roomId}:active_speaker`, userId);
+        } else {
+          const active = await redis.get(`rtc:room:${dto.roomId}:active_speaker`);
+          if (active === userId) {
+            await redis.del(`rtc:room:${dto.roomId}:active_speaker`);
+          }
         }
       } catch (e) {
         this.logger.warn(`Redis speaking state error: ${e}`);
@@ -1062,6 +1292,7 @@ export class RtcService {
       activeSpeakerUserId: dto.isSpeaking ? userId : null,
       isSpeaking: dto.isSpeaking,
       audioLevel: dto.audioLevel || 0,
+      role,
       timestamp: new Date().toISOString(),
     });
 
@@ -1069,22 +1300,32 @@ export class RtcService {
       message: 'Speaking state updated',
       roomId: dto.roomId,
       userId,
+      role,
       isSpeaking: dto.isSpeaking,
     };
   }
 
   // 11. Recording Pause / Resume
-  async pauseRecording(userId: string, dto: PauseRecordingDto) {
+  async pauseRecording(
+    userId: string,
+    dto: PauseRecordingDto,
+    userRole?: string,
+  ) {
     const job = await this.recordingJobRepository.findOne({
       where: { id: dto.jobId },
     });
     if (!job)
       throw new NotFoundException(`Recording job ${dto.jobId} not found`);
+    await this.assertRecordingJobAuthority(userId, userRole, job);
 
     const config = await this.getRtcConfig();
     const provider = this.providerFactory.getProvider(job.provider);
-    if (provider.pauseRecording && job.providerJobId) {
-      await provider.pauseRecording(config, job.providerJobId);
+    if (!provider.pauseRecording || !job.providerJobId) {
+      throw new BadRequestException('RTC provider does not support authoritative recording pause');
+    }
+    const providerResult = await provider.pauseRecording(config, job.providerJobId);
+    if (!providerResult.success) {
+      throw new BadRequestException('RTC provider did not confirm recording pause');
     }
 
     job.status = RecordingJobStatus.PAUSED;
@@ -1099,17 +1340,26 @@ export class RtcService {
     return saved;
   }
 
-  async resumeRecording(userId: string, dto: ResumeRecordingDto) {
+  async resumeRecording(
+    userId: string,
+    dto: ResumeRecordingDto,
+    userRole?: string,
+  ) {
     const job = await this.recordingJobRepository.findOne({
       where: { id: dto.jobId },
     });
     if (!job)
       throw new NotFoundException(`Recording job ${dto.jobId} not found`);
+    await this.assertRecordingJobAuthority(userId, userRole, job);
 
     const config = await this.getRtcConfig();
     const provider = this.providerFactory.getProvider(job.provider);
-    if (provider.resumeRecording && job.providerJobId) {
-      await provider.resumeRecording(config, job.providerJobId);
+    if (!provider.resumeRecording || !job.providerJobId) {
+      throw new BadRequestException('RTC provider does not support authoritative recording resume');
+    }
+    const providerResult = await provider.resumeRecording(config, job.providerJobId);
+    if (!providerResult.success) {
+      throw new BadRequestException('RTC provider did not confirm recording resume');
     }
 
     job.status = RecordingJobStatus.RECORDING;
@@ -1155,7 +1405,7 @@ export class RtcService {
       ? Math.round(
           recentMetrics.reduce((a, b) => a + b.rtt, 0) / recentMetrics.length,
         )
-      : 35;
+      : null;
     const avgPacketLoss = recentMetrics.length
       ? Number(
           (
@@ -1163,7 +1413,7 @@ export class RtcService {
             recentMetrics.length
           ).toFixed(2),
         )
-      : 0.5;
+      : null;
 
     return {
       activeRoomsCount: activeSessionsCount,
@@ -1172,13 +1422,14 @@ export class RtcService {
         totalParticipants,
       ),
       activeProvider: config.activeProvider,
-      providerStatus: 'operational',
+      providerStatus: 'configured',
       averageRtt: avgRtt,
       averagePacketLoss: avgPacketLoss,
       recordingStatus: recordingJobs.length > 0 ? 'recording' : 'idle',
       activeRecordingsCount: recordingJobs.length,
-      connectionFailures: 0,
-      reconnectionCount: 0,
+      connectionFailures: null,
+      reconnectionCount: null,
+      telemetryCompleteness: recentMetrics.length > 0 ? 'measured' : 'no-data',
       activeSpeakersCount: activeSessions.reduce(
         (acc, s) => acc + (s.activeSpeakersList?.length || 0),
         0,

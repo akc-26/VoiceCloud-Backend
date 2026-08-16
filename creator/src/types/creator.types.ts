@@ -119,15 +119,43 @@ export interface LiveRoomSummary {
 export interface CreatorPlan {
   id: string;
   creatorId: string;
-  name: string;
-  /** Canonical backend plan title; retained alongside legacy display name. */
-  title?: string;
+  title: string;
   description: string;
-  priceCoins: number;
-  perks: string[];
-  activeSubscribersCount: number;
-  isActive: boolean;
+  monthlyPrice: number;
+  yearlyPrice?: number | null;
+  benefits: string[];
+  visibility: 'PUBLIC' | 'PRIVATE' | string;
+  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | string;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreatorPlanInput {
+  title: string;
+  description?: string;
+  monthlyPrice: number;
+  yearlyPrice?: number;
+  benefits?: string[];
+  visibility?: 'PUBLIC' | 'PRIVATE' | string;
+}
+
+export interface CreatorFollower {
+  id: string;
+  userId: string;
+  name: string;
+  handle: string;
+  avatarUrl?: string;
+  badge?: string;
+  verified: boolean;
+  isFollowingBack: boolean;
+}
+
+export interface CreatorFollowersPage {
+  data: CreatorFollower[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface CreatorSubscriber {

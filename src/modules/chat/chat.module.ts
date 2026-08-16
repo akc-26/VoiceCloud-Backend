@@ -6,6 +6,7 @@ import { StorageModule } from '../storage/storage.module';
 import { RedisModule } from '../../redis/redis.module';
 import { EventsModule } from '../../common/events/events.module';
 import { QueueModule } from '../../queue/queue.module';
+import { RoomsModule } from '../rooms/rooms.module';
 
 import { Conversation } from './entities/conversation.entity';
 import { ConversationMember } from './entities/conversation-member.entity';
@@ -28,6 +29,7 @@ import { VoiceNote } from './entities/voice-note.entity';
     RedisModule,
     EventsModule,
     QueueModule,
+    RoomsModule,
   ],
   controllers: [ChatController],
   providers: [ChatService],

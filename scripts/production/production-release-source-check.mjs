@@ -10,6 +10,7 @@ import {
 } from './production-release-policy.mjs';
 
 import { verifyR10BaselineIntegrity } from '../wp09/wp09-r10-baseline-integrity.mjs';
+import { verifyR11BaselineIntegrity } from '../wp09/wp09-r11-baseline-integrity.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const consolidatedParentBranch = 'VoiceCloud-Backend-VC-PH08-WP08-04-05-R02';
@@ -171,9 +172,10 @@ const protectedDigest = () => {
   return { digest: hash.digest('hex'), count };
 };
 
-const r10ProtectedState = verifyR10BaselineIntegrity(root, 'Production release R10 baseline integrity');
+const r11ProtectedState = verifyR11BaselineIntegrity(root, 'Production release R11 baseline integrity');
+const r10ProtectedState = r11ProtectedState ? null : verifyR10BaselineIntegrity(root, 'Production release R10 baseline integrity');
 let legacyProtectedState = null;
-if (!r10ProtectedState) {
+if (!r11ProtectedState && !r10ProtectedState) {
   legacyProtectedState = protectedDigest();
   const protectedState = legacyProtectedState;
   if (protectedState.count !== protectedParentFileCount)
@@ -309,9 +311,11 @@ console.log(`Release foundation commit: ${ACCEPTED_PARENT_COMMIT}`);
 console.log(`Consolidated parent branch: ${consolidatedParentBranch}`);
 console.log(`Consolidated parent commit: ${consolidatedParentCommit}`);
 console.log(
-  r10ProtectedState
-    ? `${r10ProtectedState.checkedBaseline} R09 baseline files remain content-identical after cross-platform EOL normalization outside the approved R10 delta.`
-    : `${legacyProtectedState.count} parent-controlled source files remain byte-identical outside the approved consolidated presentation/tooling delta.`,
+  r11ProtectedState
+    ? `${r11ProtectedState.checkedBaseline} R10 baseline files remain content-identical after cross-platform EOL normalization outside the approved R11 delta.`
+    : r10ProtectedState
+      ? `${r10ProtectedState.checkedBaseline} R09 baseline files remain content-identical after cross-platform EOL normalization outside the approved R10 delta.`
+      : `${legacyProtectedState.count} parent-controlled source files remain byte-identical outside the approved consolidated presentation/tooling delta.`,
 );
 console.log('package-lock.json retains its protected LF-byte identity.');
 console.log(

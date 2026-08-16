@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import { randomBytes } from 'node:crypto';
 import { RoomTicket } from './entities/room-ticket.entity';
 import { ScheduledRoom } from './entities/scheduled-room.entity';
 import { BuyTicketDto } from './dto/buy-ticket.dto';
@@ -82,10 +83,7 @@ export class RoomTicketsService {
         );
       }
 
-      const randomSuffix = Math.random()
-        .toString(36)
-        .substring(2, 6)
-        .toUpperCase();
+      const randomSuffix = randomBytes(4).toString('hex').toUpperCase();
       const ticketCode = `TKT-${Date.now().toString(36).toUpperCase()}-${randomSuffix}`;
 
       const ticket = transactionalEntityManager.create(RoomTicket, {

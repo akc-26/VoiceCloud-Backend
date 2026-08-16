@@ -53,15 +53,11 @@ export function useCreatorProfile() {
       setProfile({
         id: query.data.id || '',
         userId: query.data.id || '',
-        displayName:
-          query.data.displayName ||
-          BRAND_CONFIG.defaults.officialCreatorDisplayName,
-        handle: query.data.username
-          ? `@${query.data.username}`
-          : BRAND_CONFIG.defaults.officialCreatorHandle,
+        displayName: query.data.displayName || query.data.username || '',
+        handle: query.data.username ? `@${query.data.username}` : '', 
         avatarUrl: query.data.avatarUrl || '',
         coverUrl: query.data.coverUrl || '',
-        bio: query.data.bio || BRAND_CONFIG.defaults.officialCreatorBio,
+        bio: query.data.bio || '',
         verified: query.data.isVerified ?? false,
         tier: (query.data.creatorTier as any) || 'Standard',
         followersCount: query.data.followersCount ?? 0,

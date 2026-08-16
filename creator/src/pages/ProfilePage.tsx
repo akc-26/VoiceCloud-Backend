@@ -14,7 +14,7 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import { CheckCircle2, Save, Camera } from 'lucide-react';
+import { CheckCircle2, Save } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { creatorApi } from '../services/creator-api.service';
 import { useCreatorProfileStore } from '../store/creator-profile.store';
@@ -29,8 +29,8 @@ export const ProfilePage: React.FC = () => {
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [handle, setHandle] = useState(profile.handle);
   const [bio, setBio] = useState(profile.bio);
-  const [category, setCategory] = useState(profile.category || 'Creator');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setDisplayName(profile.displayName);
@@ -54,20 +54,16 @@ export const ProfilePage: React.FC = () => {
         handle: res.username ? `@${res.username}` : handle,
         bio: res.bio || bio,
       });
+      setSaveError(null);
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
       void queryClient.invalidateQueries({ queryKey: ['creator', 'profile'] });
     },
-    onError: () => {
-      // Fallback local state save if backend offline
-      setProfile({
-        ...profile,
-        displayName,
-        handle,
-        bio,
-      });
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
+    onError: (error: Error) => {
+      setSavedSuccess(false);
+      setSaveError(
+        error?.message || 'Profile changes could not be saved to the server.',
+      );
     },
   });
 
@@ -76,6 +72,21 @@ export const ProfilePage: React.FC = () => {
       <Box sx={{ p: 1 }}>
         <LoadingSkeleton type="card" count={2} />
       </Box>
+    );
+  }
+
+  if (profileQuery.isError) {
+    return (
+      <PageErrorState
+        title="Failed to Load Creator Profile"
+        message={
+          profileQuery.error?.message ||
+          'Unable to retrieve your creator profile from the backend.'
+        }
+        onRetry={() => {
+          void profileQuery.refetch();
+        }}
+      />
     );
   }
 
@@ -95,6 +106,12 @@ export const ProfilePage: React.FC = () => {
       {savedSuccess && (
         <Alert severity="success" sx={{ borderRadius: 2 }}>
           Profile changes saved successfully!
+        </Alert>
+      )}
+
+      {saveError && (
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
+          {saveError}
         </Alert>
       )}
 
@@ -185,13 +202,14 @@ export const ProfilePage: React.FC = () => {
                   variant="contained"
                   color="primary"
                   startIcon={<Save size={18} />}
-                  onClick={() =>
+                  onClick={() => {
+                    setSaveError(null);
                     updateMutation.mutate({
                       displayName,
                       username: handle.replace(/^@/, ''),
                       bio,
-                    })
-                  }
+                    });
+                  }}
                   disabled={updateMutation.isPending}
                   sx={{ alignSelf: 'flex-start', fontWeight: 700 }}
                 >

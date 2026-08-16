@@ -1,4 +1,3 @@
-import { BRAND_CONFIG } from '@shared/branding';
 import { create } from 'zustand';
 import { CreatorProfile } from '../types/creator.types';
 
@@ -11,11 +10,11 @@ interface CreatorProfileState {
 const initialCreatorProfile: CreatorProfile = {
   id: '',
   userId: '',
-  displayName: BRAND_CONFIG.defaults.officialCreatorDisplayName,
-  handle: BRAND_CONFIG.defaults.officialCreatorHandle,
+  displayName: '',
+  handle: '',
   avatarUrl: '',
   coverUrl: '',
-  bio: BRAND_CONFIG.defaults.officialCreatorBio,
+  bio: '',
   verified: false,
   tier: 'Standard',
   followersCount: 0,

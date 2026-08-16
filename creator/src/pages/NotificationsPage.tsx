@@ -185,7 +185,7 @@ export const NotificationsPage: React.FC = () => {
                         {item.message}
                       </Typography>
                       <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5 }}>
-                        {new Date(item.createdAt || Date.now()).toLocaleString()}
+                        {item.createdAt ? new Date(item.createdAt).toLocaleString() : '—'}
                       </Typography>
                     </Box>
 

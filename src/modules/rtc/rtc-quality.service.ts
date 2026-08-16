@@ -8,12 +8,12 @@ import { RedisService } from '../../redis/redis.service';
 export interface RoomQualitySummary {
   roomId: string;
   totalParticipantsReporting: number;
-  averageBitrate: number;
-  averagePacketLoss: number;
-  averageJitter: number;
-  averageRtt: number;
+  averageBitrate: number | null;
+  averagePacketLoss: number | null;
+  averageJitter: number | null;
+  averageRtt: number | null;
   overallConnectionQuality: string;
-  overallScore: number;
+  overallScore: number | null;
   adaptiveRecommendation: string;
   participantScores: Array<{
     userId: string;
@@ -139,13 +139,13 @@ export class RtcQualityService {
       return {
         roomId,
         totalParticipantsReporting: 0,
-        averageBitrate: 0,
-        averagePacketLoss: 0,
-        averageJitter: 0,
-        averageRtt: 0,
-        overallConnectionQuality: 'good',
-        overallScore: 100,
-        adaptiveRecommendation: 'maintain',
+        averageBitrate: null,
+        averagePacketLoss: null,
+        averageJitter: null,
+        averageRtt: null,
+        overallConnectionQuality: 'no-data',
+        overallScore: null,
+        adaptiveRecommendation: 'no-data',
         participantScores: [],
       };
     }

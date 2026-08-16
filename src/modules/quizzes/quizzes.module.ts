@@ -7,6 +7,7 @@ import { QuizParticipantScore } from './entities/quiz-participant-score.entity';
 import { QuizzesService } from './quizzes.service';
 import { QuizzesController } from './quizzes.controller';
 import { EventsModule } from '../../common/events/events.module';
+import { RoomsModule } from '../rooms/rooms.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { EventsModule } from '../../common/events/events.module';
       QuizParticipantScore,
     ]),
     EventsModule,
+    RoomsModule,
   ],
   controllers: [QuizzesController],
   providers: [QuizzesService],

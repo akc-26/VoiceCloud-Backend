@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { verifyR10BaselineIntegrity } from '../wp09/wp09-r10-baseline-integrity.mjs';
+import { verifyR11BaselineIntegrity } from '../wp09/wp09-r11-baseline-integrity.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const acceptedParentBranch = 'VoiceCloud-Backend-VC-PH08-WP08-04-05-R02';
@@ -172,9 +173,10 @@ const protectedDigest = () => {
   return { digest: hash.digest('hex'), count };
 };
 
-const r10ProtectedState = verifyR10BaselineIntegrity(root, 'Consolidated UI / white-label R10 baseline integrity');
+const r11ProtectedState = verifyR11BaselineIntegrity(root, 'Consolidated UI / white-label R11 baseline integrity');
+const r10ProtectedState = r11ProtectedState ? null : verifyR10BaselineIntegrity(root, 'Consolidated UI / white-label R10 baseline integrity');
 let legacyProtectedState = null;
-if (!r10ProtectedState) {
+if (!r11ProtectedState && !r10ProtectedState) {
   legacyProtectedState = protectedDigest();
   const protectedState = legacyProtectedState;
   if (protectedState.count !== protectedParentFileCount)
@@ -337,7 +339,7 @@ const technicalCompatibilityChecks = new Map([
   ['creator/src/store/auth.store.ts', 'voicecloud-creator-auth-v3'],
   [
     'creator/src/services/creator-api.service.ts',
-    'rtmps://live.voicecloud.app:443/live',
+    '/creator/stream-credentials',
   ],
 ]);
 for (const [path, marker] of technicalCompatibilityChecks) {
@@ -385,9 +387,11 @@ console.log(`Accepted parent branch: ${acceptedParentBranch}`);
 console.log(`Accepted parent commit: ${acceptedParentCommit}`);
 console.log(`Accepted parent archive SHA-256: ${acceptedParentArchiveSha256}`);
 console.log(
-  r10ProtectedState
-    ? `${r10ProtectedState.checkedBaseline} R09 baseline files remain content-identical after cross-platform EOL normalization outside the approved R10 delta.`
-    : `${legacyProtectedState.count} parent-controlled files remain byte-identical outside the approved presentation/tooling delta.`,
+  r11ProtectedState
+    ? `${r11ProtectedState.checkedBaseline} R10 baseline files remain content-identical after cross-platform EOL normalization outside the approved R11 delta.`
+    : r10ProtectedState
+      ? `${r10ProtectedState.checkedBaseline} R09 baseline files remain content-identical after cross-platform EOL normalization outside the approved R10 delta.`
+      : `${legacyProtectedState.count} parent-controlled files remain byte-identical outside the approved presentation/tooling delta.`,
 );
 console.log('package-lock.json retains its protected LF-byte identity.');
 console.log(

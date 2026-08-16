@@ -6,11 +6,13 @@ import { PollVote } from './entities/poll-vote.entity';
 import { PollsService } from './polls.service';
 import { PollsController } from './polls.controller';
 import { EventsModule } from '../../common/events/events.module';
+import { RoomsModule } from '../rooms/rooms.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Poll, PollOption, PollVote]),
     EventsModule,
+    RoomsModule,
   ],
   controllers: [PollsController],
   providers: [PollsService],

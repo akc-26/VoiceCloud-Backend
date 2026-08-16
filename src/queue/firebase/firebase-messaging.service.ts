@@ -1,5 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DynamicConfigService } from '../../modules/config/dynamic-config.service';
+import { ProviderCategory } from '../../modules/admin/entities/provider-config.entity';
 import {
   App,
   initializeApp,
@@ -40,19 +42,59 @@ export class FirebaseMessagingService implements OnModuleInit {
   private firebaseApp: App | null = null;
   private isInitialized = false;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly dynamicConfigService: DynamicConfigService,
+  ) {}
 
-  onModuleInit() {
-    this.initFirebase();
+  async onModuleInit() {
+    await this.initFirebase();
   }
 
-  private initFirebase() {
+  private isPlaceholderSecret(value: unknown): boolean {
+    if (typeof value !== 'string' || value.trim().length === 0) return true;
+    return /(_DEFAULT|_PLACEHOLDER|CHANGE_ME|YOUR_|\.\.\.)/i.test(value);
+  }
+
+  private async initFirebase() {
     try {
       const existingApps = getApps();
       if (existingApps.length > 0) {
         this.firebaseApp = existingApps[0]!;
         this.isInitialized = true;
         this.logger.log('Firebase Admin SDK already initialized.');
+        return;
+      }
+
+      const dynamicProvider =
+        await this.dynamicConfigService.getActiveProviderConfig(
+          ProviderCategory.FIREBASE,
+        );
+      const dynamicConfig = dynamicProvider?.config || {};
+
+      const dynamicProjectId = String(dynamicConfig.projectId || '');
+      const dynamicClientEmail = String(dynamicConfig.clientEmail || '');
+      const dynamicPrivateKey = String(dynamicConfig.privateKey || '');
+
+      if (
+        dynamicProvider &&
+        dynamicProvider.isEnabled &&
+        dynamicProjectId &&
+        dynamicClientEmail &&
+        !this.isPlaceholderSecret(dynamicPrivateKey)
+      ) {
+        this.firebaseApp = initializeApp({
+          credential: cert({
+            projectId: dynamicProjectId,
+            clientEmail: dynamicClientEmail,
+            privateKey: dynamicPrivateKey.replace(/\\n/g, '\n'),
+          }),
+          projectId: dynamicProjectId,
+        });
+        this.isInitialized = true;
+        this.logger.log(
+          'Firebase Admin SDK initialized from active provider configuration.',
+        );
         return;
       }
 
@@ -91,7 +133,7 @@ export class FirebaseMessagingService implements OnModuleInit {
         );
       } else {
         this.logger.warn(
-          'Firebase credentials (FIREBASE_SERVICE_ACCOUNT / GOOGLE_APPLICATION_CREDENTIALS) not provided. Push notifications will run in dry-run/mock mode.',
+          'Firebase credentials are not configured. Push notifications will fail closed until a real provider is configured.',
         );
       }
     } catch (error: any) {
@@ -141,10 +183,10 @@ export class FirebaseMessagingService implements OnModuleInit {
     };
 
     if (!this.isInitialized || !this.firebaseApp) {
-      this.logger.debug(
-        `[FCM Mock] Single notification sent to ${token.substring(0, 10)}: "${payload.title}"`,
+      this.logger.warn(
+        `[FCM] Send rejected because Firebase is not configured. Token prefix: ${token.substring(0, 10)}`,
       );
-      return { success: true, messageId: `mock-msg-${Date.now()}` };
+      return { success: false, error: 'FIREBASE_NOT_CONFIGURED' };
     }
 
     try {
@@ -196,13 +238,11 @@ export class FirebaseMessagingService implements OnModuleInit {
     };
 
     if (!this.isInitialized || !this.firebaseApp) {
-      this.logger.debug(
-        `[FCM Mock] Multicast notification sent to ${tokens.length} tokens: "${payload.title}"`,
-      );
       return {
-        success: true,
-        successCount: tokens.length,
-        failureCount: 0,
+        success: false,
+        error: 'FIREBASE_NOT_CONFIGURED',
+        successCount: 0,
+        failureCount: tokens.length,
       };
     }
 

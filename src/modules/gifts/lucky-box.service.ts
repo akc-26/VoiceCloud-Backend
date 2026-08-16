@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import {
   WalletBalanceType,
@@ -147,7 +147,8 @@ export class LuckyBoxService {
   }
 
   private rollBoxReward(tier: LuckyBoxTier, pricePerBox: number): LuckyBoxReward {
-    const roll = Math.random() * 100;
+    // Financially meaningful reward selection uses cryptographic randomness.
+    const roll = randomInt(0, 1_000_000) / 10_000;
     if (roll < 2) {
       const mult = tier === LuckyBoxTier.DIAMOND ? 50 : 10;
       const val = pricePerBox * mult;

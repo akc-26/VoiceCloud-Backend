@@ -16,6 +16,7 @@ import {
   TextField,
   CircularProgress,
   IconButton,
+  Alert,
 } from '@mui/material';
 import { Calendar, Plus, Clock, Users, Bell, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,6 +31,7 @@ export const SchedulePage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const scheduleQuery = useQuery({
     queryKey: ['creator', 'schedule'],
@@ -45,6 +47,12 @@ export const SchedulePage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['creator', 'schedule'] });
       setIsScheduleOpen(false);
       setTitle('');
+      setScheduledDate('');
+      setScheduledTime('');
+      setActionError(null);
+    },
+    onError: (error: Error) => {
+      setActionError(error?.message || 'Scheduled broadcast could not be created.');
     },
   });
 
@@ -52,6 +60,10 @@ export const SchedulePage: React.FC = () => {
     mutationFn: (id: string) => creatorApi.deleteScheduledRoom(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['creator', 'schedule'] });
+      setActionError(null);
+    },
+    onError: (error: Error) => {
+      setActionError(error?.message || 'Scheduled broadcast could not be deleted.');
     },
   });
 
@@ -123,6 +135,8 @@ export const SchedulePage: React.FC = () => {
         </Button>
       </Box>
 
+      {actionError && <Alert severity="error">{actionError}</Alert>}
+
       {/* Events Grid or Empty State */}
       {events.length === 0 ? (
         <EmptyState
@@ -156,7 +170,7 @@ export const SchedulePage: React.FC = () => {
                       color="text.secondary"
                       sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
                     >
-                      <Bell size={14} /> Reminders Active
+                      <Bell size={14} /> {evt.rsvpCount ?? 0} RSVP reminders
                     </Typography>
                   </Box>
 
@@ -173,7 +187,7 @@ export const SchedulePage: React.FC = () => {
                       <Calendar size={16} />{' '}
                       {evt.scheduledStartTime
                         ? new Date(evt.scheduledStartTime).toLocaleDateString()
-                        : evt.date || 'Upcoming'}
+                        : evt.date || '—'}
                     </Typography>
                     <Typography
                       variant="body2"
@@ -186,7 +200,7 @@ export const SchedulePage: React.FC = () => {
                             [],
                             { hour: '2-digit', minute: '2-digit' },
                           )
-                        : evt.time || '20:00 UTC'}
+                        : evt.time || '—'}
                     </Typography>
                   </Stack>
 
@@ -204,8 +218,7 @@ export const SchedulePage: React.FC = () => {
                       color="text.secondary"
                       sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
                     >
-                      <Users size={14} /> {evt.rsvpCount ?? evt.attendees ?? 0}{' '}
-                      RSVP Reminders
+                      <Users size={14} /> {evt.rsvpCount ?? 0} RSVPs
                     </Typography>
                     <IconButton
                       color="error"

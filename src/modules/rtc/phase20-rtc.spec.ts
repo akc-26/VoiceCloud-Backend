@@ -30,6 +30,7 @@ import { RedisStateService } from '../../redis/redis-state.service';
 import { EventsGateway } from '../../common/events/events.gateway';
 import { DynamicConfigService } from '../config/dynamic-config.service';
 import { AdminSettingsService } from '../admin/admin-settings.service';
+import { RealtimeRoomStateService } from '../../common/events/services/realtime-room-state.service';
 
 describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
   let service: RtcService;
@@ -40,7 +41,7 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
 
   const mockConfig: RtcConfig = {
     id: '1',
-    activeProvider: RtcProviderType.AGORA,
+    activeProvider: RtcProviderType.DEFAULT_MOCK,
     appId: 'test_app_id',
     apiKey: 'test_api_key',
     secret: 'test_secret_32_chars_long_key_000',
@@ -93,6 +94,7 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
     sadd: jest.fn().mockResolvedValue(1),
     srem: jest.fn().mockResolvedValue(1),
     smembers: jest.fn().mockResolvedValue(['user-1', 'user-2']),
+    sismember: jest.fn().mockResolvedValue(0),
     rpush: jest.fn().mockResolvedValue(1),
   };
 
@@ -120,6 +122,8 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    process.env.NODE_ENV = 'test';
+    process.env.ENABLE_RTC_MOCK_PROVIDER = 'true';
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -170,6 +174,9 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
           provide: RedisStateService,
           useValue: {
             isModerator: jest.fn().mockResolvedValue(false),
+            isSpeaker: jest.fn().mockResolvedValue(false),
+            setSpeaker: jest.fn().mockResolvedValue([]),
+            removeSpeaker: jest.fn().mockResolvedValue([]),
           },
         },
         {
@@ -186,6 +193,16 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
           provide: DynamicConfigService,
           useValue: {
             getActiveProviderConfig: jest.fn().mockResolvedValue(null),
+            getProviderConfig: jest.fn().mockResolvedValue({
+              providerType: 'livekit',
+              config: { host: 'wss://example.livekit.cloud' },
+            }),
+          },
+        },
+        {
+          provide: RealtimeRoomStateService,
+          useValue: {
+            assertRoomJoinable: jest.fn().mockResolvedValue(mockRoom),
           },
         },
         {
@@ -231,28 +248,27 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
       );
     });
 
-    it('should generate valid tokens across all providers', async () => {
+    it('generates signed LiveKit tokens while unsupported provider adapters fail closed', async () => {
       const options = {
         roomId: 'room-101',
         userId: 'user-1',
         role: SpeakerRole.HOST,
       };
 
-      const agoraToken = await factory
-        .getProvider('agora')
-        .generateToken(mockConfig, options);
-      expect(agoraToken.token).toBeDefined();
-      expect(agoraToken.provider).toEqual('agora');
-
-      const zegoToken = await factory
-        .getProvider('zegocloud')
-        .generateToken(mockConfig, options);
-      expect(zegoToken.token).toContain('ZEGO04');
+      await expect(
+        factory.getProvider('agora').generateToken(mockConfig, options),
+      ).rejects.toThrow(/official server-side Agora adapter/);
+      await expect(
+        factory.getProvider('zegocloud').generateToken(mockConfig, options),
+      ).rejects.toThrow(/official server-side ZEGOCLOUD adapter/);
 
       const livekitToken = await factory
         .getProvider('livekit')
         .generateToken(mockConfig, options);
       expect(livekitToken.token.split('.')).toHaveLength(3);
+      await expect(
+        factory.getProvider('livekit').validateToken(mockConfig, livekitToken.token),
+      ).resolves.toBe(true);
     });
   });
 

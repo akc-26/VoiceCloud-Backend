@@ -37,7 +37,7 @@ import {
   ChevronRight,
   RefreshCw,
 } from 'lucide-react';
-import { creatorApi } from '../services/creator-api.service';
+import { creatorApi, ApiError } from '../services/creator-api.service';
 import { useCreatorProfileStore } from '../store/creator-profile.store';
 import {
   HostEligibilityResponse,
@@ -74,15 +74,17 @@ export const HostVerificationPage: React.FC = () => {
   const [eligibility, setEligibility] =
     useState<HostEligibilityResponse | null>(null);
   const [eligibilityError, setEligibilityError] = useState<string | null>(null);
+  const [hostLoadError, setHostLoadError] = useState<string | null>(null);
+  const [progressionError, setProgressionError] = useState<string | null>(null);
 
   // Application Form State
   const [realName, setRealName] = useState('');
   const [idNumber, setIdNumber] = useState('');
-  const [country, setCountry] = useState('United States');
+  const [country, setCountry] = useState('');
   const [bio, setBio] = useState('');
-  const [languages, setLanguages] = useState('English');
-  const [categories, setCategories] = useState('Podcast & Audio Lounge');
-  const [experience, setExperience] = useState('2+ years in live broadcasting');
+  const [languages, setLanguages] = useState('');
+  const [categories, setCategories] = useState('');
+  const [experience, setExperience] = useState('');
 
   // Document Uploads State
   const [verificationAssets, setVerificationAssets] = useState<
@@ -103,9 +105,22 @@ export const HostVerificationPage: React.FC = () => {
     setLoading(true);
     setAssetLoadError(null);
     setEligibilityError(null);
+    setHostLoadError(null);
+    setProgressionError(null);
     try {
       const [pData, eligibilityResult, assetResult] = await Promise.all([
-        creatorApi.getHostProfile().catch(() => null),
+        creatorApi
+          .getHostProfile()
+          .then((profileData) => ({ profileData, error: null as string | null }))
+          .catch((error: unknown) => ({
+            profileData: null,
+            error:
+              error instanceof ApiError && error.statusCode === 404
+                ? null
+                : error instanceof Error
+                  ? error.message
+                  : 'Host profile could not be loaded.',
+          })),
         creatorApi
           .getHostEligibility()
           .then((value) => ({ value, error: null as string | null }))
@@ -122,29 +137,41 @@ export const HostVerificationPage: React.FC = () => {
           })),
       ]);
 
-      if (pData) {
-        setHostProfile(pData);
-        setRealName(pData.realName || profile?.displayName || '');
+      setHostLoadError(pData.error);
+      const loadedHostProfile = pData.profileData;
+      setHostProfile(loadedHostProfile);
+
+      if (loadedHostProfile) {
+        setRealName(loadedHostProfile.realName || profile?.displayName || '');
         setIdNumber(''); // Keep editable replacement field empty by default
-        setCountry(pData.country || 'United States');
-        setBio(pData.bio || '');
-        if (pData.languages)
+        setCountry(loadedHostProfile.country || '');
+        setBio(loadedHostProfile.bio || '');
+        if (loadedHostProfile.languages)
           setLanguages(
-            Array.isArray(pData.languages)
-              ? pData.languages.join(', ')
-              : pData.languages,
+            Array.isArray(loadedHostProfile.languages)
+              ? loadedHostProfile.languages.join(', ')
+              : loadedHostProfile.languages,
           );
-        if (pData.categories)
+        if (loadedHostProfile.categories)
           setCategories(
-            Array.isArray(pData.categories)
-              ? pData.categories.join(', ')
-              : pData.categories,
+            Array.isArray(loadedHostProfile.categories)
+              ? loadedHostProfile.categories.join(', ')
+              : loadedHostProfile.categories,
           );
-        if (pData.experience) setExperience(pData.experience);
+        if (loadedHostProfile.experience) setExperience(loadedHostProfile.experience);
 
         // Fetch progression stats if host profile exists
-        const prog = await creatorApi.getHostProgression().catch(() => null);
-        if (prog) setProgression(prog);
+        try {
+          const prog = await creatorApi.getHostProgression();
+          setProgression(prog);
+        } catch (error) {
+          setProgression(null);
+          setProgressionError(
+            error instanceof Error
+              ? error.message
+              : 'Host progression could not be loaded.',
+          );
+        }
       }
       setEligibility(eligibilityResult.value);
       setEligibilityError(eligibilityResult.error);
@@ -524,6 +551,30 @@ export const HostVerificationPage: React.FC = () => {
         </Alert>
       )}
 
+      {hostLoadError && (
+        <Alert
+          severity="error"
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              startIcon={<RefreshCw size={14} />}
+              onClick={() => void fetchHostStatus()}
+            >
+              Retry
+            </Button>
+          }
+        >
+          Host profile status could not be loaded: {hostLoadError}
+        </Alert>
+      )}
+
+      {progressionError && hostProfile?.status === 'APPROVED' && (
+        <Alert severity="warning">
+          Host progression metrics are temporarily unavailable: {progressionError}
+        </Alert>
+      )}
+
       {eligibilityError && (
         <Alert
           severity="error"
@@ -594,7 +645,7 @@ export const HostVerificationPage: React.FC = () => {
                       <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
                         <Chip
                           icon={<CheckCircle2 size={14} />}
-                          label={`Verified Host Lvl ${hostProfile?.hostLevel || 1}`}
+                          label={hostProfile?.hostLevel ? `Verified Host Lvl ${hostProfile.hostLevel}` : 'Verified Host'}
                           color="primary"
                           size="small"
                         />
@@ -618,7 +669,7 @@ export const HostVerificationPage: React.FC = () => {
                         Identity Record
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {hostProfile?.idNumber || 'Verified ID'}
+                        {hostProfile?.idNumber || 'Not displayed'}
                       </Typography>
                     </Grid>
                     <Grid size={{ xs: 6 }}>
@@ -626,7 +677,7 @@ export const HostVerificationPage: React.FC = () => {
                         Country / Region
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {hostProfile?.country || 'Global'}
+                        {hostProfile?.country || 'Not provided'}
                       </Typography>
                     </Grid>
                     <Grid size={{ xs: 6 }}>
@@ -666,11 +717,9 @@ export const HostVerificationPage: React.FC = () => {
                     >
                       <Typography variant="caption" color="text.secondary">
                         Level{' '}
-                        {progression?.currentLevel ||
-                          hostProfile?.hostLevel ||
-                          1}{' '}
-                        XP ({progression?.currentXP || hostProfile?.xp || 0} /{' '}
-                        {progression?.requiredXP || 1000} XP)
+                        {progression?.currentLevel ?? hostProfile?.hostLevel ?? '—'}{' '}
+                        XP ({progression?.currentXP ?? hostProfile?.xp ?? 0} /{' '}
+                        {progression?.requiredXP ?? '—'} XP)
                       </Typography>
                       <Typography
                         variant="caption"

@@ -25,6 +25,7 @@ import { ScheduledRoomStatus, VisibilityType } from '../../common/enums';
 import { HostsService } from '../hosts/hosts.service';
 import { HostVerificationStatus } from '../hosts/entities/host-profile.entity';
 import { User } from '../users/entities/user.entity';
+import { RoomAuthorityService } from './room-authority.service';
 
 @Injectable()
 export class RoomsService {
@@ -39,6 +40,7 @@ export class RoomsService {
     private readonly realtimeRoomStateService: RealtimeRoomStateService,
     private readonly dataSource: DataSource,
     private readonly hostsService: HostsService,
+    private readonly roomAuthorityService: RoomAuthorityService,
   ) {}
 
   async createRoom(userId: string, dto: CreateRoomDto): Promise<Room> {
@@ -542,6 +544,7 @@ export class RoomsService {
     userId: string,
   ) {
     if (!file) throw new BadRequestException('Cover file is required');
+    await this.roomAuthorityService.assertOwnerOrCoHost(userId, roomId);
 
     const media = await this.storageService.uploadFile(
       file,
@@ -583,6 +586,7 @@ export class RoomsService {
     userId: string,
   ) {
     if (!file) throw new BadRequestException('Thumbnail file is required');
+    await this.roomAuthorityService.assertOwnerOrCoHost(userId, roomId);
 
     const media = await this.storageService.uploadFile(
       file,
@@ -619,6 +623,7 @@ export class RoomsService {
   ) {
     if (!file)
       throw new BadRequestException('Background image file is required');
+    await this.roomAuthorityService.assertOwnerOrCoHost(userId, roomId);
 
     const media = await this.storageService.uploadFile(
       file,

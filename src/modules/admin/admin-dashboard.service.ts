@@ -17,6 +17,7 @@ export class AdminDashboardService {
     this.logger.debug('Generating admin system dashboard stats');
 
     let totalUsers = 0;
+    let activeTodayUsers = 0;
     let totalRooms = 0;
     let liveRooms = 0;
     let totalWalletTx = 0;
@@ -32,7 +33,14 @@ export class AdminDashboardService {
 
     try {
       if (this.dataSource.hasMetadata('User')) {
-        totalUsers = await this.dataSource.getRepository('User').count();
+        const userRepo = this.dataSource.getRepository('User');
+        totalUsers = await userRepo.count();
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        activeTodayUsers = await userRepo
+          .createQueryBuilder('u')
+          .where('u.lastActiveAt >= :startOfToday', { startOfToday })
+          .getCount();
       }
       if (this.dataSource.hasMetadata('Room')) {
         totalRooms = await this.dataSource.getRepository('Room').count();
@@ -93,6 +101,41 @@ export class AdminDashboardService {
       );
     }
 
+    let activeRtcSessions = liveRooms;
+    let averageRtcQualityScore: number | null = null;
+    let storageProvider: string | null = null;
+
+    try {
+      if (this.dataSource.hasMetadata('RtcSession')) {
+        activeRtcSessions = await this.dataSource
+          .getRepository('RtcSession')
+          .count({ where: { status: 'active' } });
+      }
+      if (this.dataSource.hasMetadata('RtcAnalytics')) {
+        const quality = await this.dataSource
+          .getRepository('RtcAnalytics')
+          .createQueryBuilder('a')
+          .select('AVG(a.networkQualityScore)', 'average')
+          .getRawOne<{ average: string | null }>();
+        averageRtcQualityScore = quality?.average === null || quality?.average === undefined
+          ? null
+          : Number(Number(quality.average).toFixed(2));
+      }
+      if (this.dataSource.hasMetadata('ProviderConfig')) {
+        const provider = await this.dataSource
+          .getRepository('ProviderConfig')
+          .findOne({
+            where: { category: 'storage', isEnabled: true, isActive: true },
+            order: { priority: 'ASC' },
+          });
+        storageProvider = provider?.name || provider?.providerType || null;
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `Infrastructure dashboard metrics could not be fully resolved: ${err?.message || err}`,
+      );
+    }
+
     let redisPing = false;
     try {
       redisPing = await this.redisService.ping();
@@ -106,7 +149,7 @@ export class AdminDashboardService {
 
     return {
       overview: {
-        users: { total: totalUsers, activeToday: Math.floor(totalUsers * 0.4) },
+        users: { total: totalUsers, activeToday: activeTodayUsers },
         rooms: { total: totalRooms, liveNow: liveRooms },
         wallet: { totalTransactions: totalWalletTx },
         gifts: { catalogSize: totalGifts },
@@ -127,11 +170,15 @@ export class AdminDashboardService {
         },
         redis: { status: redisPing ? 'connected' : 'disconnected' },
         rtcSessions: {
-          active: liveRooms,
-          capacityLimit: 500,
-          averageQualityScore: 92.4,
+          active: activeRtcSessions,
+          capacityLimit: null,
+          averageQualityScore: averageRtcQualityScore,
         },
-        storage: { provider: 'AWS S3 / Local', usageMb: 1240 },
+        storage: {
+          provider: storageProvider,
+          usageMb: null,
+          usageTracked: false,
+        },
       },
       timestamp: new Date().toISOString(),
     };

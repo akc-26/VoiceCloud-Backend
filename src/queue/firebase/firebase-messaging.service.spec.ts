@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { FirebaseMessagingService } from './firebase-messaging.service';
+import { DynamicConfigService } from '../../modules/config/dynamic-config.service';
 
 describe('FirebaseMessagingService', () => {
   let service: FirebaseMessagingService;
@@ -18,18 +19,24 @@ describe('FirebaseMessagingService', () => {
             }),
           },
         },
+        {
+          provide: DynamicConfigService,
+          useValue: {
+            getActiveProviderConfig: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<FirebaseMessagingService>(FirebaseMessagingService);
-    service.onModuleInit();
+    await service.onModuleInit();
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  it('should send single push notification in dry-run mode when no live admin SDK', async () => {
+  it('should fail closed when Firebase is not configured', async () => {
     const res = await service.sendSingleNotification('mock-token-123', {
       title: 'Test Title',
       body: 'Test Body',
@@ -37,19 +44,20 @@ describe('FirebaseMessagingService', () => {
       data: { key1: 'val1' },
     });
 
-    expect(res.success).toBe(true);
-    expect(res.messageId).toBeDefined();
+    expect(res.success).toBe(false);
+    expect(res.error).toBe('FIREBASE_NOT_CONFIGURED');
   });
 
-  it('should send multicast push notification in dry-run mode', async () => {
+  it('should fail multicast when Firebase is not configured', async () => {
     const res = await service.sendMultiNotification(['token1', 'token2'], {
       title: 'Multicast Title',
       body: 'Multicast Body',
     });
 
-    expect(res.success).toBe(true);
-    expect(res.successCount).toBe(2);
-    expect(res.failureCount).toBe(0);
+    expect(res.success).toBe(false);
+    expect(res.error).toBe('FIREBASE_NOT_CONFIGURED');
+    expect(res.successCount).toBe(0);
+    expect(res.failureCount).toBe(2);
   });
 
   it('should handle batch push notifications', async () => {
@@ -64,8 +72,9 @@ describe('FirebaseMessagingService', () => {
       },
     ]);
 
-    expect(res.success).toBe(true);
-    expect(res.successCount).toBe(2);
+    expect(res.success).toBe(false);
+    expect(res.successCount).toBe(0);
+    expect(res.failureCount).toBe(2);
   });
 
   it('should return error if no tokens are provided for multicast', async () => {
