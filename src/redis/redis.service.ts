@@ -17,13 +17,46 @@ export class RedisService implements OnModuleDestroy {
       const result = await this.redisClient.ping();
       return result === 'PONG';
     } catch (error) {
-      this.logger.error(`Redis connection check failed: ${error.message}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Redis connection check failed: ${msg}`);
       return false;
     }
   }
 
   getClient(): Redis {
     return this.redisClient;
+  }
+
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.redisClient.get(key);
+    } catch {
+      return null;
+    }
+  }
+
+  async set(key: string, value: string, ttlSeconds = 300): Promise<void> {
+    try {
+      await this.redisClient.set(key, value, 'EX', ttlSeconds);
+    } catch {
+      // ignore cache set error
+    }
+  }
+
+  async del(key: string): Promise<void> {
+    try {
+      await this.redisClient.del(key);
+    } catch {
+      // ignore cache del error
+    }
+  }
+
+  async ttl(key: string): Promise<number> {
+    try {
+      return await this.redisClient.ttl(key);
+    } catch {
+      return -1;
+    }
   }
 
   async onModuleDestroy() {

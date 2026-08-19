@@ -1,0 +1,547 @@
+{
+  "schemaVersion": 1,
+  "workPackage": "VC-PH08-WP08-03-01",
+  "title": "Remaining Business Flow Audit and Acceptance Contract Lock",
+  "baseline": {
+    "repository": "https://github.com/akc-26/VoiceCloud-Backend",
+    "branch": "VoiceCloud-Backend-VC-PH08-WP08-02-R05",
+    "commit": "5d73fac20e87630b70ca8bfe6711be93d94138f0",
+    "uploadedArchiveSha256": "d71a135342674f9dffb3e59dc382d09bb8156d25fece117861dccb6b4d19b91e",
+    "packageJsonSha256": "b63a30630075f63e6e139649d31fbbc4293f0bb2fd02e993edcdcb23a642161e",
+    "packageLockSha256": "17bd8cd3c6832e438a51eb0a91bee6b261ed663113c66d328fbf1c0a00dc211a",
+    "baselineFileCount": 793
+  },
+  "scopeDomains": [
+    "gifts",
+    "wallet-ledger",
+    "creator-payouts",
+    "host-earnings",
+    "tasks-achievements",
+    "vip",
+    "notifications",
+    "bullmq",
+    "redis-events",
+    "creator-ui",
+    "admin-ui"
+  ],
+  "lockedPrinciples": [
+    "PostgreSQL is the source of truth for money, rewards, payout state, and immutable audit records.",
+    "Redis is cache, presence, rate-limit, and pub/sub infrastructure; it never owns a financial balance.",
+    "Every financial mutation uses a database transaction, is atomic, concurrency-safe, and is represented by immutable ledger entries.",
+    "Every retryable business operation is idempotent through a unique persistent operation key.",
+    "Socket.IO broadcasts occur only after authoritative database commit and remain room-scoped.",
+    "Queues process persisted operation IDs and are safe to retry after worker or Redis failure.",
+    "Administrative economy endpoints require explicit ADMIN or SUPER_ADMIN authorization.",
+    "Acceptance UI must expose backend failures and must not silently substitute fabricated production data.",
+    "Existing public REST paths and response compatibility are preserved unless a documented security correction requires otherwise."
+  ],
+  "findings": [
+    {
+      "id": "ECO-001",
+      "severity": "CRITICAL",
+      "domain": "gifts-wallet",
+      "status": "OPEN_WP08_03_02",
+      "title": "Gift settlement has split Redis and PostgreSQL authorities",
+      "evidence": [
+        "src/modules/gifts/gifting-engine.service.ts:63",
+        "src/modules/gifts/gifting-engine.service.ts:81-118",
+        "src/modules/wallet/wallet.service.ts:86-234"
+      ],
+      "impact": "Gift debits and receiver credits can diverge from wallet_balances and wallet_transactions; a missing Redis key grants a fallback balance and a missing recipient becomes host_placeholder.",
+      "lockedDecision": "PostgreSQL wallet_balances plus wallet_transactions will be the only financial authority. Redis may cache or publish after commit, never own money."
+    },
+    {
+      "id": "ECO-002",
+      "severity": "CRITICAL",
+      "domain": "wallet-ledger",
+      "status": "OPEN_WP08_03_02",
+      "title": "Balance mutations and ledger writes are not atomic or concurrency-safe",
+      "evidence": [
+        "src/modules/wallet/wallet.service.ts:240-445",
+        "src/modules/wallet/wallet.service.ts:789-949"
+      ],
+      "impact": "Credit, debit, transfer, conversion, creator earnings, settlement, and refund can partially commit or overspend under concurrent requests.",
+      "lockedDecision": "Every financial mutation requires a database transaction, locked wallet rows, deterministic references, and ledger writes inside the same commit."
+    },
+    {
+      "id": "ECO-003",
+      "severity": "CRITICAL",
+      "domain": "wallet-bootstrap",
+      "status": "OPEN_WP08_03_02",
+      "title": "Wallet creation auto-provisions users and grants non-zero balances",
+      "evidence": [
+        "src/modules/wallet/wallet.service.ts:86-126"
+      ],
+      "impact": "A production lookup can create identity data and grant coins, diamonds, bonus, promotional, and withdrawable balances without an authoritative business event.",
+      "lockedDecision": "Production wallets start at zero and never create users. Any development seed must be explicit, isolated, and disabled in production."
+    },
+    {
+      "id": "ECO-004",
+      "severity": "CRITICAL",
+      "domain": "creator-payouts",
+      "status": "OPEN_WP08_03_02",
+      "title": "Creator payout requests do not reserve funds and are disconnected from settlement processing",
+      "evidence": [
+        "src/modules/creator/creator.service.ts:369-410",
+        "src/modules/wallet/wallet.service.ts:896-949",
+        "src/queue/processors/payout.processor.ts:32-83"
+      ],
+      "impact": "Concurrent payout requests can exceed available diamonds; queue status updates do not debit, reserve, release, or reconcile the wallet; two payout models can disagree.",
+      "lockedDecision": "One payout lifecycle will reserve withdrawable diamonds transactionally, settle once, and release reservation on rejection, cancellation, or terminal failure."
+    },
+    {
+      "id": "ECO-005",
+      "severity": "HIGH",
+      "domain": "host-settlements",
+      "status": "OPEN_WP08_03_02",
+      "title": "Host earnings and settlement aggregates lack an immutable financial ledger",
+      "evidence": [
+        "src/modules/hosts/hosts.service.ts:895-1017",
+        "src/modules/hosts/entities/host-earnings.entity.ts"
+      ],
+      "impact": "completeSettlement can add more than the pending amount while clamping pending to zero, and failures cannot be reconciled to source transactions.",
+      "lockedDecision": "Host earnings will reconcile to authoritative wallet/earning ledger entries, and settlement completion cannot exceed a reserved pending amount."
+    },
+    {
+      "id": "ECO-006",
+      "severity": "HIGH",
+      "domain": "rewards",
+      "status": "OPEN_WP08_03_03",
+      "title": "Task and achievement rewards mutate legacy User balances outside the wallet ledger",
+      "evidence": [
+        "src/modules/tasks-achievements/services/reward-engine.service.ts:36-151",
+        "src/modules/tasks-achievements/entities/reward-audit-log.entity.ts"
+      ],
+      "impact": "User coins/diamonds, wallet balances, and reward audit logs can disagree; retries can duplicate rewards because source identity is not unique.",
+      "lockedDecision": "Currency rewards use the wallet transaction service with an idempotency key derived from source, sourceId, user, and reward type."
+    },
+    {
+      "id": "ECO-007",
+      "severity": "HIGH",
+      "domain": "vip",
+      "status": "OPEN_WP08_03_03",
+      "title": "VIP purchase and reward flows are not financially authoritative",
+      "evidence": [
+        "src/modules/vip/vip.service.ts:357-485",
+        "src/modules/vip/vip.service.ts:890-943",
+        "src/modules/vip/entities/vip-reward-claim.entity.ts"
+      ],
+      "impact": "VIP membership can activate without a wallet/payment charge; claimed coins are recorded but not credited; concurrent claims lack a database uniqueness guarantee.",
+      "lockedDecision": "VIP purchase and reward claims must commit payment/wallet, membership/claim, and ledger records atomically with a unique period claim constraint."
+    },
+    {
+      "id": "ECO-008",
+      "severity": "HIGH",
+      "domain": "idempotency",
+      "status": "OPEN_WP08_03_02",
+      "title": "Financial and reward records lack end-to-end idempotency constraints",
+      "evidence": [
+        "src/modules/gifts/entities/gift-transaction.entity.ts",
+        "src/modules/wallet/entities/wallet-transaction.entity.ts",
+        "src/modules/vip/entities/vip-reward-claim.entity.ts",
+        "src/modules/users/entities/creator-payout-request.entity.ts"
+      ],
+      "impact": "HTTP retries, BullMQ retries, and concurrent requests can duplicate gifts, rewards, notifications, or payouts.",
+      "lockedDecision": "Externally repeatable operations require caller or server-generated idempotency keys enforced by unique database constraints."
+    },
+    {
+      "id": "ECO-009",
+      "severity": "CRITICAL",
+      "domain": "rbac",
+      "status": "OPEN_WP08_03_02",
+      "title": "Multiple economy administration routes require authentication but not Admin role enforcement",
+      "evidence": [
+        "src/modules/wallet/admin-wallet.controller.ts",
+        "src/modules/gifts/gifts.controller.ts:120-236",
+        "src/modules/tasks-achievements/controllers/admin-tasks-achievements.controller.ts",
+        "src/modules/vip/vip.controller.ts:228-376",
+        "src/modules/notifications/notifications.controller.ts:117-126"
+      ],
+      "impact": "A normal authenticated user may reach wallet credit/debit, gift catalog, reward grant, VIP administration, or notification creation routes.",
+      "lockedDecision": "All administrative economy routes require RolesGuard and explicit ADMIN/SUPER_ADMIN roles, with denial tests for Creator and User roles."
+    },
+    {
+      "id": "ECO-010",
+      "severity": "HIGH",
+      "domain": "notifications-retry",
+      "status": "OPEN_WP08_03_03",
+      "title": "Notification retries can create duplicate database notifications",
+      "evidence": [
+        "src/queue/processors/notification.processor.ts:42-128",
+        "src/modules/notifications/notifications.service.ts:79-100"
+      ],
+      "impact": "A push failure after notification persistence causes a retry that can insert another notification when notificationId is absent.",
+      "lockedDecision": "Persist the notification once, pass its ID to the queue, and make delivery attempts idempotent and separately auditable."
+    },
+    {
+      "id": "ECO-011",
+      "severity": "HIGH",
+      "domain": "queue-integration",
+      "status": "OPEN_WP08_03_03",
+      "title": "BullMQ payout and notification producers are not connected to core business flows",
+      "evidence": [
+        "src/queue/queue.service.ts:127-190",
+        "src/modules/creator/creator.service.ts:369-410",
+        "src/queue/processors/payout.processor.ts"
+      ],
+      "impact": "Retry and recovery processors exist but are not consistently invoked by payout, gift, reward, or notification workflows.",
+      "lockedDecision": "Queues perform post-commit or resumable work using persisted operation IDs; no queue job may be the sole owner of uncommitted money."
+    },
+    {
+      "id": "ECO-012",
+      "severity": "MEDIUM",
+      "domain": "queue-placeholders",
+      "status": "OPEN_WP08_03_03",
+      "title": "Several economy workers are placeholders rather than recovery-capable processors",
+      "evidence": [
+        "src/queue/processors/gift.processor.ts",
+        "src/queue/processors/host-earnings.processor.ts",
+        "src/queue/processors/host-reward.processor.ts"
+      ],
+      "impact": "Jobs can report success without performing authoritative work, masking missing settlement and recovery behavior.",
+      "lockedDecision": "Every production worker must validate persisted operation state, be idempotent, and return success only after its intended side effect is complete."
+    },
+    {
+      "id": "ECO-013",
+      "severity": "HIGH",
+      "domain": "ui-truthfulness",
+      "status": "OPEN_WP08_03_04",
+      "title": "Creator economy views can hide API failures with fabricated balances and notifications",
+      "evidence": [
+        "creator/src/services/creator-api.service.ts:260-458",
+        "creator/src/pages/EarningsPage.tsx:58-61",
+        "creator/src/pages/PayoutRequestsPage.tsx"
+      ],
+      "impact": "Real end-to-end verification can appear successful while the backend is unavailable or returning errors.",
+      "lockedDecision": "Acceptance-tested economy screens must display explicit errors and backend data; demo fallbacks must be removed or gated by an explicit development-only flag."
+    },
+    {
+      "id": "ECO-014",
+      "severity": "HIGH",
+      "domain": "admin-ui-integration",
+      "status": "OPEN_WP08_03_04",
+      "title": "Admin Wallet, Gifts, and Notifications pages use local static data instead of authoritative APIs",
+      "evidence": [
+        "admin/src/pages/WalletPage.tsx",
+        "admin/src/pages/GiftsPage.tsx",
+        "admin/src/pages/NotificationsPage.tsx"
+      ],
+      "impact": "Admin actions and dashboards cannot participate in real business-flow acceptance or reflect persisted state.",
+      "lockedDecision": "WP08 acceptance covers real Admin API integration for wallet ledger, gifts, payout review, rewards, and notification delivery status."
+    },
+    {
+      "id": "ECO-015",
+      "severity": "MEDIUM",
+      "domain": "contract-mismatch",
+      "status": "OPEN_WP08_03_04",
+      "title": "Payout thresholds and exchange assumptions differ between Backend and Creator UI",
+      "evidence": [
+        "src/modules/creator/creator.service.ts:374-405",
+        "creator/src/pages/WalletPage.tsx:31-56",
+        "creator/src/pages/PayoutRequestsPage.tsx:55-60"
+      ],
+      "impact": "The UI advertises and enforces 10,000 diamonds while the backend accepts 100 diamonds and uses different conversion amounts.",
+      "lockedDecision": "Thresholds and exchange rates are backend-authoritative settings returned to Creator and Admin clients."
+    },
+    {
+      "id": "ECO-016",
+      "severity": "LOW",
+      "domain": "socket-contract",
+      "status": "LOCKED_EXISTING",
+      "title": "Socket.IO gift:send is display-only and must remain non-financial",
+      "evidence": [
+        "src/common/events/gateways/reactions.gateway.ts:121-218"
+      ],
+      "impact": "Treating the realtime event as a payment command would bypass REST validation and ledger settlement.",
+      "lockedDecision": "REST/service commits the gift first; room-scoped Socket.IO events are emitted only from the committed server-side result."
+    }
+  ],
+  "nextSequence": [
+    {
+      "workPackage": "VC-PH08-WP08-03-02",
+      "objective": "Authoritative gifts, wallet ledger, creator/host earnings, payout reservation, settlement, RBAC, concurrency, and idempotency verification."
+    },
+    {
+      "workPackage": "VC-PH08-WP08-03-03",
+      "objective": "Rewards, VIP, notifications, BullMQ retry, failure recovery, and reconciliation verification."
+    },
+    {
+      "workPackage": "VC-PH08-WP08-03-04",
+      "objective": "Creator/Admin UI integration and consolidated real PostgreSQL, Redis, BullMQ, Socket.IO end-to-end acceptance."
+    }
+  ],
+  "sourceSnapshot": [
+    {
+      "path": "src/modules/gifts/gifting-engine.service.ts",
+      "sha256": "2bb4980fa954941a955526e35969d19652b56de0de70d094989d8bbcd70a6f50"
+    },
+    {
+      "path": "src/modules/gifts/gifts.controller.ts",
+      "sha256": "54ab974808333c9601748bd04e278af99094e16279cc8fa61a17fbd0ee93783c"
+    },
+    {
+      "path": "src/modules/gifts/entities/gift-transaction.entity.ts",
+      "sha256": "f26de460d85f4ca8c70fa8ba2e11310a7efc477abc2930ad17c11b694a1f02a0"
+    },
+    {
+      "path": "src/modules/gifts/entities/gift-queue-item.entity.ts",
+      "sha256": "d1dbd130225393fa9d26d6457b472b7792860b2ddf1cf1a3096cf52a5a54315e"
+    },
+    {
+      "path": "src/common/events/gateways/reactions.gateway.ts",
+      "sha256": "da5acdc37d8d71e28c591ef1032ce4ababafe0934e6a9e7514c78b3cb8813956"
+    },
+    {
+      "path": "src/common/events/events.gateway.ts",
+      "sha256": "01acdbc6befc8679ff49795fbe651ab119c1f184ce19f8376ae5095057cc3d30"
+    },
+    {
+      "path": "src/modules/wallet/wallet.service.ts",
+      "sha256": "3e177ec4526c1eb3db986aae6bb17fc4b26864476f593d91d0723377ea5ae333"
+    },
+    {
+      "path": "src/modules/wallet/wallet.controller.ts",
+      "sha256": "cb76c916f7e3071b68d84bb20aaa29ecd6565acae8e3c6264b17c86a8c55277a"
+    },
+    {
+      "path": "src/modules/wallet/admin-wallet.controller.ts",
+      "sha256": "a6a1a9cc6f37add172833bb8eb0fd0ceb5b74cee69cd251cd901e029a059aaf3"
+    },
+    {
+      "path": "src/modules/wallet/entities/wallet-balance.entity.ts",
+      "sha256": "8b2d71cb3684cd2198cd8177d76f3b2ffa85dff84c5e0519f93c10cd2d68bc34"
+    },
+    {
+      "path": "src/modules/wallet/entities/wallet-transaction.entity.ts",
+      "sha256": "d0ba4df0e34db416e7c4409bcd1bf74c5fa6336de510a6611e2d34b21efe6bbd"
+    },
+    {
+      "path": "src/modules/wallet/entities/creator-settlement.entity.ts",
+      "sha256": "218346ec6d3a886f802cf4f204fbbfebb72ada9a7e37e8e98a5c10f2ff827776"
+    },
+    {
+      "path": "src/modules/wallet/entities/purchase.entity.ts",
+      "sha256": "ac13d3dc153fb9aa381ad9da439a08b9f476ffd841c63470bfed5fddc7cf7f26"
+    },
+    {
+      "path": "src/modules/wallet/entities/refund.entity.ts",
+      "sha256": "80c37a8f355e7900ba820c699789c5e9fd0995c4d711341bfbb6dd795a75542a"
+    },
+    {
+      "path": "src/modules/creator/creator.service.ts",
+      "sha256": "4654d27c5bb4435af35a518c5becd25a643c1c6b882a2cce6b7aff37bebceb4e"
+    },
+    {
+      "path": "src/modules/creator/creator.controller.ts",
+      "sha256": "8358d845ffcdfb4f86fc4d29ac4e88acf9748e50661327900d33b50ab6d5e25a"
+    },
+    {
+      "path": "src/modules/users/entities/creator-payout-request.entity.ts",
+      "sha256": "45b4cd7a4ad34f5d532df8c71ab1d7849b58466f1c5078cf2761bf38072ba0e1"
+    },
+    {
+      "path": "src/modules/users/entities/creator-subscription.entity.ts",
+      "sha256": "265b02870cb644d1240bc86e990679583740e4d7b8fc2ae6f4a5c77d0ce0ef18"
+    },
+    {
+      "path": "src/modules/hosts/hosts.service.ts",
+      "sha256": "098b4f8fbb9e45a928f7d510a1357207aa6f366597d0a3a4aa54deaca6aabbc4"
+    },
+    {
+      "path": "src/modules/hosts/hosts.controller.ts",
+      "sha256": "582f38e49760c8ec700b7b35d0420507dc6d6e1894218aae07764feaac3b2b63"
+    },
+    {
+      "path": "src/modules/hosts/entities/host-earnings.entity.ts",
+      "sha256": "23ba7a945c6b4795e6ce1ece0c4c161026ecf72ca7da41219197ef506c7ae0bf"
+    },
+    {
+      "path": "src/modules/hosts/entities/host-reward.entity.ts",
+      "sha256": "033ef25fc3cc17069324812012c5659f76fa13826166136fbf430d503b6693e6"
+    },
+    {
+      "path": "src/modules/tasks-achievements/services/reward-engine.service.ts",
+      "sha256": "ceb769bf0ee0b0c89c00172bc2754d4017860602178ac3a6b18eb9ec45151d0e"
+    },
+    {
+      "path": "src/modules/tasks-achievements/services/daily-tasks.service.ts",
+      "sha256": "34230ffc2d60af16d799258501095b59944dfd4834b6004050b9ece10b0d8bbf"
+    },
+    {
+      "path": "src/modules/tasks-achievements/services/daily-checkin.service.ts",
+      "sha256": "f0e984e283776a50fe4687cffb7660287f9668fbf8e60e28330660500cd7d856"
+    },
+    {
+      "path": "src/modules/tasks-achievements/controllers/tasks-achievements.controller.ts",
+      "sha256": "fb5e98a6cb12a645c9909cd13b05f2ae307e10d9ee7dc340340f3eb67504a78d"
+    },
+    {
+      "path": "src/modules/tasks-achievements/controllers/admin-tasks-achievements.controller.ts",
+      "sha256": "e0762b6a6d6f6546be132a876582d0357ae7c997dd63baf0604b77f989bc27bd"
+    },
+    {
+      "path": "src/modules/tasks-achievements/entities/reward-audit-log.entity.ts",
+      "sha256": "e2d232492b284d7057b367bf9a9a3148f6d56eb24fc8a3b404f456fc781ff5d1"
+    },
+    {
+      "path": "src/modules/tasks-achievements/entities/user-task-progress.entity.ts",
+      "sha256": "bfa1da5562bfdd89596d0c277c5d683450470e9f1759f099c40284433b9c3676"
+    },
+    {
+      "path": "src/modules/vip/vip.service.ts",
+      "sha256": "f11b0ec45bdc3518d58500c5eb44816c0d9faeaa0aa049706b5ca3aa3c7138c9"
+    },
+    {
+      "path": "src/modules/vip/vip.controller.ts",
+      "sha256": "34178251a9a99b1e722f4212090de41f3a3305609383798938e3a0fd3ae274c8"
+    },
+    {
+      "path": "src/modules/vip/entities/vip-reward-claim.entity.ts",
+      "sha256": "0fffa1f3567968cf074b1089e3dbc7e02a98e2dfbba2f1985756a19f9bd412dd"
+    },
+    {
+      "path": "src/modules/vip/entities/vip-transaction.entity.ts",
+      "sha256": "d0aab343c634d0676a0c5aaed956dfe49b61369d8403fa194929865c07550603"
+    },
+    {
+      "path": "src/modules/vip/entities/vip-membership.entity.ts",
+      "sha256": "0e9c24b603db50fc42185dec0a6580090fcd1bcca18bf2f9b0b53084d973c1ee"
+    },
+    {
+      "path": "src/modules/notifications/notifications.service.ts",
+      "sha256": "0fdb2e2e25b3ea5d95960912a5549b5e1cdac42bab8c9b3d58291e5d981f4c91"
+    },
+    {
+      "path": "src/modules/notifications/notifications.controller.ts",
+      "sha256": "c30f81b8f6fb3aa0483e288e033ad96118a0f67e36dd48b3936123e0e529db55"
+    },
+    {
+      "path": "src/modules/notifications/entities/notification.entity.ts",
+      "sha256": "285ee13e2e3599a9895b561aae86744c2905c0df6ec9143b7e98c8f2d8cd70e8"
+    },
+    {
+      "path": "src/queue/queue.service.ts",
+      "sha256": "d298229dce5a1eb11f856e1e9f5d8bb9799b11d8d631fcaac1cd554e2fd37d40"
+    },
+    {
+      "path": "src/queue/queue.constants.ts",
+      "sha256": "a1f550a521f9294b2798f304515dde864ff2a3ed4a13509919dc03e1a55c561f"
+    },
+    {
+      "path": "src/queue/processors/gift.processor.ts",
+      "sha256": "67dedab4e3683c2a5a983945e02eacb67b02f7f7973d2239c20c5a2eaf12178e"
+    },
+    {
+      "path": "src/queue/processors/payout.processor.ts",
+      "sha256": "7bc88ebbaec12a79e03e976117ead7d290833d024eb806cec02bf793544a8d95"
+    },
+    {
+      "path": "src/queue/processors/notification.processor.ts",
+      "sha256": "0698b8b7272feff36e5f60923ce8b2b163271e04b97a4a5dc39009600ed53f5f"
+    },
+    {
+      "path": "src/queue/processors/host-earnings.processor.ts",
+      "sha256": "2b58bab20efb4dce71dc52a0394906a2d92b103c225608c9fb6ae6f5bfb98a0b"
+    },
+    {
+      "path": "src/queue/processors/host-reward.processor.ts",
+      "sha256": "7810030dbdbbc4b90763210742e0144621f4fbad2c46a94fa618cbec0ccb8cde"
+    },
+    {
+      "path": "src/queue/processors/tasks.processor.ts",
+      "sha256": "bfc99e791d65897e601f96683bbd0cc517b525f0cb9f6f50c0583df1879596a5"
+    },
+    {
+      "path": "src/queue/processors/vip.processor.ts",
+      "sha256": "b4977c2dde3e30b0f461b96c0237ced2b79741a9ee6ea4474ebc68d94b77ea56"
+    },
+    {
+      "path": "src/queue/processors/subscription.processor.ts",
+      "sha256": "3798b8d3f37ca20807c9c322cb8dd8afa0e3ec296e8ffbd46f5127f21ed4d08c"
+    },
+    {
+      "path": "creator/src/services/creator-api.service.ts",
+      "sha256": "ff5f175f64260a0c570578e23b63784b5993382e03b1c0fcc48c13c80a13e809"
+    },
+    {
+      "path": "creator/src/pages/WalletPage.tsx",
+      "sha256": "80af5c5154b78c663ff59156d3e94b9158b981e91089694434d0c8f27d4af54c"
+    },
+    {
+      "path": "creator/src/pages/EarningsPage.tsx",
+      "sha256": "4665a276f6996de58810625eefb9c3481363bb52e6de3dc1941dcdfff428e9eb"
+    },
+    {
+      "path": "creator/src/pages/PayoutRequestsPage.tsx",
+      "sha256": "81a9cf684ca48487937c924dafd7cc434a431f40e1878db3c6f480e8788957a2"
+    },
+    {
+      "path": "admin/src/pages/WalletPage.tsx",
+      "sha256": "62dc44267895ca28c3762e318ebafcff613cfa3e2e0d9083cb2576f5d26651be"
+    },
+    {
+      "path": "admin/src/pages/GiftsPage.tsx",
+      "sha256": "18f3ddbaefdee2eb0264dc0b3f158a2ffb362af4c9c5379921d7994a618eff58"
+    },
+    {
+      "path": "admin/src/pages/VipPage.tsx",
+      "sha256": "7a2485bdac7b9194cec05480c6172455fc6c79578f56b3a1564e1d217139988f"
+    },
+    {
+      "path": "admin/src/pages/NotificationsPage.tsx",
+      "sha256": "6e6b141e466a43361b08223e3ffc698e9f9027ff10fa4878197efa8bd46e62f7"
+    },
+    {
+      "path": "admin/src/services/tasks-achievements.service.ts",
+      "sha256": "142fdc988b9fbd63c4b7a6fe593a928d778df729ef18496c2c3917d7fed9293b"
+    },
+    {
+      "path": "admin/src/services/hosts.service.ts",
+      "sha256": "e4af62a14c83ef8405f4538f63659fe739df4ffffc04c240e349d0cf7d8c8703"
+    }
+  ],
+  "allowedChangesForThisPackage": [
+    "CHANGELOG.md",
+    "docs/wp08/WP08-03-01-ECONOMY-AUDIT-AND-CONTRACT-LOCK.md",
+    "docs/wp08/wp08-03-01-economy-contract-lock.json",
+    "package.json",
+    "scripts/start-local-full.mjs",
+    "scripts/wp08/wp08-03-01-check.ps1",
+    "scripts/wp08/wp08-03-01-frontend-smoke.mjs",
+    "scripts/wp08/wp08-03-01-self-check.mjs",
+    "src/hosting-routing.spec.ts",
+    "src/hosting/frontend-hosting.ts",
+    "src/main.ts",
+    "src/wp08/wp08-03-01-economy-contract.spec.ts"
+  ],
+  "baselineFormattingDebt": [
+    "src/common/events/events.gateway.ts",
+    "src/common/events/gateways/presence.gateway.ts",
+    "src/common/events/phase3a-realtime.spec.ts",
+    "src/common/events/realtime-room-access.wp08-02.spec.ts",
+    "src/common/events/services/realtime-room-state.service.ts",
+    "src/common/events/services/realtime-socket-auth.service.ts",
+    "src/database/bootstrap-schema.ts",
+    "src/database/database.module.ts",
+    "src/database/migrations/1700000000008-Phase08RoomLifecycleAuthority.ts",
+    "src/modules/moderation/device-security.service.ts",
+    "src/modules/rooms/rooms.service.ts",
+    "src/modules/rooms/rooms.service.wp08-02.spec.ts",
+    "src/redis/redis-keys.constant.ts",
+    "src/redis/redis-state.service.ts",
+    "src/socket/creator.gateway.ts",
+    "src/wp08/wp08-02-realtime-security.spec.ts",
+    "scripts/wp08/wp08-02-acceptance.mjs"
+  ],
+  "runtimeHostingCorrection": {
+    "revision": "R03",
+    "reason": "The R02 checker verified build artifacts but did not start the compiled application. Runtime testing exposed JSON 404 responses for Landing, Admin, and Creator routes.",
+    "lockedRequirements": [
+      "Register compiled frontend static middleware on the underlying Express adapter before Nest route mapping.",
+      "Resolve the complete dist root independently of the shell working directory.",
+      "Fail startup clearly when the full frontend build is incomplete.",
+      "Verify Landing, Admin, Creator, and their compiled assets through a real child-process HTTP smoke test after build.",
+      "Keep normal local full-application startup on port 3000."
+    ]
+  }
+}
