@@ -153,7 +153,9 @@
     "wp09:r11:source-check": "npm run wp09:r11:admin-source-check && npm run wp09:r11:creator-source-check && npm run wp09:r11:backend-source-check && npm run wp09:r11:rtc-security-source-check && npm run wp09:r11:api-parity-source-check",
     "typecheck:website": "tsc -p website/tsconfig.json --noEmit",
     "web:ph01:source-check": "node scripts/website/web-ph01-source-check.mjs",
-    "web:ph01:acceptance": "npm run web:ph01:source-check && npm run typecheck:website && npm run build:website"
+    "web:ph01:acceptance": "npm run web:ph01:source-check && npm run typecheck:website && npm run build:website",
+    "web:ph02:source-check": "node scripts/website/web-ph02-source-check.mjs",
+    "web:ph02:acceptance": "npm run web:ph01:source-check && npm run web:ph02:source-check && npm run typecheck:website && npm run build:website"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

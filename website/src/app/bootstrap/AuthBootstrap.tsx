@@ -8,17 +8,15 @@ export function AuthBootstrap({ children }: PropsWithChildren) {
   const status = useWebsiteAuthStore((state) => state.bootstrapStatus);
   const setUser = useWebsiteAuthStore((state) => state.setUser);
   const setStatus = useWebsiteAuthStore((state) => state.setBootstrapStatus);
-  const clearAuth = useWebsiteAuthStore((state) => state.clearAuth);
+  const markSessionExpired = useWebsiteAuthStore((state) => state.markSessionExpired);
 
   useEffect(() => {
     let active = true;
-
     async function bootstrap() {
       if (!accessToken) {
         setStatus('ready');
         return;
       }
-
       setStatus('checking');
       try {
         const { data } = await apiClient.get<WebsiteUser>('/auth/me');
@@ -27,24 +25,15 @@ export function AuthBootstrap({ children }: PropsWithChildren) {
         setStatus('ready');
       } catch {
         if (!active) return;
-        clearAuth();
+        markSessionExpired();
       }
     }
-
     void bootstrap();
-    return () => {
-      active = false;
-    };
-  }, [accessToken, clearAuth, setStatus, setUser]);
+    return () => { active = false; };
+  }, [accessToken, markSessionExpired, setStatus, setUser]);
 
   if (status === 'checking') {
-    return (
-      <div className="vc-bootstrap" role="status" aria-live="polite">
-        <div className="vc-bootstrap__mark" />
-        <span>Preparing VoiceCloud…</span>
-      </div>
-    );
+    return <div className="vc-bootstrap" role="status" aria-live="polite"><div className="vc-bootstrap__mark" /><span>Preparing VoiceCloud…</span></div>;
   }
-
   return children;
 }

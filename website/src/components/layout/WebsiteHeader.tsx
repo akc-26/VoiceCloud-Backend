@@ -42,6 +42,7 @@ export function WebsiteHeader() {
               <button className="vc-icon-button" type="button" aria-label="Notifications" onClick={() => navigate('/notifications')}>
                 <Bell size={19} />
               </button>
+              {user?.isGuest ? <button className="vc-header__upgrade" type="button" onClick={() => navigate('/auth/guest/upgrade')}>Upgrade Guest</button> : null}
               <button className="vc-profile-button" type="button" onClick={() => navigate('/me')}>
                 {user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : <span>{user?.displayName?.[0] ?? 'V'}</span>}
                 <strong>{user?.displayName ?? 'My Profile'}</strong>

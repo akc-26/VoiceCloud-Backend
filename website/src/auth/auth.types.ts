@@ -10,6 +10,12 @@ export interface WebsiteUser {
   isGuest: boolean;
   role: string;
   referralCode?: string;
+  profileCompletion?: number;
+  bio?: string;
+  country?: string;
+  preferredLanguage?: string;
+  interests?: string[];
+  isCreatorEnabled?: boolean;
 }
 
 export interface WebsiteAuthResponse {

@@ -77,7 +77,7 @@ apiClient.interceptors.response.use(
       };
       return apiClient.request(original);
     } catch (refreshError) {
-      useWebsiteAuthStore.getState().clearAuth();
+      useWebsiteAuthStore.getState().markSessionExpired();
       return Promise.reject(refreshError);
     }
   },
@@ -85,7 +85,19 @@ apiClient.interceptors.response.use(
 
 export function apiErrorMessage(error: unknown): string {
   if (!axios.isAxiosError(error)) return 'Something went wrong. Please try again.';
+
   const data = error.response?.data as { message?: string | string[] } | undefined;
   if (Array.isArray(data?.message)) return data.message.join(' ');
-  return data?.message ?? error.message ?? 'Unable to complete the request.';
+  if (data?.message) return data.message;
+
+  // A Vite proxy ECONNREFUSED is surfaced to Axios as a 5xx response without
+  // the normal backend JSON error payload. Do not expose the raw Axios
+  // "Request failed with status code 500" message to users.
+  if (!error.response || (error.response.status >= 500 && !data?.message)) {
+    return import.meta.env.DEV
+      ? 'The local VoiceCloud backend is unavailable. Start the backend on port 3000 and try again.'
+      : 'VoiceCloud is temporarily unavailable. Please try again shortly.';
+  }
+
+  return error.message ?? 'Unable to complete the request.';
 }

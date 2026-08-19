@@ -1,10 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type {
-  WebsiteAuthResponse,
-  WebsiteRefreshResponse,
-  WebsiteUser,
-} from './auth.types';
+import type { WebsiteAuthResponse, WebsiteRefreshResponse, WebsiteUser } from './auth.types';
+
+type BootstrapStatus = 'idle' | 'checking' | 'ready';
+type AuthIssue = 'session-expired' | null;
 
 interface WebsiteAuthState {
   accessToken: string | null;
@@ -14,63 +13,68 @@ interface WebsiteAuthState {
   sessionId: string | null;
   deviceId: string | null;
   isAuthenticated: boolean;
-  bootstrapStatus: 'idle' | 'checking' | 'ready';
+  bootstrapStatus: BootstrapStatus;
+  authIssue: AuthIssue;
   setAuthResponse: (response: WebsiteAuthResponse) => void;
   setRefreshResponse: (response: WebsiteRefreshResponse) => void;
   setUser: (user: WebsiteUser | null) => void;
-  setBootstrapStatus: (status: WebsiteAuthState['bootstrapStatus']) => void;
+  setBootstrapStatus: (status: BootstrapStatus) => void;
+  markSessionExpired: () => void;
   clearAuth: () => void;
   hasRole: (...roles: string[]) => boolean;
 }
 
+const emptyAuth = {
+  accessToken: null,
+  refreshToken: null,
+  expiresIn: null,
+  user: null,
+  sessionId: null,
+  deviceId: null,
+  isAuthenticated: false,
+} as const;
+
 export const useWebsiteAuthStore = create<WebsiteAuthState>()(
   persist(
     (set, get) => ({
-      accessToken: null,
-      refreshToken: null,
-      expiresIn: null,
-      user: null,
-      sessionId: null,
-      deviceId: null,
-      isAuthenticated: false,
+      ...emptyAuth,
       bootstrapStatus: 'idle',
+      authIssue: null,
 
-      setAuthResponse: (response) =>
-        set({
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken,
-          expiresIn: response.expiresIn,
-          user: response.user,
-          sessionId: response.sessionId ?? null,
-          deviceId: response.deviceId ?? null,
-          isAuthenticated: true,
-          bootstrapStatus: 'ready',
-        }),
+      setAuthResponse: (response) => set({
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        expiresIn: response.expiresIn,
+        user: response.user,
+        sessionId: response.sessionId ?? null,
+        deviceId: response.deviceId ?? null,
+        isAuthenticated: true,
+        bootstrapStatus: 'ready',
+        authIssue: null,
+      }),
 
-      setRefreshResponse: (response) =>
-        set({
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken,
-          expiresIn: response.expiresIn,
-          isAuthenticated: Boolean(get().user),
-        }),
+      setRefreshResponse: (response) => set({
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        expiresIn: response.expiresIn,
+        isAuthenticated: Boolean(get().user),
+        authIssue: null,
+      }),
 
-      setUser: (user) =>
-        set({ user, isAuthenticated: Boolean(user && get().accessToken) }),
-
+      setUser: (user) => set({ user, isAuthenticated: Boolean(user && get().accessToken) }),
       setBootstrapStatus: (bootstrapStatus) => set({ bootstrapStatus }),
 
-      clearAuth: () =>
-        set({
-          accessToken: null,
-          refreshToken: null,
-          expiresIn: null,
-          user: null,
-          sessionId: null,
-          deviceId: null,
-          isAuthenticated: false,
-          bootstrapStatus: 'ready',
-        }),
+      markSessionExpired: () => set({
+        ...emptyAuth,
+        bootstrapStatus: 'ready',
+        authIssue: 'session-expired',
+      }),
+
+      clearAuth: () => set({
+        ...emptyAuth,
+        bootstrapStatus: 'ready',
+        authIssue: null,
+      }),
 
       hasRole: (...roles) => {
         const role = get().user?.role;

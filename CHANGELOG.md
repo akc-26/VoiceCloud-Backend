@@ -304,3 +304,7 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Connected recovery workers to authoritative persisted operations for rewards, VIP, Host rewards/earnings, gifts and payouts; placeholder financial successes now fail explicitly.
 - Added additive/reversible Phase08 rewards/VIP/notification recovery migration and consolidated product-oriented tests.
 - Preserved accepted WP08-03-02A/B/C/D financial authority, API compatibility, frontend implementation and `package-lock.json`.
+
+## VC-WEB-PH02-R05
+- Fixed phone OTP verification inputs: real six-field numeric entry, keyboard/backspace/paste support, resend clearing and development-only OTP display.
+- Added durable source regression checks for the workstation-discovered OTP interaction defect.

@@ -1,0 +1,40 @@
+VC-WEB-PH02-R01 diff against protected PH01 parent
+
+ADDED:
+ + VC-WEB-PH02-BASELINE.txt
+ + docs/website/VC-WEB-PH02-IMPLEMENTATION-REPORT-R01.md
+ + docs/website/VC-WEB-PH02-MANUAL-QA-R01.md
+ + scripts/website/VC-WEB-PH02-ACCEPTANCE.cmd
+ + scripts/website/web-ph02-source-check.mjs
+ + website/public/website/auth/avatar-ava.jpg
+ + website/public/website/auth/midnight.jpg
+ + website/public/website/auth/poetry.jpg
+ + website/src/auth/auth-navigation.ts
+ + website/src/auth/auth.api.ts
+ + website/src/auth/device.ts
+ + website/src/auth/firebase-web.ts
+ + website/src/components/auth/AuthCard.tsx
+ + website/src/components/auth/AuthField.tsx
+ + website/src/components/auth/AuthVisualPanel.tsx
+ + website/src/pages/auth/GuestUpgradePage.tsx
+ + website/src/pages/auth/OnboardingPage.tsx
+ + website/src/pages/auth/OtpVerifyPage.tsx
+ + website/src/pages/auth/PhoneSignInPage.tsx
+ + website/src/pages/auth/RegisterPage.tsx
+ + website/src/pages/auth/RestrictedAccountPage.tsx
+ + website/src/pages/auth/SessionExpiredPage.tsx
+ + website/src/pages/auth/SignInPage.tsx
+
+CHANGED:
+ M .env.example
+ M package.json
+ M website/src/api/client.ts
+ M website/src/app/bootstrap/AuthBootstrap.tsx
+ M website/src/app/guards/RequireAuth.tsx
+ M website/src/app/router/AppRouter.tsx
+ M website/src/auth/auth.store.ts
+ M website/src/auth/auth.types.ts
+ M website/src/components/layout/WebsiteHeader.tsx
+ M website/src/styles/global.css
+
+REMOVED:
