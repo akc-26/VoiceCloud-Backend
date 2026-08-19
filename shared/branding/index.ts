@@ -33,8 +33,8 @@ export const BRAND_CONFIG = {
     website: {
       name: BRAND_NAME,
       shortName: 'Live Audio Platform',
-      fullName: `${BRAND_NAME} Live Audio Platform`,
-      documentTitle: `${BRAND_NAME} - Live Audio & Creator Platform`,
+      fullName: `${BRAND_NAME} Live Voice Community`,
+      documentTitle: `${BRAND_NAME} - Real Voices. Real Connections.`,
     },
     backend: {
       name: `${BRAND_NAME} Backend`,
@@ -64,6 +64,34 @@ export const BRAND_CONFIG = {
       'Inter, "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     creatorFontFamily:
       'Inter, "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    websiteDisplayFontFamily:
+      'Iowan Old Style, Baskerville, Georgia, "Times New Roman", serif',
+  },
+  presentation: {
+    website: {
+      gradients: {
+        primary: 'linear-gradient(135deg, #536DFE 0%, #8B5CF6 100%)',
+        hero: 'linear-gradient(120deg, #F8FAFF 0%, #EEF2FF 48%, #F5ECFF 100%)',
+        aura: 'radial-gradient(circle at 50% 50%, rgba(139,92,246,.22), rgba(83,109,254,.08) 42%, transparent 72%)',
+      },
+      radii: {
+        sm: '12px',
+        md: '18px',
+        lg: '24px',
+        xl: '30px',
+        pill: '999px',
+      },
+      shadows: {
+        soft: '0 10px 34px rgba(44, 57, 128, 0.08)',
+        card: '0 16px 46px rgba(44, 57, 128, 0.10)',
+        floating: '0 22px 70px rgba(44, 57, 128, 0.14)',
+      },
+      layout: {
+        maxWidth: '1680px',
+        headerHeight: '76px',
+        pagePadding: 'clamp(18px, 3vw, 48px)',
+      },
+    },
   },
   colors: {
     common: {
@@ -137,12 +165,25 @@ export const BRAND_CONFIG = {
       darkTextSecondary: '#a7bbb2',
     },
     website: {
-      primary: '#2563eb',
-      primaryLight: '#f0f6ff',
-      primarySoft: '#e0edff',
-      primaryDark: '#1d4ed8',
-      secondary: '#7c3aed',
-      secondaryDark: '#6d28d9',
+      // Royal Sapphire consumer-web authority. Keep website presentation here;
+      // compatibility-sensitive identifiers remain intentionally separate.
+      primary: '#536DFE',
+      primaryLight: '#F4F6FF',
+      primarySoft: '#E8ECFF',
+      primaryDark: '#3554E8',
+      secondary: '#8B5CF6',
+      secondaryDark: '#6D3FD8',
+      indigo: '#6875F5',
+      lavender: '#F3EDFF',
+      lavenderStrong: '#E5D9FF',
+      sky: '#EAF4FF',
+      cloud: '#F8FAFF',
+      surface: '#FFFFFF',
+      surfaceSoft: '#F9FAFF',
+      ink: '#121D48',
+      text: '#34406B',
+      textMuted: '#7B86AB',
+      border: '#E0E5F5',
     },
   },
 } as const;
