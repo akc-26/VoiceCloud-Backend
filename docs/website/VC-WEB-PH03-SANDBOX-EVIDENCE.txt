@@ -1,0 +1,21 @@
+VC-WEB-PH03-R02 sandbox evidence
+
+PASS: VC-WEB-PH01 source check
+PASS: VC-WEB-PH02 source check
+PASS: VC-WEB-PH03 source check
+PASS: TypeScript isolated transpilation/syntax pass across 49 website TS/TSX files (0 diagnostics)
+PASS: protected source tree hashes unchanged versus PH02-R05 for src/, admin/, creator/, shared/
+
+NOT RUN / NOT CLAIMED:
+- npm ci (sandbox package cache lacks zustand-5.0.14; external registry access unavailable)
+- website tsc semantic check with project dependencies
+- Vite website production build
+- complete R11 regression build
+- full Nest + Website + Admin + Creator monolith build
+
+Run scripts\\website\\VC-WEB-PH03-ACCEPTANCE.cmd on the user workstation before acceptance/Git freeze.
+
+R02 CORRECTION:
+PASS: workstation-reported follow/unfollow literal result typing defect corrected
+PASS: durable PH03 regression check added for shared FollowMutationResult contract
+NOT CLAIMED: dependency-backed project TypeScript/Vite/full monolith build; rerun workstation acceptance for R02

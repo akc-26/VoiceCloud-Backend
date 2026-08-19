@@ -1,16 +1,16 @@
+import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Headphones, Mic2, Radio, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { GradientButton } from '@/components/common/GradientButton';
-
-const liveRooms = [
-  ['Midnight Talkers', 'Deep talks, real vibes', '1.2K', 'room-card--midnight'],
-  ['Chill Café', 'Relax, unwind, sip', '532', 'room-card--sunset'],
-  ['Poetry & Piano', 'Words. Music. Feelings.', '799', 'room-card--cosmic'],
-  ['Creators Connect', 'Share. Learn. Grow.', '1.6K', 'room-card--violet'],
-] as const;
+import { RoomCard } from '@/components/discovery/RoomCard';
+import { UserCard } from '@/components/discovery/UserCard';
+import { DiscoveryEmpty, DiscoveryError, DiscoveryLoading } from '@/components/discovery/DiscoveryStates';
+import { discoveryApi } from '@/features/discovery/discovery.api';
 
 export function HomeFoundationPage() {
   const navigate = useNavigate();
+  const rooms = useQuery({ queryKey: ['ph03','home','rooms'], queryFn: () => discoveryApi.liveRooms() });
+  const people = useQuery({ queryKey: ['ph03','home','people'], queryFn: () => discoveryApi.trendingUsers(4) });
 
   return (
     <div className="vc-home vc-page-width">
@@ -21,7 +21,7 @@ export function HomeFoundationPage() {
           <p>Join live conversations, discover incredible people, and be part of communities that sound like you.</p>
           <div className="vc-hero__actions">
             <GradientButton onClick={() => navigate('/rooms')}><Radio size={17} /> Explore Rooms</GradientButton>
-            <GradientButton variant="secondary" onClick={() => navigate('/communities')}>Discover Communities <ArrowRight size={17} /></GradientButton>
+            <GradientButton variant="secondary" onClick={() => navigate('/explore')}>Discover VoiceCloud <ArrowRight size={17} /></GradientButton>
           </div>
           <div className="vc-hero__trust">
             <span><Headphones size={17} /> Live conversations</span>
@@ -39,47 +39,28 @@ export function HomeFoundationPage() {
         </div>
       </section>
 
-      <section className="vc-section">
+      <section className="vc-section vc-discovery-section">
         <div className="vc-section__heading">
-          <div><span className="vc-live-dot" /> <h2>Live Now</h2><p>Jump into conversations happening right now.</p></div>
+          <div><span className="vc-live-dot" /> <h2>Live Now</h2><p>Rooms returned by the VoiceCloud live-room discovery API.</p></div>
           <button type="button" onClick={() => navigate('/rooms')}>View all <ArrowRight size={15} /></button>
         </div>
-        <div className="vc-room-grid">
-          {liveRooms.map(([title, subtitle, listeners, artClass]) => (
-            <article className="vc-room-card" key={title}>
-              <div className={`vc-room-card__art ${artClass}`}>
-                <span className="vc-room-card__live">LIVE</span>
-                <span className="vc-room-card__listeners">◉ {listeners}</span>
-                <div className="vc-room-card__wave" />
-              </div>
-              <div className="vc-room-card__body">
-                <h3>{title}</h3>
-                <p>{subtitle}</p>
-                <button type="button" onClick={() => navigate('/rooms')}>Join Room <Mic2 size={14} /></button>
-              </div>
-            </article>
-          ))}
-        </div>
+        {rooms.isPending ? <DiscoveryLoading label="Loading live rooms…"/> : rooms.isError ? <DiscoveryError error={rooms.error}/> : rooms.data?.items.length ? <div className="vc-discovery-room-grid">{rooms.data.items.slice(0,4).map(room => <RoomCard key={room.id} room={room}/>)}</div> : <DiscoveryEmpty title="No rooms are live right now" description="When a host goes live, their room will appear here automatically."/>}
       </section>
 
       <section className="vc-home-panels">
         <article className="vc-home-panel">
           <div className="vc-home-panel__icon"><Users size={22} /></div>
-          <h3>Trending Communities</h3>
-          <p>Find communities built around conversations you actually want to have.</p>
-          <button type="button" onClick={() => navigate('/communities')}>Explore communities <ArrowRight size={15} /></button>
+          <h3>Discover People</h3>
+          <p>Find public VoiceCloud profiles using real discovery and profile data.</p>
+          <button type="button" onClick={() => navigate('/people')}>Meet people <ArrowRight size={15} /></button>
         </article>
         <article className="vc-home-panel vc-home-panel--feature">
-          <div className="vc-home-panel__quote">“</div>
-          <h3>Your voice belongs here.</h3>
-          <p>Be heard. Be you. Belong.</p>
-          <GradientButton onClick={() => navigate('/rooms')}>Join a Room Now <ArrowRight size={16} /></GradientButton>
+          <div className="vc-home-panel__quote">“</div><h3>Your voice belongs here.</h3><p>Be heard. Be you. Belong.</p>
+          <GradientButton onClick={() => navigate('/explore')}>Start Exploring <ArrowRight size={16} /></GradientButton>
         </article>
-        <article className="vc-home-panel">
-          <div className="vc-home-panel__icon"><Sparkles size={22} /></div>
-          <h3>Recommended People</h3>
-          <p>Discover hosts and listeners who share the things you care about.</p>
-          <button type="button" onClick={() => navigate('/people')}>Meet people <ArrowRight size={15} /></button>
+        <article className="vc-home-panel vc-home-panel--people">
+          <div className="vc-home-panel__icon"><Sparkles size={22} /></div><h3>Trending voices</h3>
+          {people.isPending ? <small>Loading…</small> : people.data?.items.length ? <div className="vc-home-people">{people.data.items.slice(0,3).map(u=><UserCard key={u.id} user={u}/>)}</div> : <p>No trending profiles yet.</p>}
         </article>
       </section>
     </div>

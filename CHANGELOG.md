@@ -308,3 +308,18 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 ## VC-WEB-PH02-R05
 - Fixed phone OTP verification inputs: real six-field numeric entry, keyboard/backspace/paste support, resend clearing and development-only OTP display.
 - Added durable source regression checks for the workstation-discovered OTP interaction defect.
+
+## VC-WEB-PH03-R01
+- Implemented backend-driven Home, Explore, Live Rooms, People discovery and Search experiences.
+- Implemented public/self profile, follow/unfollow, Followers, Following and Friends workflows against canonical R11 APIs.
+- Removed PH01 fabricated live-room runtime arrays from Home; backend responses now drive room/person state and counts.
+- Preserved centralized Royal Sapphire branding as the only PH03 color/logo authority.
+- Added PH03 source regression checks, implementation report, manual QA and workstation acceptance launcher.
+- Kept room detail/listening, communities/events, messaging and profile editing in their later locked phases.
+
+
+## VC-WEB-PH03-R02
+- Corrected the PH03 public-profile follow/unfollow TanStack mutation typing found by the workstation TypeScript gate.
+- Unified follow and unfollow return typing through `FollowMutationResult { isFollowing: boolean }`.
+- Added durable source regression checks preventing incompatible literal-only follow/unfollow return types from returning.
+- Preserved PH03-R01 functional scope and protected PH02-R05 parent unchanged.
