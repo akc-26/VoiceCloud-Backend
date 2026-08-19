@@ -15,8 +15,26 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return app status object for getRoot', () => {
+      expect(appController.getRoot()).toEqual({
+        name: 'VoiceCloud Monolith API',
+        version: '1.0.0',
+        status: 'online',
+        documentation: '/api/docs',
+        health: '/health',
+        api: '/api',
+      });
+    });
+
+    it('should return app status object for getHello', () => {
+      expect(appController.getHello()).toEqual({
+        name: 'VoiceCloud Monolith API',
+        version: '1.0.0',
+        status: 'online',
+        documentation: '/api/docs',
+        health: '/health',
+        api: '/api',
+      });
     });
   });
 });
