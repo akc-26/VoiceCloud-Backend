@@ -1,0 +1,15 @@
+VC-WEB-PH04-R01 sandbox evidence
+
+Protected parent source package: VC-WEB-PH03-R02
+Frozen Git parent supplied and independently verified: ba268d03f9ca2ec2cd949c121731c0fd3a633923
+
+Executed locally in the implementation sandbox:
+- web-ph01-source-check.mjs: PASS
+- web-ph02-source-check.mjs: PASS
+- web-ph03-source-check.mjs: PASS
+- web-ph04-source-check.mjs: PASS
+- TypeScript transpile/syntax pass over website TS/TSX (excluding vite-env.d.ts): 64 files, 0 diagnostics
+- Protected tree byte comparison: src/ UNCHANGED, admin/ UNCHANGED, creator/ UNCHANGED, shared/ UNCHANGED
+
+Not claimed in sandbox:
+- npm ci / full dependency-backed TypeScript/Vite/monolith build. The sandbox npm cache lacks locked dependencies and has no registry access. Windows workstation acceptance remains authoritative.

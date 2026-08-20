@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { Room } from '../rooms/entities/room.entity';
 import {
@@ -9,6 +9,7 @@ import {
 } from '../hosts/entities/host-profile.entity';
 import { RedisService } from '../../redis/redis.service';
 import { DiscoveryQueryDto } from './dto/discovery-query.dto';
+import { UserRole } from '../../common/enums';
 
 export interface PaginatedResult<T> {
   items: T[];
@@ -21,6 +22,7 @@ export interface PaginatedResult<T> {
 @Injectable()
 export class DiscoveryService {
   private readonly logger = new Logger(DiscoveryService.name);
+  private readonly consumerUserRoles: string[] = [UserRole.USER, UserRole.CREATOR];
 
   constructor(
     @InjectRepository(User)
@@ -36,7 +38,7 @@ export class DiscoveryService {
   async getTrendingUsers(
     dto: DiscoveryQueryDto,
   ): Promise<PaginatedResult<User>> {
-    const cacheKey = `discovery:users:trending:${JSON.stringify(dto)}`;
+    const cacheKey = `discovery:users:trending:v2:${JSON.stringify(dto)}`;
     const cached = await this.redisService.get(cacheKey);
     if (cached) {
       try {
@@ -51,6 +53,7 @@ export class DiscoveryService {
     const skip = (page - 1) * limit;
 
     const [items, total] = await this.userRepository.findAndCount({
+      where: { role: In(this.consumerUserRoles) },
       order: { popularityScore: 'DESC', followersCount: 'DESC' },
       skip,
       take: limit,
@@ -75,6 +78,7 @@ export class DiscoveryService {
     const skip = (page - 1) * limit;
 
     const [items, total] = await this.userRepository.findAndCount({
+      where: { role: In(this.consumerUserRoles) },
       order: { followersCount: 'DESC' },
       skip,
       take: limit,
@@ -97,6 +101,7 @@ export class DiscoveryService {
     const skip = (page - 1) * limit;
 
     const [items, total] = await this.userRepository.findAndCount({
+      where: { role: In(this.consumerUserRoles) },
       order: { lastActiveAt: 'DESC' },
       skip,
       take: limit,
@@ -117,7 +122,7 @@ export class DiscoveryService {
     const skip = (page - 1) * limit;
 
     const [items, total] = await this.userRepository.findAndCount({
-      where: { isOnline: true },
+      where: { isOnline: true, role: In(this.consumerUserRoles) },
       order: { popularityScore: 'DESC' },
       skip,
       take: limit,
@@ -140,6 +145,7 @@ export class DiscoveryService {
     const skip = (page - 1) * limit;
 
     const [items, total] = await this.userRepository.findAndCount({
+      where: { role: In(this.consumerUserRoles) },
       order: { isVerified: 'DESC', popularityScore: 'DESC' },
       skip,
       take: limit,
@@ -160,6 +166,7 @@ export class DiscoveryService {
     const skip = (page - 1) * limit;
 
     const [items, total] = await this.userRepository.findAndCount({
+      where: { role: In(this.consumerUserRoles) },
       order: { createdAt: 'DESC' },
       skip,
       take: limit,

@@ -1,0 +1,3 @@
+VC-WEB-PH04-R02 corrective pass
+Parent baseline: ba268d03f9ca2ec2cd949c121731c0fd3a633923 (VC-WEB-PH03-R02)
+Corrects: consumer role visibility, self recommendations, header search UX, smooth navigation, global search host SQL mismatch.

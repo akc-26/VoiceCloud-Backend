@@ -45,8 +45,18 @@ export const discoveryApi = {
     return data;
   },
   async globalSearch(query: string): Promise<GlobalSearchResponse> {
-    const { data } = await apiClient.get('/search', { params: { q: query, type: 'all', page: 1, limit: 12 } });
-    return data;
+    const [usersResponse, roomsResponse] = await Promise.all([
+      apiClient.get<GlobalSearchResponse>('/search', { params: { q: query, type: 'users', page: 1, limit: 12 } }),
+      apiClient.get<GlobalSearchResponse>('/search', { params: { q: query, type: 'rooms', page: 1, limit: 12 } }),
+    ]);
+    return {
+      query,
+      type: 'consumer',
+      results: {
+        users: usersResponse.data.results.users,
+        rooms: roomsResponse.data.results.rooms,
+      },
+    };
   },
 };
 

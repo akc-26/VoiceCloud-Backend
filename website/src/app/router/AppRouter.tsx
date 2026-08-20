@@ -11,6 +11,15 @@ import { ProfilePage } from '@/pages/ProfilePage';
 import { MyProfilePage } from '@/pages/MyProfilePage';
 import { SocialListPage } from '@/pages/SocialListPage';
 import { FriendsPage } from '@/pages/FriendsPage';
+import { CommunitiesPage } from '@/pages/CommunitiesPage';
+import { CommunityDetailsPage } from '@/pages/CommunityDetailsPage';
+import { CommunityMembersPage } from '@/pages/CommunityMembersPage';
+import { CommunityRoomsPage } from '@/pages/CommunityRoomsPage';
+import { EventsPage } from '@/pages/EventsPage';
+import { EventDetailsPage } from '@/pages/EventDetailsPage';
+import { MessagesPage } from '@/pages/MessagesPage';
+import { ConversationPage } from '@/pages/ConversationPage';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { SignInPage } from '@/pages/auth/SignInPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
@@ -24,7 +33,7 @@ import { OnboardingPage } from '@/pages/auth/OnboardingPage';
 export function AppRouter(){return <Routes><Route element={<WebsiteShell/>}>
 <Route index element={<HomeFoundationPage/>}/>
 <Route path="/explore" element={<ExplorePage/>}/><Route path="/rooms" element={<LiveRoomsPage/>}/><Route path="/rooms/:roomId" element={<FeaturePlaceholderPage/>}/><Route path="/people" element={<PeoplePage/>}/><Route path="/search" element={<SearchPage/>}/><Route path="/profile/:username" element={<ProfilePage/>}/>
-{['/communities','/events','/about'].map(path=><Route key={path} path={path} element={<FeaturePlaceholderPage/>}/>)}
+<Route path="/communities" element={<CommunitiesPage/>}/><Route path="/communities/:communityId" element={<CommunityDetailsPage/>}/><Route path="/communities/:communityId/members" element={<CommunityMembersPage/>}/><Route path="/communities/:communityId/rooms" element={<CommunityRoomsPage/>}/><Route path="/events" element={<EventsPage/>}/><Route path="/events/:eventId" element={<EventDetailsPage/>}/><Route path="/about" element={<FeaturePlaceholderPage/>}/>
 <Route path="/auth/sign-in" element={<SignInPage/>}/><Route path="/auth/register" element={<RegisterPage/>}/><Route path="/auth/phone" element={<PhoneSignInPage/>}/><Route path="/auth/verify" element={<OtpVerifyPage/>}/><Route path="/auth/restricted" element={<RestrictedAccountPage/>}/><Route path="/auth/session-expired" element={<SessionExpiredPage/>}/>
-<Route element={<RequireAuth/>}><Route path="/me" element={<MyProfilePage/>}/><Route path="/followers" element={<SocialListPage mode="followers"/>}/><Route path="/following" element={<SocialListPage mode="following"/>}/><Route path="/friends" element={<FriendsPage/>}/>{['/messages','/notifications','/settings'].map(path=><Route key={path} path={path} element={<FeaturePlaceholderPage/>}/>)}<Route path="/auth/guest/upgrade" element={<GuestUpgradePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/></Route>
+<Route element={<RequireAuth/>}><Route path="/me" element={<MyProfilePage/>}/><Route path="/followers" element={<SocialListPage mode="followers"/>}/><Route path="/following" element={<SocialListPage mode="following"/>}/><Route path="/friends" element={<FriendsPage/>}/><Route path="/messages" element={<MessagesPage/>}/><Route path="/messages/:conversationId" element={<ConversationPage/>}/><Route path="/notifications" element={<NotificationsPage/>}/><Route path="/settings" element={<FeaturePlaceholderPage/>}/><Route path="/auth/guest/upgrade" element={<GuestUpgradePage/>}/><Route path="/onboarding" element={<OnboardingPage/>}/></Route>
 <Route path="*" element={<NotFoundPage/>}/></Route></Routes>}

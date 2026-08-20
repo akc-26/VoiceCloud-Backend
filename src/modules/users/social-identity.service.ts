@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
+import { UserRole } from '../../common/enums';
 
 @Injectable()
 export class SocialIdentityService {
@@ -70,7 +71,10 @@ export class SocialIdentityService {
     const user = await this.userRepository.findOne({
       where: { username },
     });
-    if (!user) {
+    if (
+      !user ||
+      ![UserRole.USER, UserRole.CREATOR].includes(user.role as UserRole)
+    ) {
       throw new NotFoundException(
         `Public profile for username '${username}' not found`,
       );

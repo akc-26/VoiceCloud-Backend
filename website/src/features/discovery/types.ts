@@ -18,6 +18,8 @@ export interface VoiceCloudUser {
   id: string;
   username: string;
   displayName: string;
+  role?: string;
+  isGuest?: boolean;
   avatarUrl?: string | null;
   coverUrl?: string | null;
   bio?: string | null;

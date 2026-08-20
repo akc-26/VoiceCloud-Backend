@@ -15,10 +15,12 @@ import { SearchHostsQueryDto } from './dto/search-hosts-query.dto';
 import { SearchGiftsQueryDto } from './dto/search-gifts-query.dto';
 import { SearchAnnouncementsQueryDto } from './dto/search-announcements-query.dto';
 import { CreateSearchHistoryDto } from './dto/create-search-history.dto';
+import { UserRole } from '../../common/enums';
 
 @Injectable()
 export class SearchService {
   private readonly logger = new Logger(SearchService.name);
+  private readonly consumerUserRoles: string[] = [UserRole.USER, UserRole.CREATOR];
 
   constructor(
     @InjectRepository(User)
@@ -109,6 +111,9 @@ export class SearchService {
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.userRepository.createQueryBuilder('user');
+    queryBuilder.andWhere('user.role IN (:...consumerRoles)', {
+      consumerRoles: this.consumerUserRoles,
+    });
 
     if (dto.q) {
       const condition = dto.prefixOnly ? `${dto.q}%` : `%${dto.q}%`;
@@ -210,12 +215,23 @@ export class SearchService {
     const limit = dto.limit || 20;
     const skip = (page - 1) * limit;
 
-    const queryBuilder = this.hostRepository.createQueryBuilder('host');
+    const queryBuilder = this.hostRepository
+      .createQueryBuilder('host')
+      .leftJoin(User, 'hostUser', 'hostUser.id = host.userId')
+      .andWhere('hostUser.role IN (:...consumerRoles)', {
+        consumerRoles: this.consumerUserRoles,
+      });
 
     if (dto.q) {
       const condition = dto.prefixOnly ? `${dto.q}%` : `%${dto.q}%`;
       queryBuilder.andWhere(
-        '(host.bio ILIKE :q OR host.displayName ILIKE :q OR host.category ILIKE :q)',
+        `(
+          host.bio ILIKE :q OR
+          host.realName ILIKE :q OR
+          CAST(host.categories AS TEXT) ILIKE :q OR
+          hostUser.displayName ILIKE :q OR
+          hostUser.username ILIKE :q
+        )`,
         { q: condition },
       );
     }

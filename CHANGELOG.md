@@ -323,3 +323,17 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Unified follow and unfollow return typing through `FollowMutationResult { isFollowing: boolean }`.
 - Added durable source regression checks preventing incompatible literal-only follow/unfollow return types from returning.
 - Preserved PH03-R01 functional scope and protected PH02-R05 parent unchanged.
+
+## VC-WEB-PH04-R01
+- Implemented consumer Communities discovery/detail/membership/member-directory and club-linked scheduled-room experiences against canonical R11 club/scheduled-room APIs.
+- Implemented Upcoming Events and event-detail/reminder flows against canonical scheduled-room APIs.
+- Implemented authenticated messaging inbox, direct-conversation creation from profiles, conversation history, text sending and read receipts against canonical chat APIs.
+- Implemented authenticated notification list, unread count, mark-read, mark-all-read, delete and user-scoped realtime invalidation.
+- Preserved backend, Admin, Creator and shared branding source trees unchanged.
+- Added durable PH04 source regression checks, implementation report, manual QA and Windows acceptance gate.
+
+
+## VC-WEB-PH04-R02
+- Corrected consumer discovery visibility for backend-only accounts and self recommendations.
+- Corrected interactive header search and route transitions.
+- Fixed global search HostProfile SQL field mismatch (`displayName`/`category`).

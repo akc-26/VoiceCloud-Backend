@@ -17,7 +17,7 @@ for(const route of ['/explore','/rooms','/people','/search','/profile/:username'
 for(const page of ['ExplorePage','LiveRoomsPage','PeoplePage','SearchPage','ProfilePage','MyProfilePage','SocialListPage','FriendsPage'])if(router.includes(`path=\"/${page}\"`))errors.push(`PH03 route wiring malformed for ${page}`);
 const home=fs.readFileSync(path.join(root,'website/src/pages/HomeFoundationPage.tsx'),'utf8');
 if(home.includes('const liveRooms = ['))errors.push('Home must not use fabricated live-room runtime data');
-if(!home.includes('discoveryApi.liveRooms()')||!home.includes('discoveryApi.trendingUsers(4)'))errors.push('Home must consume backend discovery APIs');
+if(!home.includes('discoveryApi.liveRooms()')||!home.includes('discoveryApi.trendingUsers('))errors.push('Home must consume backend discovery APIs');
 const profile=fs.readFileSync(path.join(root,'website/src/pages/ProfilePage.tsx'),'utf8');
 if(!profile.includes('publicByUsername')||!profile.includes('profileApi.byId')||!profile.includes('profileApi.follow')||!profile.includes('profileApi.unfollow'))errors.push('Public profile/follow authority incomplete');
 if(api.includes('as { isFollowing: true }')||api.includes('as { isFollowing: false }'))errors.push('Follow/unfollow API must not expose incompatible literal-only mutation result types');

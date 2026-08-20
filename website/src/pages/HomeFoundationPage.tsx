@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, Headphones, Mic2, Radio, ShieldCheck, Sparkles, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -5,12 +6,16 @@ import { GradientButton } from '@/components/common/GradientButton';
 import { RoomCard } from '@/components/discovery/RoomCard';
 import { UserCard } from '@/components/discovery/UserCard';
 import { DiscoveryEmpty, DiscoveryError, DiscoveryLoading } from '@/components/discovery/DiscoveryStates';
+import { useWebsiteAuthStore } from '@/auth/auth.store';
 import { discoveryApi } from '@/features/discovery/discovery.api';
+import { visibleConsumerUsers } from '@/features/discovery/consumer-users';
 
 export function HomeFoundationPage() {
   const navigate = useNavigate();
+  const currentUser = useWebsiteAuthStore((state) => state.user);
   const rooms = useQuery({ queryKey: ['ph03','home','rooms'], queryFn: () => discoveryApi.liveRooms() });
-  const people = useQuery({ queryKey: ['ph03','home','people'], queryFn: () => discoveryApi.trendingUsers(4) });
+  const people = useQuery({ queryKey: ['ph03','home','people'], queryFn: () => discoveryApi.trendingUsers(8) });
+  const visiblePeople = useMemo(() => visibleConsumerUsers(people.data?.items, currentUser).slice(0, 3), [people.data?.items, currentUser?.id, currentUser?.username]);
 
   return (
     <div className="vc-home vc-page-width">
@@ -60,7 +65,7 @@ export function HomeFoundationPage() {
         </article>
         <article className="vc-home-panel vc-home-panel--people">
           <div className="vc-home-panel__icon"><Sparkles size={22} /></div><h3>Trending voices</h3>
-          {people.isPending ? <small>Loading…</small> : people.data?.items.length ? <div className="vc-home-people">{people.data.items.slice(0,3).map(u=><UserCard key={u.id} user={u}/>)}</div> : <p>No trending profiles yet.</p>}
+          {people.isPending ? <small>Loading…</small> : visiblePeople.length ? <div className="vc-home-people">{visiblePeople.map(u=><UserCard key={u.id} user={u}/>)}</div> : <p>No trending profiles yet.</p>}
         </article>
       </section>
     </div>

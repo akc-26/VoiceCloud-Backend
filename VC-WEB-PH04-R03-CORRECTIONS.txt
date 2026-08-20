@@ -1,0 +1,11 @@
+VC-WEB-PH04-R03 CORRECTIONS
+
+1. Search people results now apply the same signed-in-user exclusion used by recommendations.
+2. Consumer identity filtering compares both immutable user id and normalized username.
+3. UserCard has a defense-in-depth guard: self, guest and backend-only identities cannot render even if a future caller forgets to pre-filter.
+4. Followers/Following result rendering applies the centralized consumer discovery visibility policy.
+5. Friends list, suggestions, incoming requests and outgoing requests apply consumer visibility/self-exclusion safety.
+6. Community member directory hides backend-only/guest platform identities while retaining legitimate consumer members, including the current user's own membership.
+7. PH04 source regression checks explicitly protect SearchPage self-exclusion and reusable UserCard visibility enforcement.
+
+No new feature scope was added. This is a corrective consumer-visibility hardening revision of PH04-R02.
