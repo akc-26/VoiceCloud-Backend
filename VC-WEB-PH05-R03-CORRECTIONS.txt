@@ -1,0 +1,12 @@
+VC-WEB-PH05-R03 CORRECTION
+
+Acceptance finding fixed:
+- TypeScript DOM typing rejected `playsInline` on generic `HTMLMediaElement`.
+
+Correction:
+- Narrow attached LiveKit media elements with `instanceof HTMLVideoElement` before assigning `playsInline = true`.
+- Keep autoplay/playback handling generic for audio media elements.
+- Add a PH05 source-regression check for this exact typing issue.
+
+No live-room lifecycle scope was removed or deferred.
+Protected parent remains VoiceCloud-Backend-VC-WEB-PH04-R03 @ bd330734886cda3ebf2b1a268a6dfd63f7f6011a.

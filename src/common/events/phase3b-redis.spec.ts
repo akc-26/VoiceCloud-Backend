@@ -34,7 +34,7 @@ describe('Phase 3B - Redis Integration & Distributed State', () => {
   };
 
   const mockSocketAuthService = {
-    getAuthenticatedUser: (client: any) => client.data.user,
+    ensureAuthenticatedUser: async (client: any) => client.data.user,
     assertJoinedRoom: (client: any, roomId: string) => {
       const joined = client.data.joinedRoomIds as Set<string>;
       if (!joined?.has(roomId)) {

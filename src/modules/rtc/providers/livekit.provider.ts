@@ -15,6 +15,7 @@ import { RtcConfig } from '../entities/rtc-config.entity';
 import { SpeakerRole } from '../entities/rtc-speaker-history.entity';
 import { DynamicConfigService } from '../../config/dynamic-config.service';
 import { ProviderCategory } from '../../admin/entities/provider-config.entity';
+import { liveKitHttpBaseUrl, resolveLiveKitProviderConfig } from '../livekit-config.util';
 
 interface LiveKitParticipantInfo {
   identity?: string;
@@ -28,7 +29,7 @@ export class LiveKitProvider implements IRtcProvider {
 
   constructor(private readonly dynamicConfigService: DynamicConfigService) {}
 
-  private requireCredentials(config: RtcConfig): { apiKey: string; apiSecret: string } {
+  private requireLegacyCredentials(config: RtcConfig): { apiKey: string; apiSecret: string } {
     const apiKey = config.apiKey?.trim();
     const apiSecret = config.secret?.trim();
     if (
@@ -73,25 +74,97 @@ export class LiveKitProvider implements IRtcProvider {
     };
   }
 
-  private async getHttpBaseUrl(): Promise<string> {
+  private async resolveRuntimeConfig(config: RtcConfig): Promise<{
+    apiKey: string;
+    apiSecret: string;
+    serverUrl: string;
+  }> {
+    const activeProvider = await this.dynamicConfigService.getActiveProviderConfig(
+      ProviderCategory.RTC,
+    );
+    if (
+      activeProvider &&
+      activeProvider.providerType.trim().toLowerCase() === this.name
+    ) {
+      if (activeProvider.healthStatus !== 'healthy') {
+        throw new ServiceUnavailableException(
+          'Active LiveKit provider must pass the Admin connection test before RTC broadcasting is enabled',
+        );
+      }
+      const resolved = resolveLiveKitProviderConfig(
+        activeProvider.config as Record<string, unknown>,
+      );
+      if (!resolved.serverUrl || !resolved.apiKey || !resolved.apiSecret) {
+        throw new ServiceUnavailableException(
+          'Active LiveKit provider requires Project URL, API Key, and API Secret',
+        );
+      }
+      if (/DEFAULT|PLACEHOLDER|YOUR_|voicecloud\.app/i.test(
+        `${resolved.serverUrl}${resolved.apiKey}${resolved.apiSecret}`,
+      )) {
+        throw new ServiceUnavailableException(
+          'Active LiveKit provider still contains placeholder/default values',
+        );
+      }
+      return {
+        apiKey: resolved.apiKey,
+        apiSecret: resolved.apiSecret,
+        serverUrl: resolved.serverUrl,
+      };
+    }
+
+    const legacy = this.requireLegacyCredentials(config);
     const provider = await this.dynamicConfigService.getProviderConfig(
       ProviderCategory.RTC,
       this.name,
     );
-    const host = String(provider?.config?.host || '').trim();
-    if (!host || /voicecloud\.app$/i.test(host.replace(/^wss?:\/\//, ''))) {
+    if (provider && provider.healthStatus !== 'healthy') {
       throw new ServiceUnavailableException(
-        'LiveKit server URL is not configured with a real provider endpoint',
+        'LiveKit provider must pass the Admin connection test before RTC broadcasting is enabled',
       );
     }
-    const httpHost = host
-      .replace(/^wss:\/\//i, 'https://')
-      .replace(/^ws:\/\//i, 'http://')
-      .replace(/\/$/, '');
-    if (!/^https?:\/\//i.test(httpHost)) {
-      throw new ServiceUnavailableException('LiveKit server URL must use ws/wss/http/https');
+    const resolved = resolveLiveKitProviderConfig(
+      provider?.config as Record<string, unknown> | undefined,
+    );
+    if (!resolved.serverUrl) {
+      throw new ServiceUnavailableException(
+        'LiveKit Project URL is missing from provider configuration',
+      );
     }
-    return httpHost;
+    return { ...legacy, serverUrl: resolved.serverUrl };
+  }
+
+  private async verifyConnectivity(config: RtcConfig): Promise<void> {
+    const { apiKey, apiSecret, serverUrl } = await this.resolveRuntimeConfig(config);
+    const baseUrl = liveKitHttpBaseUrl(serverUrl);
+    const { token } = this.signJwt(
+      apiKey,
+      apiSecret,
+      'voicecloud-rtc-preflight',
+      90,
+      { roomList: true },
+    );
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/twirp/livekit.RoomService/ListRooms`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        `LiveKit signaling endpoint could not be reached: ${(error as Error).message}`,
+      );
+    }
+    if (!response.ok) {
+      const detail = (await response.text()).slice(0, 500);
+      throw new ServiceUnavailableException(
+        `LiveKit rejected the configured Project URL/API credentials (${response.status}): ${detail}`,
+      );
+    }
   }
 
   private async roomServiceRequest<T>(
@@ -100,8 +173,8 @@ export class LiveKitProvider implements IRtcProvider {
     roomId: string,
     body: Record<string, unknown>,
   ): Promise<T> {
-    const { apiKey, apiSecret } = this.requireCredentials(config);
-    const baseUrl = await this.getHttpBaseUrl();
+    const { apiKey, apiSecret, serverUrl } = await this.resolveRuntimeConfig(config);
+    const baseUrl = liveKitHttpBaseUrl(serverUrl);
     const { token } = this.signJwt(apiKey, apiSecret, 'voicecloud-server', 120, {
       room: roomId,
       roomAdmin: true,
@@ -136,7 +209,7 @@ export class LiveKitProvider implements IRtcProvider {
     config: RtcConfig,
     options: RtcTokenOptions,
   ): Promise<RtcTokenResult> {
-    const { apiKey, apiSecret } = this.requireCredentials(config);
+    const { apiKey, apiSecret, serverUrl } = await this.resolveRuntimeConfig(config);
     const expirationSeconds =
       options.expirationSeconds || config.tokenExpiration || 3600;
     const canPublish =
@@ -144,6 +217,18 @@ export class LiveKitProvider implements IRtcProvider {
       options.role === SpeakerRole.CO_HOST ||
       options.role === SpeakerRole.MODERATOR ||
       options.role === SpeakerRole.SPEAKER;
+
+    // Host/room-manager token generation doubles as the broadcast preflight.
+    // A syntactically valid JWT is not enough: verify that these exact URL/key/secret
+    // values can authenticate against LiveKit before VoiceCloud can mark a room LIVE.
+    if (
+      options.role === SpeakerRole.HOST ||
+      options.role === SpeakerRole.CO_HOST ||
+      options.role === SpeakerRole.MODERATOR
+    ) {
+      await this.verifyConnectivity(config);
+    }
+
     const { token, expiresAt } = this.signJwt(
       apiKey,
       apiSecret,
@@ -161,6 +246,7 @@ export class LiveKitProvider implements IRtcProvider {
       token,
       provider: this.name,
       appId: apiKey,
+      serverUrl,
       roomId: options.roomId,
       userId: options.userId,
       role: options.role,
@@ -170,7 +256,7 @@ export class LiveKitProvider implements IRtcProvider {
 
   async validateToken(config: RtcConfig, token: string): Promise<boolean> {
     try {
-      const { apiKey, apiSecret } = this.requireCredentials(config);
+      const { apiKey, apiSecret } = await this.resolveRuntimeConfig(config);
       const parts = token.split('.');
       if (parts.length !== 3) return false;
       const expected = crypto
@@ -319,7 +405,7 @@ export class LiveKitProvider implements IRtcProvider {
     _body: unknown,
   ): boolean {
     try {
-      const { apiKey, apiSecret } = this.requireCredentials(config);
+      const { apiKey, apiSecret } = this.requireLegacyCredentials(config);
       const rawAuth = headers.authorization || headers.Authorization;
       if (!rawAuth?.startsWith('Bearer ')) return false;
       const token = rawAuth.slice(7).trim();

@@ -27,6 +27,8 @@ import {
   HostVerificationApplicationPayload,
   HostEligibilityResponse,
   OwnerHostProfile,
+  CreatorRtcJoinResult,
+  CreatorRoomStageState,
 } from '../types/creator.types';
 
 export class ApiError extends Error {
@@ -500,7 +502,135 @@ export class CreatorApiService {
       scheduledFor: r.scheduledFor,
       isPrivate: r.isPrivate ?? !!(r.isInviteOnly || r.isLocked || r.clubId),
       isInviteOnly: r.isInviteOnly,
+      scheduledRoomId: r.scheduledRoomId ?? null,
+      description: r.description,
+      hostId: r.hostId,
+      listenerCount: r.listenerCount ?? 0,
+      speakerCount: r.speakerCount ?? 0,
     }));
+  }
+
+  async getRoom(id: string, signal?: AbortSignal): Promise<LiveRoomSummary> {
+    return this.request<LiveRoomSummary>(`/rooms/${id}`, { signal });
+  }
+
+  async startVoiceSession(roomId: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>('/rtc/sessions/start', {
+      method: 'POST',
+      body: JSON.stringify({ roomId, qualityProfile: 'speech' }),
+      signal,
+    });
+  }
+
+  async getActiveVoiceSessions(roomId: string, signal?: AbortSignal): Promise<any[]> {
+    const res = await this.request<any>(`/rtc/sessions/active?roomId=${encodeURIComponent(roomId)}&limit=20`, { signal });
+    return Array.isArray(res) ? res : res?.data || [];
+  }
+
+  async stopVoiceSession(sessionId: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>('/rtc/sessions/stop', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+      signal,
+    });
+  }
+
+  async ensureVoiceSession(roomId: string, signal?: AbortSignal): Promise<any> {
+    const sessions = await this.getActiveVoiceSessions(roomId, signal);
+    const existing = sessions.find((session) => session?.roomId === roomId && String(session?.status || '').toLowerCase() === 'active');
+    return existing || this.startVoiceSession(roomId, signal);
+  }
+
+  async preflightBroadcastAudio(roomId: string, signal?: AbortSignal): Promise<CreatorRtcJoinResult> {
+    const result = await this.request<CreatorRtcJoinResult>('/rtc/token', {
+      method: 'POST',
+      body: JSON.stringify({ roomId, role: 'host' }),
+      signal,
+    });
+    if (result.provider !== 'livekit' || !result.serverUrl) {
+      throw new ApiError(
+        `Real browser broadcasting currently requires an active LiveKit provider. Current provider: ${result.provider || 'unknown'}.`,
+        503,
+        { code: 'RTC_MEDIA_UNAVAILABLE' },
+      );
+    }
+    return result;
+  }
+
+  async startBroadcast(id: string, signal?: AbortSignal): Promise<any> {
+    await this.preflightBroadcastAudio(id, signal);
+    const room = await this.startRoom(id, signal);
+    try {
+      await this.ensureVoiceSession(id, signal);
+      return room;
+    } catch (error) {
+      await this.endRoom(id, signal).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async endBroadcast(id: string, signal?: AbortSignal): Promise<any> {
+    const sessions = await this.getActiveVoiceSessions(id, signal);
+    for (const session of sessions) {
+      if (session?.id) await this.stopVoiceSession(session.id, signal);
+    }
+    return this.endRoom(id, signal);
+  }
+
+  async joinRtcRoom(roomId: string, signal?: AbortSignal): Promise<CreatorRtcJoinResult> {
+    return this.request<CreatorRtcJoinResult>('/rtc/rooms/join', {
+      method: 'POST',
+      body: JSON.stringify({ roomId, role: 'host', deviceInfo: 'creator-studio-web' }),
+      signal,
+    });
+  }
+
+  async leaveRtcRoom(roomId: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>('/rtc/rooms/leave', {
+      method: 'POST',
+      body: JSON.stringify({ roomId }),
+      signal,
+    });
+  }
+
+  async getRtcParticipants(roomId: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>(`/rtc/rooms/${roomId}/participants`, { signal });
+  }
+
+  async reportSpeakingState(roomId: string, isSpeaking: boolean, signal?: AbortSignal): Promise<any> {
+    return this.request<any>('/rtc/speaking-state', {
+      method: 'POST',
+      body: JSON.stringify({ roomId, isSpeaking, audioLevel: isSpeaking ? 100 : 0 }),
+      signal,
+    });
+  }
+
+  async getRoomStage(roomId: string, signal?: AbortSignal): Promise<CreatorRoomStageState> {
+    return this.request<CreatorRoomStageState>(`/rtc/rooms/${roomId}/stage`, { signal });
+  }
+
+  async getUserProfileById(userId: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>(`/users/${userId}/profile`, { signal });
+  }
+
+  async getRoomConversation(roomId: string, name?: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>('/chat/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ type: 'room', roomId, name }),
+      signal,
+    });
+  }
+
+  async getRoomMessages(conversationId: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>(`/chat/conversations/${conversationId}/messages?page=1&limit=100`, { signal });
+  }
+
+  async sendRoomMessage(conversationId: string, content: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>(`/chat/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'text', content }),
+      signal,
+    });
   }
 
   async createRoom(
@@ -579,6 +709,22 @@ export class CreatorApiService {
     });
   }
 
+  async approveSpeaker(roomId: string, targetUserId: string, seatIndex = 1, signal?: AbortSignal): Promise<any> {
+    return this.request<any>(`/rtc/rooms/${roomId}/approve-speaker`, {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId, seatIndex }),
+      signal,
+    });
+  }
+
+  async rejectSpeaker(roomId: string, targetUserId: string, signal?: AbortSignal): Promise<any> {
+    return this.request<any>(`/rtc/rooms/${roomId}/reject-speaker`, {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId }),
+      signal,
+    });
+  }
+
   async removeSpeaker(
     roomId: string,
     targetUserId: string,
@@ -599,7 +745,7 @@ export class CreatorApiService {
   ): Promise<any> {
     return this.request<any>(`/rtc/rooms/${roomId}/mute-user`, {
       method: 'POST',
-      body: JSON.stringify({ targetUserId, isMuted }),
+      body: JSON.stringify({ targetUserId, mute: isMuted }),
       signal,
     });
   }
@@ -612,7 +758,7 @@ export class CreatorApiService {
   ): Promise<any> {
     return this.request<any>(`/rtc/rooms/${roomId}/lock-seat`, {
       method: 'POST',
-      body: JSON.stringify({ seatIndex, isLocked }),
+      body: JSON.stringify({ seatIndex, lock: isLocked }),
       signal,
     });
   }
@@ -621,8 +767,10 @@ export class CreatorApiService {
    * Scheduled Rooms API
    * Endpoint: GET /api/v1/scheduled-rooms
    */
-  async getScheduledRooms(signal?: AbortSignal): Promise<any[]> {
-    const res = await this.request<any>('/scheduled-rooms?limit=100', { signal });
+  async getScheduledRooms(hostId?: string, signal?: AbortSignal): Promise<any[]> {
+    const query = new URLSearchParams({ limit: '100' });
+    if (hostId) query.set('hostId', hostId);
+    const res = await this.request<any>(`/scheduled-rooms?${query.toString()}`, { signal });
     return Array.isArray(res) ? res : res?.data || [];
   }
 

@@ -114,7 +114,45 @@ export interface LiveRoomSummary {
   scheduledFor?: string;
   isPrivate?: boolean;
   isInviteOnly?: boolean;
+  scheduledRoomId?: string | null;
+  description?: string | null;
+  hostId?: string;
+  listenerCount?: number;
+  speakerCount?: number;
 }
+
+export interface CreatorRtcJoinResult {
+  message: string;
+  roomId: string;
+  userId: string;
+  role: string;
+  token: string;
+  provider?: string;
+  appId?: string;
+  serverUrl?: string;
+  expiresAt: string;
+  presenceState?: Record<string, unknown>;
+}
+
+export interface CreatorRtcParticipant {
+  userId: string;
+  roomId?: string;
+  role?: string;
+  status?: string;
+  isMuted?: boolean;
+  isSpeaking?: boolean;
+  handRaised?: boolean;
+  username?: string;
+}
+
+export interface CreatorRoomStageState {
+  roomId: string;
+  handQueue: Array<{ userId: string; seatIndex?: number; timestamp?: number }>;
+  speakers: Array<{ userId: string; username?: string; isMuted?: boolean; role?: string; joinedStageAt?: string }>;
+  participants: CreatorRtcParticipant[];
+  activeSession?: { id: string; status: string; concurrentUsers?: number; peakAudience?: number } | null;
+}
+
 
 export interface CreatorPlan {
   id: string;

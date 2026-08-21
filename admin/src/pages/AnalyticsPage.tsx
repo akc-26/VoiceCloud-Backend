@@ -60,7 +60,7 @@ export const AnalyticsPage: React.FC = () => {
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" fontWeight={800}>Platform Analytics & Intelligence</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800 }}>Platform Analytics & Intelligence</Typography>
         <Typography color="text.secondary">
           Current persisted platform and monetization metrics. Values are never substituted with fabricated analytics when an API is unavailable.
         </Typography>
@@ -70,7 +70,7 @@ export const AnalyticsPage: React.FC = () => {
           <Card key={label}>
             <CardContent>
               <Typography variant="caption" color="text.secondary">{label}</Typography>
-              <Typography variant="h4" fontWeight={800}>{value.toLocaleString()}</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 800 }}>{value.toLocaleString()}</Typography>
             </CardContent>
           </Card>
         ))}

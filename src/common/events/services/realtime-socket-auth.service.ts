@@ -21,6 +21,12 @@ export interface AuthenticatedRealtimeSocketUser {
   jti: string;
 }
 
+type SocketAuthData = {
+  user?: AuthenticatedRealtimeSocketUser;
+  joinedRoomIds?: Set<string>;
+  authPromise?: Promise<AuthenticatedRealtimeSocketUser>;
+};
+
 @Injectable()
 export class RealtimeSocketAuthService {
   private readonly logger = new Logger(RealtimeSocketAuthService.name);
@@ -28,7 +34,50 @@ export class RealtimeSocketAuthService {
 
   constructor(private readonly moduleRef: ModuleRef) {}
 
+  /**
+   * Authenticate the Socket.IO connection. The same promise is shared with
+   * message handlers so a valid JWT can never lose a race against Nest's async
+   * gateway connection hook.
+   */
   async authenticate(
+    client: Socket,
+  ): Promise<AuthenticatedRealtimeSocketUser> {
+    return this.ensureAuthenticatedUser(client);
+  }
+
+  /**
+   * Await authenticated socket identity, lazily verifying the handshake token
+   * when a message arrives before handleConnection() has finished. This keeps
+   * security fail-closed while removing transient "Authenticated socket user
+   * required" errors for valid clients.
+   */
+  async ensureAuthenticatedUser(
+    client: Socket,
+  ): Promise<AuthenticatedRealtimeSocketUser> {
+    const data = client.data as SocketAuthData;
+    if (data.user?.userId) return data.user;
+    if (data.authPromise) return data.authPromise;
+
+    const authPromise = this.verifyAndAttach(client);
+    data.authPromise = authPromise;
+    try {
+      return await authPromise;
+    } finally {
+      if (data.authPromise === authPromise) delete data.authPromise;
+    }
+  }
+
+  assertJoinedRoom(client: Socket, roomId: string): void {
+    const joinedRoomIds = (client.data as SocketAuthData)?.joinedRoomIds;
+    if (!joinedRoomIds?.has(roomId)) {
+      throw {
+        code: SocketErrorCode.NOT_IN_ROOM,
+        message: 'Join the room before performing this action',
+      };
+    }
+  }
+
+  private async verifyAndAttach(
     client: Socket,
   ): Promise<AuthenticatedRealtimeSocketUser> {
     const token = this.extractToken(client);
@@ -44,31 +93,10 @@ export class RealtimeSocketAuthService {
 
     const payload = await this.jwtTokenService.verifyAccessToken(token);
     const user = this.toSocketUser(payload);
-    client.data.user = user;
-    client.data.joinedRoomIds = new Set<string>();
+    const data = client.data as SocketAuthData;
+    data.user = user;
+    data.joinedRoomIds ??= new Set<string>();
     return user;
-  }
-
-  getAuthenticatedUser(client: Socket): AuthenticatedRealtimeSocketUser {
-    const user = client.data?.user as
-      | AuthenticatedRealtimeSocketUser
-      | undefined;
-    if (!user?.userId) {
-      throw new UnauthorizedException('Authenticated socket user required');
-    }
-    return user;
-  }
-
-  assertJoinedRoom(client: Socket, roomId: string): void {
-    const joinedRoomIds = client.data?.joinedRoomIds as
-      | Set<string>
-      | undefined;
-    if (!joinedRoomIds?.has(roomId)) {
-      throw {
-        code: SocketErrorCode.NOT_IN_ROOM,
-        message: 'Join the room before performing this action',
-      };
-    }
   }
 
   private toSocketUser(

@@ -1,0 +1,12 @@
+VC-WEB-PH05-R04 COMPREHENSIVE ACCEPTANCE CORRECTION
+
+This revision is based on PH05-R03 and fixes the complete Creator Studio TypeScript failure reported by the workstation acceptance gate (28 errors across 4 files), rather than only the first surfaced error.
+
+Corrections:
+- MUI v9: moved unsupported Stack/Box/Typography system shorthand props into sx in AudiencePage and LiveRoomConsolePage.
+- MUI v9: replaced TextField inputProps with slotProps.htmlInput in SubscribersPage.
+- LiveRoomsPage: create mutation now uses the required CreateLiveRoomInput contract instead of Partial<LiveRoomSummary>.
+- LiveRoomConsolePage JSX was normalized/readabilized while preserving the PH05-R02/R03 live-room behavior.
+- PH05 source check now protects these Creator/MUI type-compatibility rules.
+
+No live-room lifecycle functionality from R02/R03 is removed.

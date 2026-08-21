@@ -1,0 +1,13 @@
+VC-WEB-PH05-R07 CORRECTIONS
+Parent candidate: VC-WEB-PH05-R06
+Protected Git parent remains: VC-WEB-PH04-R03 / bd330734886cda3ebf2b1a268a6dfd63f7f6011a
+
+R07 closes the backend semantic acceptance gap exposed by the Windows R06 gate:
+- fixes stale RoomsService WP08-02 test construction after RoomAuthorityService became a required dependency;
+- adds a repository-wide TypeScript AST constructor-contract audit for manual service instantiations in specs/tests;
+- adds LiveKit Admin connection-test regression coverage for missing, valid, and rejected credentials;
+- expands PH05 runtime acceptance to include the full WP08-02 room/realtime/security suite and R11 RTC authority tests;
+- preserves all R05/R06 live-room, LiveKit, Creator, realtime, identity, and MUI-v9 corrections.
+
+No database schema/entity/migration changes.
+- replaces fail-fast post-install acceptance with a non-fail-fast Node runner that executes all 17 post-install gates and reports every failing gate together, preventing serial one-error-per-revision discovery.

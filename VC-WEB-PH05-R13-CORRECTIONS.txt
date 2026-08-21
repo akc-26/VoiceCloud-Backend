@@ -1,0 +1,40 @@
+VC-WEB-PH05-R13 CORRECTIVE PACKAGE
+Parent: VC-WEB-PH05-R12 corrective package, validated against the user workstation R12 acceptance log
+
+Why R13 was required
+The R12 workstation acceptance run exposed two regressions introduced by the realtime-auth refactor:
+1. src/common/events/phase3a-realtime.spec.ts called the now-async PresenceGateway.handlePing() without await, causing Backend/shared TypeScript to fail.
+2. src/wp08/wp08-02-realtime-security.spec.ts still mocked the removed synchronous socket-auth contract, so PresenceGateway.handleGetParticipantCount() failed with `ensureAuthenticatedUser is not a function`.
+
+R13 corrections
+1. Acceptance regression repair
+   - Heartbeat/ping test is async and awaits handlePing().
+   - WP08 private participant-count test mocks ensureAuthenticatedUser().
+   - Phase3A/Phase3B socket-auth mocks use only the awaited authentication contract.
+
+2. Creator Pause hardening
+   - Removed the obsolete synchronous getAuthenticatedUser() accessor from production realtime auth.
+   - The literal `Authenticated socket user required` runtime message is no longer present in production source.
+   - Creator Pause on /rooms, Live Room Console, and Schedule continues to the authoritative HTTP pause lifecycle even if local microphone cleanup reports an error.
+
+3. Realtime auth runtime regression
+   - Added src/common/events/realtime-socket-auth.r13.spec.ts.
+   - It starts connection authentication, fires a presence handler before JWT verification completes, then verifies the handler waits for the same in-flight auth promise and succeeds after verification.
+   - Missing identity/token still fails closed.
+
+4. Preserved R12 functionality
+   - Schedule start/edit/local-timezone/timestamptz correction preserved.
+   - Creator chat own-right/others-left preserved.
+   - Host mute state and consumer authoritative mute enforcement preserved.
+   - Consumer emoji reconnect/ACK correction preserved.
+   - Pause/resume/end realtime handling and ended-room redirect preserved.
+   - Bounded consumer chat preserved.
+   - LIVE-only interaction authority while paused preserved.
+
+Acceptance additions
+- scripts/r13/r13-live-room-corrections-source-check.mjs
+- src/common/events/realtime-socket-auth.r13.spec.ts
+- Comprehensive acceptance is labeled VC-WEB-PH05-R13 and runs both R12 and R13 regression gates.
+
+Windows acceptance command
+  scripts\website\VC-WEB-PH05-ACCEPTANCE.cmd

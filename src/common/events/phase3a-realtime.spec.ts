@@ -26,7 +26,7 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
   } as unknown as Server;
 
   const mockSocketAuthService = {
-    getAuthenticatedUser: (client: Socket) => client.data.user,
+    ensureAuthenticatedUser: async (client: Socket) => client.data.user,
     assertJoinedRoom: (client: Socket, roomId: string) => {
       const joined = client.data.joinedRoomIds as Set<string>;
       if (!joined?.has(roomId)) {
@@ -554,9 +554,9 @@ describe('Phase 3A - Socket.IO Real-Time Extensions', () => {
       );
     });
 
-    it('should respond to heartbeat/ping', () => {
+    it('should respond to heartbeat/ping', async () => {
       const socket = createMockSocket('user-pres-1');
-      const res = presenceGateway.handlePing(socket, { timestamp: 123456 });
+      const res = await presenceGateway.handlePing(socket, { timestamp: 123456 });
 
       expect(res.success).toBe(true);
       expect('pong' in res ? res.pong : undefined).toBe(true);

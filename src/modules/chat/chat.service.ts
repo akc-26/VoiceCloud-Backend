@@ -16,6 +16,7 @@ import { EventsGateway } from '../../common/events/events.gateway';
 import { QueueService } from '../../queue/queue.service';
 import { JOB_TYPES } from '../../queue/queue.constants';
 import { RoomAuthorityService } from '../rooms/room-authority.service';
+import { RealtimeRoomStateService } from '../../common/events/services/realtime-room-state.service';
 
 import { Conversation, ConversationType } from './entities/conversation.entity';
 import {
@@ -41,6 +42,7 @@ import {
 } from './dto/update-group.dto';
 import { ReportMessageDto, ResolveReportDto } from './dto/report-message.dto';
 import { ChatQueryDto } from './dto/chat-query.dto';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class ChatService {
@@ -59,12 +61,55 @@ export class ChatService {
     private readonly reportRepo: Repository<MessageReport>,
     @InjectRepository(VoiceNote)
     private readonly voiceNoteRepo: Repository<VoiceNote>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly storageService: StorageService,
     private readonly redisService: RedisService,
     private readonly roomAuthorityService: RoomAuthorityService,
+    private readonly realtimeRoomStateService: RealtimeRoomStateService,
     @Optional() private readonly eventsGateway?: EventsGateway,
     @Optional() private readonly queueService?: QueueService,
   ) {}
+
+  private async senderSummary(userId: string) {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      select: { id: true, username: true, displayName: true, avatarUrl: true },
+    });
+    if (!user) {
+      return { id: userId, username: 'voicecloud-user', displayName: 'VoiceCloud user', avatarUrl: null };
+    }
+    return {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl || null,
+    };
+  }
+
+  private async withSender<T extends Message>(message: T) {
+    return { ...message, sender: await this.senderSummary(message.senderId) };
+  }
+
+  private async withSenders<T extends Message>(messages: T[]) {
+    const senderIds = Array.from(new Set(messages.map((message) => message.senderId).filter(Boolean)));
+    const users = senderIds.length
+      ? await this.userRepo.find({
+          where: { id: In(senderIds) },
+          select: { id: true, username: true, displayName: true, avatarUrl: true },
+        })
+      : [];
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    return messages.map((message) => {
+      const user = userMap.get(message.senderId);
+      return {
+        ...message,
+        sender: user
+          ? { id: user.id, username: user.username, displayName: user.displayName, avatarUrl: user.avatarUrl || null }
+          : { id: message.senderId, username: 'voicecloud-user', displayName: 'VoiceCloud user', avatarUrl: null },
+      };
+    });
+  }
 
   // ==========================================
   // DIRECT & GROUP CONVERSATIONS
@@ -194,6 +239,11 @@ export class ChatService {
     createdById?: string,
     name?: string,
   ) {
+    if (createdById) {
+      await this.realtimeRoomStateService.assertRoomJoinable(roomId, createdById);
+      await this.realtimeRoomStateService.assertParticipantOrHost(roomId, createdById);
+    }
+
     let conversation = await this.conversationRepo.findOne({
       where: { roomId, type: ConversationType.ROOM },
     });
@@ -221,6 +271,7 @@ export class ChatService {
         });
         await this.memberRepo.save(member);
       }
+      return this.getConversationById(conversation.id, createdById);
     }
 
     return conversation;
@@ -295,6 +346,15 @@ export class ChatService {
     return { conversations: formatted, total, page, limit };
   }
 
+  private async assertRoomConversationAccess(
+    conversation: Conversation,
+    userId?: string,
+  ): Promise<void> {
+    if (!userId || conversation.type !== ConversationType.ROOM || !conversation.roomId) return;
+    await this.realtimeRoomStateService.assertRoomJoinable(conversation.roomId, userId);
+    await this.realtimeRoomStateService.assertParticipantOrHost(conversation.roomId, userId);
+  }
+
   async getConversationById(conversationId: string, userId?: string) {
     const conversation = await this.conversationRepo.findOne({
       where: { id: conversationId },
@@ -314,6 +374,7 @@ export class ChatService {
           'You are not a member of this conversation',
         );
       }
+      await this.assertRoomConversationAccess(conversation, userId);
     }
 
     let lastMessage = null;
@@ -573,6 +634,11 @@ export class ChatService {
           'You are not a member of this conversation',
         );
       }
+    } else {
+      await this.assertRoomConversationAccess(conversation, senderId);
+      if (conversation.roomId) {
+        await this.realtimeRoomStateService.assertRoomInteractive(conversation.roomId);
+      }
     }
 
     let attachments: MessageAttachment[] = dto.attachments || [];
@@ -632,17 +698,22 @@ export class ChatService {
     conversation.lastMessageAt = new Date();
     await this.conversationRepo.save(conversation);
 
+    const publicMessage = await this.withSender(savedMessage);
+    const roomMessage = conversation.roomId
+      ? { ...publicMessage, roomId: conversation.roomId }
+      : publicMessage;
+
     if (this.eventsGateway) {
       this.eventsGateway.broadcastToRoom(
         conversationId,
         'chat_message',
-        savedMessage,
+        publicMessage,
       );
       if (conversation.roomId) {
         this.eventsGateway.broadcastToRoom(
           conversation.roomId,
           'chat_message',
-          savedMessage,
+          roomMessage,
         );
       }
     }
@@ -668,7 +739,7 @@ export class ChatService {
       });
     }
 
-    return savedMessage;
+    return publicMessage;
   }
 
   async getMessages(
@@ -694,9 +765,11 @@ export class ChatService {
     }
 
     const [messages, total] = await qb.getManyAndCount();
+    const orderedMessages = messages.reverse();
+    const publicMessages = await this.withSenders(orderedMessages);
 
     return {
-      messages: messages.reverse(),
+      messages: publicMessages,
       total,
       page,
       limit,
@@ -706,6 +779,7 @@ export class ChatService {
   async editMessage(messageId: string, userId: string, content: string) {
     const message = await this.messageRepo.findOne({
       where: { id: messageId },
+      relations: { conversation: true },
     });
 
     if (!message) {
@@ -721,16 +795,27 @@ export class ChatService {
     message.editedAt = new Date();
 
     const updated = await this.messageRepo.save(message);
+    const publicMessage = await this.withSender(updated);
+    const updatePayload = message.conversation?.roomId
+      ? { ...publicMessage, roomId: message.conversation.roomId }
+      : publicMessage;
 
     if (this.eventsGateway) {
       this.eventsGateway.broadcastToRoom(
         message.conversationId,
         'chat_message_updated',
-        updated,
+        publicMessage,
       );
+      if (message.conversation?.roomId) {
+        this.eventsGateway.broadcastToRoom(
+          message.conversation.roomId,
+          'chat_message_updated',
+          updatePayload,
+        );
+      }
     }
 
-    return updated;
+    return publicMessage;
   }
 
   async deleteMessage(messageId: string, userId: string) {
@@ -758,11 +843,23 @@ export class ChatService {
     await this.messageRepo.softDelete(messageId);
 
     if (this.eventsGateway) {
+      const deletePayload = {
+        messageId,
+        conversationId: message.conversationId,
+        roomId: message.conversation?.roomId || undefined,
+      };
       this.eventsGateway.broadcastToRoom(
         message.conversationId,
         'chat_message_deleted',
-        { messageId },
+        deletePayload,
       );
+      if (message.conversation?.roomId) {
+        this.eventsGateway.broadcastToRoom(
+          message.conversation.roomId,
+          'chat_message_deleted',
+          deletePayload,
+        );
+      }
     }
 
     return { message: 'Message deleted successfully', messageId };
@@ -791,9 +888,18 @@ export class ChatService {
   async addReaction(messageId: string, userId: string, emoji: string) {
     const message = await this.messageRepo.findOne({
       where: { id: messageId },
+      relations: { conversation: { members: true } },
     });
     if (!message) {
       throw new NotFoundException('Message not found');
+    }
+    if (message.conversation.type === ConversationType.ROOM) {
+      await this.assertRoomConversationAccess(message.conversation, userId);
+      if (message.conversation.roomId) {
+        await this.realtimeRoomStateService.assertRoomInteractive(message.conversation.roomId);
+      }
+    } else if (!message.conversation.members.some((member) => member.userId === userId && !member.leftAt)) {
+      throw new ForbiddenException('You are not a member of this conversation');
     }
 
     let reaction = await this.reactionRepo.findOne({
@@ -810,11 +916,25 @@ export class ChatService {
     }
 
     if (this.eventsGateway) {
+      const reactionPayload = {
+        messageId,
+        userId,
+        emoji,
+        conversationId: message.conversationId,
+        roomId: message.conversation.roomId || undefined,
+      };
       this.eventsGateway.broadcastToRoom(
         message.conversationId,
         'chat_reaction_added',
-        { messageId, userId, emoji },
+        reactionPayload,
       );
+      if (message.conversation.roomId) {
+        this.eventsGateway.broadcastToRoom(
+          message.conversation.roomId,
+          'chat_reaction_added',
+          reactionPayload,
+        );
+      }
     }
 
     return { message: 'Reaction added', reaction };
@@ -823,19 +943,42 @@ export class ChatService {
   async removeReaction(messageId: string, userId: string, emoji: string) {
     const message = await this.messageRepo.findOne({
       where: { id: messageId },
+      relations: { conversation: { members: true } },
     });
     if (!message) {
       throw new NotFoundException('Message not found');
+    }
+    if (message.conversation.type === ConversationType.ROOM) {
+      await this.assertRoomConversationAccess(message.conversation, userId);
+      if (message.conversation.roomId) {
+        await this.realtimeRoomStateService.assertRoomInteractive(message.conversation.roomId);
+      }
+    } else if (!message.conversation.members.some((member) => member.userId === userId && !member.leftAt)) {
+      throw new ForbiddenException('You are not a member of this conversation');
     }
 
     await this.reactionRepo.delete({ messageId, userId, emoji });
 
     if (this.eventsGateway) {
+      const reactionPayload = {
+        messageId,
+        userId,
+        emoji,
+        conversationId: message.conversationId,
+        roomId: message.conversation.roomId || undefined,
+      };
       this.eventsGateway.broadcastToRoom(
         message.conversationId,
         'chat_reaction_removed',
-        { messageId, userId, emoji },
+        reactionPayload,
       );
+      if (message.conversation.roomId) {
+        this.eventsGateway.broadcastToRoom(
+          message.conversation.roomId,
+          'chat_reaction_removed',
+          reactionPayload,
+        );
+      }
     }
 
     return { message: 'Reaction removed', messageId, emoji };
@@ -1129,6 +1272,16 @@ export class ChatService {
     }
 
     const [conversations, total] = await qb.getManyAndCount();
+    const memberUserIds = Array.from(
+      new Set(conversations.flatMap((conversation) => conversation.members?.map((member) => member.userId) || [])),
+    );
+    const memberUsers = memberUserIds.length
+      ? await this.userRepo.find({
+          where: { id: In(memberUserIds) },
+          select: { id: true, username: true, displayName: true, avatarUrl: true },
+        })
+      : [];
+    const memberUserMap = new Map(memberUsers.map((user) => [user.id, user]));
 
     const formatted = await Promise.all(
       conversations.map(async (conv) => {
@@ -1137,6 +1290,15 @@ export class ChatService {
         });
         return {
           ...conv,
+          members: (conv.members || []).map((member) => {
+            const user = memberUserMap.get(member.userId);
+            return {
+              ...member,
+              user: user
+                ? { id: user.id, username: user.username, displayName: user.displayName, avatarUrl: user.avatarUrl || null }
+                : { id: member.userId, username: 'voicecloud-user', displayName: 'VoiceCloud user', avatarUrl: null },
+            };
+          }),
           memberCount: conv.members?.length || 0,
           messageCount,
         };
@@ -1214,14 +1376,27 @@ export class ChatService {
     const total = withAttachments.length;
     const paginated = withAttachments.slice((page - 1) * limit, page * limit);
 
+    const senderUsers = paginated.length
+      ? await this.userRepo.find({
+          where: { id: In(Array.from(new Set(paginated.map((message) => message.senderId)))) },
+          select: { id: true, username: true, displayName: true, avatarUrl: true },
+        })
+      : [];
+    const senderUserMap = new Map(senderUsers.map((user) => [user.id, user]));
     const attachmentsList = paginated.flatMap((m) =>
-      (m.attachments || []).map((att) => ({
-        ...att,
-        messageId: m.id,
-        conversationId: m.conversationId,
-        senderId: m.senderId,
-        createdAt: m.createdAt,
-      })),
+      (m.attachments || []).map((att) => {
+        const sender = senderUserMap.get(m.senderId);
+        return {
+          ...att,
+          messageId: m.id,
+          conversationId: m.conversationId,
+          senderId: m.senderId,
+          sender: sender
+            ? { id: sender.id, username: sender.username, displayName: sender.displayName, avatarUrl: sender.avatarUrl || null }
+            : { id: m.senderId, username: 'voicecloud-user', displayName: 'VoiceCloud user', avatarUrl: null },
+          createdAt: m.createdAt,
+        };
+      }),
     );
 
     return { attachments: attachmentsList, total, page, limit };

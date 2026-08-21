@@ -163,7 +163,7 @@ export const AudiencePage: React.FC = () => {
 
       <Card>
         <CardContent sx={{ p: 3 }}>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+          <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center' }}>
             <Users size={20} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Recent Follower Directory
@@ -194,7 +194,7 @@ export const AudiencePage: React.FC = () => {
                   {followers.map((row) => (
                     <TableRow key={row.userId}>
                       <TableCell>
-                        <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                           <Avatar src={row.avatarUrl} sx={{ width: 36, height: 36 }}>
                             {row.name.charAt(0).toUpperCase()}
                           </Avatar>

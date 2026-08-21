@@ -1,0 +1,34 @@
+VC-WEB-PH05-R02 DIFF MANIFEST
+Compared against PH05-R01 candidate
+
+Files CHANGELOG.md and CHANGELOG.md differ
+Files VC-WEB-PH05-BASELINE.txt and VC-WEB-PH05-BASELINE.txt differ
+Only in /mnt/data/VoiceCloud-Backend-VC-WEB-PH05-R02/VoiceCloud-Backend-VC-WEB-PH05-R02: VC-WEB-PH05-R02-CORRECTIONS.txt
+Only in /mnt/data/VoiceCloud-Backend-VC-WEB-PH05-R02/VoiceCloud-Backend-VC-WEB-PH05-R02: VC-WEB-PH05-R02-DIFF-MANIFEST.txt
+Only in creator/src/pages: LiveRoomConsolePage.tsx
+Files creator/src/pages/LiveRoomsPage.tsx and creator/src/pages/LiveRoomsPage.tsx differ
+Files creator/src/routes/AppRoutes.tsx and creator/src/routes/AppRoutes.tsx differ
+Files creator/src/services/creator-api.service.ts and creator/src/services/creator-api.service.ts differ
+Only in creator/src/services: live-room-realtime.service.ts
+Files creator/src/types/creator.types.ts and creator/src/types/creator.types.ts differ
+Files creator/vite.config.ts and creator/vite.config.ts differ
+Files docs/website/VC-WEB-PH05-IMPLEMENTATION-REPORT.md and docs/website/VC-WEB-PH05-IMPLEMENTATION-REPORT.md differ
+Files docs/website/VC-WEB-PH05-MANUAL-QA.md and docs/website/VC-WEB-PH05-MANUAL-QA.md differ
+Only in /mnt/data/VoiceCloud-Backend-VC-WEB-PH05-R02/VoiceCloud-Backend-VC-WEB-PH05-R02: node_modules
+Files package.json and package.json differ
+Files scripts/website/VC-WEB-PH05-ACCEPTANCE.cmd and scripts/website/VC-WEB-PH05-ACCEPTANCE.cmd differ
+Files scripts/website/web-ph05-source-check.mjs and scripts/website/web-ph05-source-check.mjs differ
+Only in shared: rtc
+Files src/common/events/services/realtime-room-state.service.ts and src/common/events/services/realtime-room-state.service.ts differ
+Files src/modules/rooms/room-lifecycle.service.spec.ts and src/modules/rooms/room-lifecycle.service.spec.ts differ
+Files src/modules/rooms/room-lifecycle.service.ts and src/modules/rooms/room-lifecycle.service.ts differ
+Files src/modules/rooms/rooms.service.ts and src/modules/rooms/rooms.service.ts differ
+Files src/modules/rooms/rooms.service.wp08-02.spec.ts and src/modules/rooms/rooms.service.wp08-02.spec.ts differ
+Files src/modules/rtc/providers/livekit.provider.ts and src/modules/rtc/providers/livekit.provider.ts differ
+Files src/modules/rtc/providers/rtc-provider.interface.ts and src/modules/rtc/providers/rtc-provider.interface.ts differ
+Files src/modules/rtc/rtc.controller.ts and src/modules/rtc/rtc.controller.ts differ
+Files src/modules/rtc/rtc.service.ts and src/modules/rtc/rtc.service.ts differ
+Files website/src/features/rooms/room.api.ts and website/src/features/rooms/room.api.ts differ
+Files website/src/features/rooms/types.ts and website/src/features/rooms/types.ts differ
+Files website/src/pages/RoomExperiencePage.tsx and website/src/pages/RoomExperiencePage.tsx differ
+Files website/src/styles/global.css and website/src/styles/global.css differ

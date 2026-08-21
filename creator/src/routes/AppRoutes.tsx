@@ -7,6 +7,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { LiveRoomsPage } from '../pages/LiveRoomsPage';
+import { LiveRoomConsolePage } from '../pages/LiveRoomConsolePage';
 import { SchedulePage } from '../pages/SchedulePage';
 import { AudiencePage } from '../pages/AudiencePage';
 import { FollowersPage } from '../pages/FollowersPage';
@@ -43,6 +44,7 @@ export const AppRoutes: React.FC = () => {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/rooms" element={<LiveRoomsPage />} />
+          <Route path="/rooms/:roomId/live" element={<LiveRoomConsolePage />} />
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/audience" element={<AudiencePage />} />
           <Route path="/followers" element={<FollowersPage />} />

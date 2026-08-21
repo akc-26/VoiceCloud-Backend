@@ -80,7 +80,7 @@ export const UserDetailPage: React.FC = () => {
         <>
           <Card sx={{ mb: 3 }}>
             <CardContent>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { sm: 'center' } }}>
                 <Avatar src={user.avatarUrl} sx={{ width: 72, height: 72 }}>{user.username?.charAt(0)?.toUpperCase()}</Avatar>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="h4" sx={{ fontWeight: 800 }}>{user.displayName}</Typography>

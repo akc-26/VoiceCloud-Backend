@@ -73,6 +73,13 @@ const CATEGORIES = [
 
 ];
 
+const LIVEKIT_CONFIG_TEMPLATE = {
+  serverUrl: 'wss://YOUR_PROJECT.livekit.cloud',
+  apiKey: 'YOUR_LIVEKIT_API_KEY',
+  apiSecret: 'YOUR_LIVEKIT_API_SECRET',
+  tokenExpiration: 3600,
+};
+
 const DEFAULT_PROVIDER_TYPE: Record<string, string> = {
   rtc: 'agora',
   storage: 'minio',
@@ -154,8 +161,14 @@ export const ProviderConfigsPage: React.FC = () => {
       await adminService.setActiveProviderConfig(id);
       addToast('success', `'${name}' is now active for its category`);
       fetchProviders();
-    } catch {
-      addToast('error', 'Failed to activate provider profile');
+    } catch (error) {
+      addToast(
+        'error',
+        extractApiErrorMessage(
+          error,
+          'Failed to activate provider profile. LiveKit must pass its connection test first.',
+        ),
+      );
     }
   };
 
@@ -180,7 +193,17 @@ export const ProviderConfigsPage: React.FC = () => {
   const handleOpenEdit = (provider?: ProviderConfigData) => {
     if (provider) {
       setSelectedProvider(provider);
-      setConfigJson(JSON.stringify(provider.config || {}, null, 2));
+      const config = { ...(provider.config || {}) } as Record<string, unknown>;
+      if (
+        provider.category === 'rtc' &&
+        provider.providerType.toLowerCase() === 'livekit' &&
+        !config.serverUrl &&
+        typeof config.host === 'string'
+      ) {
+        config.serverUrl = config.host;
+        delete config.host;
+      }
+      setConfigJson(JSON.stringify(config, null, 2));
     } else {
       setSelectedProvider({
         category: activeTab,
@@ -193,7 +216,11 @@ export const ProviderConfigsPage: React.FC = () => {
         notes: '',
         tags: ['custom'],
       });
-      setConfigJson('{\n  "apiKey": "SECRET_KEY_HERE"\n}');
+      setConfigJson(
+        activeTab === 'rtc'
+          ? JSON.stringify({ appId: 'AGORA_APP_ID', appCertificate: 'AGORA_APP_CERTIFICATE' }, null, 2)
+          : '{\n  "apiKey": "SECRET_KEY_HERE"\n}',
+      );
     }
     setEditModalOpen(true);
   };
@@ -210,6 +237,26 @@ export const ProviderConfigsPage: React.FC = () => {
       }
 
       const safeConfig = omitMaskedSecrets(parsedConfig) as Record<string, any>;
+      if (
+        selectedProvider.category === 'rtc' &&
+        selectedProvider.providerType?.trim().toLowerCase() === 'livekit'
+      ) {
+        const mergedForValidation = parsedConfig as Record<string, any>;
+        const serverUrl = String(
+          mergedForValidation.serverUrl || mergedForValidation.url || mergedForValidation.wsUrl || mergedForValidation.host || '',
+        ).trim();
+        const apiKey = String(mergedForValidation.apiKey || mergedForValidation.livekitApiKey || '').trim();
+        const apiSecret = String(mergedForValidation.apiSecret || mergedForValidation.livekitApiSecret || mergedForValidation.secret || '').trim();
+        const existingHasMaskedSecret = Object.values(mergedForValidation).some(isMaskedSecretValue);
+        if (!serverUrl || !apiKey || (!apiSecret && !existingHasMaskedSecret)) {
+          addToast('error', 'LiveKit requires Project URL, API Key, and API Secret from the same project.');
+          return;
+        }
+        if (!/^wss?:\/\//i.test(serverUrl)) {
+          addToast('error', 'LiveKit Project URL must begin with wss:// (or ws:// for an intentional local server).');
+          return;
+        }
+      }
 
       if (selectedProvider.id) {
         const payload: UpdateProviderConfigRequest = {
@@ -627,7 +674,17 @@ export const ProviderConfigsPage: React.FC = () => {
                 fullWidth
                 label="Provider Type (e.g. agora, s3, stripe, twilio)"
                 value={selectedProvider?.providerType || ''}
-                onChange={(e) => setSelectedProvider({ ...selectedProvider, providerType: e.target.value })}
+                onChange={(e) => {
+                  const providerType = e.target.value;
+                  setSelectedProvider({ ...selectedProvider, providerType });
+                  if (!selectedProvider?.id && activeTab === 'rtc') {
+                    if (providerType.trim().toLowerCase() === 'livekit') {
+                      setConfigJson(JSON.stringify(LIVEKIT_CONFIG_TEMPLATE, null, 2));
+                    } else if (providerType.trim().toLowerCase() === 'agora') {
+                      setConfigJson(JSON.stringify({ appId: 'AGORA_APP_ID', appCertificate: 'AGORA_APP_CERTIFICATE' }, null, 2));
+                    }
+                  }
+                }}
                 disabled={Boolean(selectedProvider?.id)}
                 helperText={
                   selectedProvider?.id
@@ -678,6 +735,15 @@ export const ProviderConfigsPage: React.FC = () => {
             </Grid>
 
             <Grid size={12}>
+              {selectedProvider?.category === 'rtc' &&
+              selectedProvider?.providerType?.trim().toLowerCase() === 'livekit' ? (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  LiveKit requires a Project URL, API Key, and API Secret from the same LiveKit project.
+                  Use <strong>serverUrl</strong> (for example, wss://YOUR_PROJECT.livekit.cloud),
+                  <strong> apiKey</strong>, and <strong>apiSecret</strong>. The Test action performs a real
+                  RoomService connectivity check before the provider is considered healthy.
+                </Alert>
+              ) : null}
               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
                 Configuration & Credentials (JSON - Auto Encrypted with AES-256-GCM)
               </Typography>

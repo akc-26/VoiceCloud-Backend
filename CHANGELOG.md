@@ -1,3 +1,74 @@
+# VC-WEB-PH05-R13
+
+- Corrects the two workstation acceptance regressions reported against R12: the async heartbeat spec now awaits `handlePing`, and the WP08 private participant-count test uses the awaited `ensureAuthenticatedUser` contract.
+- Removes the obsolete synchronous realtime socket identity accessor and its `Authenticated socket user required` runtime message from production source.
+- Adds an R13 runtime regression that fires a realtime handler while connection JWT verification is still in flight and proves both paths share one authentication promise.
+- Makes Creator Pause lifecycle independent of local microphone cleanup failure across `/rooms`, Live Room Console, and Schedule.
+- Preserves all R12 schedule/timezone, chat alignment, mute synchronization, consumer reaction, pause/end, bounded chat, and LIVE-only interaction corrections.
+
+# VC-WEB-PH05-R11
+
+- Corrects the complete reported PH05 live-room runtime batch without changing phase scope.
+- Waits for server-authenticated Socket.IO readiness before Creator/consumer room commands, eliminating `Authenticated socket user required` handshake races.
+- Enforces LIVE-only chat, reactions, raise-hand, invite/approve/reject, stage mute/remove/seat/speaking interactions while preserving presence/listening during PAUSED.
+- Keeps Creator live-console realtime attached across LIVE -> PAUSED -> LIVE, and improves room-card broadcast controls.
+- Completes scheduled-room lifecycle with creator-local date/time editing, timezone metadata, linked live-room start/pause/resume/end, microphone and console controls.
+- Makes consumer pause/resume/end realtime authoritative, auto-returns ended listeners to `/rooms`, and bounds live chat to an internal scrolling panel.
+- Persists speaker mute state into authoritative stage state and broadcasts mute/unmute to the room so host and speaker UIs stay synchronized.
+- Preserves R09/R08 23-gate comprehensive acceptance, Phase20 RTC authority corrections, LiveKit fail-closed authority, and protected R11 regressions.
+
+# VC-WEB-PH05-R09
+
+- Corrected all five stale Phase20 RTC test assumptions exposed by the R08 comprehensive Windows gate.
+- Preserved co-host RTC stage authority, listener speaking restrictions, and fail-closed unsupported Agora recording behavior.
+- Made the Phase20 active-speaker and recording fixtures deterministic and authority-correct.
+- Removed the hard-coded AGORA monitoring expectation in favor of the configured test fixture provider.
+- Added PH05 source regressions that guard all five corrected Phase20 contracts.
+- Preserved the R08 cross-platform 23-gate non-fail-fast acceptance runner and all prior PH05 live-room corrections.
+
+# VC-WEB-PH05-R08
+
+- Fixed the Windows comprehensive acceptance runner that falsely marked all R07 post-install gates failed when `npm.cmd` was spawned with `shell:false`.
+- Post-install source, TypeScript, Jest, Vite, and Nest gates now run through `process.execPath` and real JavaScript entry points.
+- Added a command-dispatch probe plus explicit spawn/missing-entry diagnostics.
+- Expanded the consolidated runner to 23 independently visible gates while preserving non-fail-fast failure aggregation.
+- Preserved the R07 RoomsService constructor/spec correction and all PH05 live-room/LiveKit/realtime/MUI-v9 fixes.
+
+# VC-WEB-PH05-R07
+
+- Fixed stale WP08-02 `RoomsService` test construction after `RoomAuthorityService` became a required dependency.
+- Added repository-wide service constructor-contract audit for backend specs/tests.
+- Added Admin LiveKit provider connection-test regression coverage.
+- Expanded PH05 acceptance through complete WP08-02 room/realtime/security and R11 RTC authority tests before builds.
+- Preserved all R05/R06 live-room, realtime, identity, LiveKit, and MUI-v9 corrections.
+
+## VC-WEB-PH05-R04 — Comprehensive Creator TypeScript Acceptance Correction
+
+- Fixed all 28 Creator Studio TypeScript errors reported by the PH05-R03 workstation acceptance gate.
+- Updated MUI v9 layout styling to use `sx` where direct system props are no longer accepted.
+- Corrected Creator room creation mutation typing to the required `CreateLiveRoomInput`.
+- Migrated subscription price field native input attributes to `slotProps.htmlInput`.
+- Added durable PH05 source checks for the complete compatibility class instead of a one-error-at-a-time guard.
+- Preserved all PH05 live-room lifecycle, RTC, listener-count, restart, stage, chat and reaction corrections.
+
+## VC-WEB-PH05-R03 — Browser Media TypeScript Compatibility Correction
+
+- Fixes the Windows acceptance TypeScript failure in `shared/rtc/livekit-browser.ts`.
+- `playsInline` is now applied only after narrowing the attached media element to `HTMLVideoElement`.
+- Preserves the R02 live-room lifecycle/audio/count/restart/Creator-console corrections unchanged.
+- Adds a PH05 regression assertion preventing generic `HTMLMediaElement.playsInline` assignments from returning.
+
+## VC-WEB-PH05-R02 — End-to-End Live Audio Room Lifecycle Correction
+
+- Added a Creator live-room control console with real host RTC join, explicit Start Speaking/Mute Microphone, participant/stage/hand-queue visibility, room chat, reactions, and stage moderation controls.
+- Added browser LiveKit audio playback/publication using backend-issued authoritative RTC tokens and configured provider WebSocket URL; unsupported providers fail closed instead of showing fake LIVE media success.
+- Added Start Broadcast RTC preflight and failed-session rollback so rooms are not marked LIVE when real browser media cannot be established.
+- Synchronized room listener/speaker counts from actual current participants and fixed the zero-listener undercount caused by subtracting disconnected stage speakers.
+- Changed ENDED -> LIVE restart semantics to reuse the same Room entity instead of cloning duplicate rooms on every restart.
+- Completed the paired consumer audio/stage path required for end-to-end verification: remote audio playback, raise/cancel hand, authoritative promotion refresh, speaker microphone publication, host mute/remove handling, reconnect and leave cleanup.
+- Added a manager-authorized RTC stage-state endpoint and strengthened PH05 acceptance with Creator TypeScript/build checks and durable regressions for all blocking defects.
+- No database schema/entity/migration change. Centralized branding remains unchanged.
+
 ## VC-PH08-WP08-03-04 R03 — Real-Infrastructure Historical Baseline Bootstrap Correction
 
 ## VC-PH08-WP08-04-06 — Consolidated UI & White-label Acceptance
@@ -337,3 +408,29 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Corrected consumer discovery visibility for backend-only accounts and self recommendations.
 - Corrected interactive header search and route transitions.
 - Fixed global search HostProfile SQL field mismatch (`displayName`/`category`).
+
+## VC-WEB-PH05-R01
+- Replaced the consumer room-detail placeholder with backend-driven room details and server-authoritative access handling.
+- Added authenticated listener room runtime using canonical RTC join/rejoin/leave plus `/realtime` presence.
+- Added current participant presence, room chat, persistent message reactions, floating realtime room reactions and reconnect UX.
+- Corrected the consumer Socket.IO namespace to the canonical `/realtime` gateway namespace.
+- Hardened backend room-chat access so only current room participants/host may create/read/send/react in a room conversation.
+- Preserved speaker queue, stage promotion, microphone publishing and Host controls for WEB-PH06.
+- Added PH05 source regression checks, implementation report, manual QA and Windows acceptance launcher.
+
+## VC-WEB-PH05-R06 — Admin MUI v9 final acceptance closure
+
+- Fixed the two remaining Windows Admin TypeScript failures in `ReferralPage.tsx` by replacing removed `InputLabelProps` with MUI v9 `slotProps.inputLabel`.
+- Expanded the PH05 cross-app MUI regression guard to reject both legacy `InputLabelProps` and `inputProps` across Admin and Creator.
+- Re-scanned Website, Creator and Admin for related MUI migration patterns before delivery.
+- Preserves all R05 LiveKit authority, persistent Creator media, realtime identity, live-room lifecycle, listener-count and same-room restart corrections unchanged.
+
+## VC-WEB-PH05-R05 — LiveKit authority, persistent Creator media & realtime identity
+- Unified LiveKit Project URL/API Key/API Secret resolution across Admin provider configuration and RTC runtime.
+- Added a real LiveKit RoomService connection test and required healthy provider status before runtime broadcast authority.
+- Added privileged host RTC connectivity preflight so invalid credentials cannot produce a false LIVE room.
+- Kept Start Broadcast on the room-management page and added Start Speaking/Mute + persistent Open Console controls to live/paused cards.
+- Added a persistent Creator media session that survives room-list/live-console navigation.
+- Changed room-management realtime observation to passive subscription so monitoring does not alter room presence.
+- Enriched room chat/reaction realtime payloads with safe user identity and removed visible UUID fallback in consumer/Creator/Admin messaging surfaces.
+- Expanded PH05 acceptance to Website + Creator + Admin + Backend TypeScript, targeted live-room Jest regressions, per-app builds, R11 regressions and full monolith build.

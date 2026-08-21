@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -18,7 +19,6 @@ import {
   MenuItem,
   CircularProgress,
   Alert,
-  Badge,
   Tooltip,
   useTheme,
 } from '@mui/material';
@@ -32,26 +32,23 @@ import {
   Mic,
   MicOff,
   Trash2,
-  UserPlus,
-  UserCheck,
-  Shield,
-  Volume2,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { creatorApi } from '../services/creator-api.service';
+import { creatorApi, type CreateLiveRoomInput } from '../services/creator-api.service';
 import { PageErrorState } from '../components/common/PageErrorState';
 import { EmptyState } from '../components/common/EmptyState';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { LiveRoomSummary } from '../types/creator.types';
+import { connectCreatorRoomRealtime } from '../services/live-room-realtime.service';
+import { creatorLiveMediaService, useCreatorLiveMedia } from '../services/creator-live-media.service';
 
 export const LiveRoomsPage: React.FC = () => {
   const theme = useTheme();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const liveMedia = useCreatorLiveMedia();
+  const [mediaError, setMediaError] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [activeStageRoom, setActiveStageRoom] =
-    useState<LiveRoomSummary | null>(null);
-  const [inviteUserId, setInviteUserId] = useState('');
-
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('Audio Lounge');
   const [newQuality, setNewQuality] = useState('324kbps Ultra HD');
@@ -60,12 +57,13 @@ export const LiveRoomsPage: React.FC = () => {
   const roomsQuery = useQuery({
     queryKey: ['creator', 'rooms'],
     queryFn: ({ signal }) => creatorApi.getRooms(signal),
-    staleTime: 30 * 1000,
+    staleTime: 2 * 1000,
+    refetchInterval: 2500,
     retry: 1,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: Partial<LiveRoomSummary>) => creatorApi.createRoom(data),
+    mutationFn: (data: CreateLiveRoomInput) => creatorApi.createRoom(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
       setIsCreateOpen(false);
@@ -75,45 +73,51 @@ export const LiveRoomsPage: React.FC = () => {
   });
 
   const startMutation = useMutation({
-    mutationFn: (id: string) => creatorApi.startRoom(id),
+    mutationFn: (id: string) => creatorApi.startBroadcast(id),
     onSuccess: () => {
+      setMediaError('');
       void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
   });
 
   const pauseMutation = useMutation({
-    mutationFn: (id: string) => creatorApi.pauseRoom(id),
+    mutationFn: async (id: string) => {
+      if (liveMedia.roomId === id && liveMedia.microphoneEnabled) {
+        await creatorLiveMediaService.stopSpeaking(id).catch(() => undefined);
+      }
+      return creatorApi.pauseRoom(id);
+    },
     onSuccess: () => {
+      setMediaError('');
       void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
+    onError: (error: Error) => setMediaError(error?.message || 'Unable to pause broadcast'),
   });
 
   const resumeMutation = useMutation({
     mutationFn: (id: string) => creatorApi.resumeRoom(id),
     onSuccess: () => {
+      setMediaError('');
       void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
+    onError: (error: Error) => setMediaError(error?.message || 'Unable to resume broadcast'),
   });
 
   const endMutation = useMutation({
-    mutationFn: (id: string) => creatorApi.endRoom(id),
+    mutationFn: async (id: string) => {
+      if (liveMedia.roomId === id) await creatorLiveMediaService.disconnect(id);
+      return creatorApi.endBroadcast(id);
+    },
     onSuccess: () => {
+      setMediaError('');
       void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
+    onError: (error: Error) => setMediaError(error?.message || 'Unable to end broadcast'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => creatorApi.deleteRoom(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
-    },
-  });
-
-  const inviteMutation = useMutation({
-    mutationFn: ({ roomId, userId }: { roomId: string; userId: string }) =>
-      creatorApi.inviteSpeaker(roomId, userId),
-    onSuccess: () => {
-      setInviteUserId('');
       void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
     },
   });
@@ -128,6 +132,56 @@ export const LiveRoomsPage: React.FC = () => {
       isPrivate: newAccess === 'PRIVATE',
     });
   };
+
+  const rooms = roomsQuery.data || [];
+  const activeRoomKey = rooms
+    .filter((room) => room.status === 'live' || room.status === 'paused')
+    .map((room) => room.id)
+    .sort()
+    .join('|');
+
+  useEffect(() => {
+    const roomIds = activeRoomKey ? activeRoomKey.split('|').filter(Boolean) : [];
+    if (!roomIds.length) return;
+    let cancelled = false;
+    let realtime: ReturnType<typeof connectCreatorRoomRealtime> | null = null;
+    const refreshRooms = (payload?: { roomId?: string }) => {
+      if (cancelled) return;
+      if (payload?.roomId && !roomIds.includes(payload.roomId)) return;
+      void queryClient.invalidateQueries({ queryKey: ['creator', 'rooms'] });
+    };
+    try {
+      // Passive management-page subscription only. Do not join room presence here:
+      // opening the management list must never make the creator appear present in every live room.
+      realtime = connectCreatorRoomRealtime();
+      [
+        'user_joined', 'user_left', 'user_reconnected', 'presence_updated',
+        'participant_joined', 'participant_left', 'participant_reconnected',
+        'speaker_joined', 'speaker_left', 'hand_raised', 'hand_approved',
+        'hand_rejected', 'microphone_muted', 'microphone_unmuted', 'stage_updated',
+        'room.started', 'room.paused', 'room.resumed', 'room.ended',
+      ].forEach((event) => realtime?.socket.on(event, refreshRooms));
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : 'Realtime room updates are unavailable');
+    }
+    return () => {
+      cancelled = true;
+      realtime?.disconnect();
+    };
+  }, [activeRoomKey, queryClient]);
+
+  async function toggleCardMic(roomId: string) {
+    setMediaError('');
+    try {
+      if (liveMedia.roomId === roomId && liveMedia.microphoneEnabled) {
+        await creatorLiveMediaService.stopSpeaking(roomId);
+      } else {
+        await creatorLiveMediaService.startSpeaking(roomId);
+      }
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : 'Unable to start the host microphone');
+    }
+  }
 
   if (roomsQuery.isLoading) {
     return (
@@ -151,8 +205,6 @@ export const LiveRoomsPage: React.FC = () => {
       />
     );
   }
-
-  const rooms = roomsQuery.data || [];
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -186,6 +238,20 @@ export const LiveRoomsPage: React.FC = () => {
         </Button>
       </Box>
 
+      {startMutation.isError ? (
+        <Alert severity="error" onClose={() => startMutation.reset()}>
+          {startMutation.error instanceof Error
+            ? startMutation.error.message
+            : 'Unable to start this broadcast. Verify the active RTC media provider and try again.'}
+        </Alert>
+      ) : null}
+
+      {mediaError ? (
+        <Alert severity="error" onClose={() => setMediaError('')}>
+          {mediaError}
+        </Alert>
+      ) : null}
+
       {/* Empty State */}
       {rooms.length === 0 ? (
         <EmptyState
@@ -210,9 +276,7 @@ export const LiveRoomsPage: React.FC = () => {
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     borderColor: isLive ? 'primary.main' : 'divider',
-                    boxShadow: isLive
-                      ? '0 14px 34px rgba(34,197,94,0.12)'
-                      : undefined,
+                    boxShadow: isLive ? theme.shadows[6] : theme.shadows[1],
                   }}
                 >
                   <CardContent sx={{ p: 3 }}>
@@ -300,88 +364,160 @@ export const LiveRoomsPage: React.FC = () => {
                       </Grid>
                     </Grid>
 
-                    <Stack direction="row" spacing={1.5}>
-                      {isLive ? (
-                        <>
-                          <Button
-                            variant="outlined"
-                            color="warning"
-                            startIcon={<Pause size={16} />}
-                            onClick={() => pauseMutation.mutate(room.id)}
-                            disabled={pauseMutation.isPending}
-                            sx={{ fontWeight: 700, flex: 1 }}
-                          >
-                            Pause
-                          </Button>
-                          <Button
-                            variant="contained"
-                            color="error"
-                            startIcon={<Square size={16} />}
-                            onClick={() => endMutation.mutate(room.id)}
-                            disabled={endMutation.isPending}
-                            sx={{ fontWeight: 700, flex: 1 }}
-                          >
-                            End
-                          </Button>
-                        </>
-                      ) : isPaused ? (
-                        <>
-                          <Button
-                            variant="contained"
-                            color="success"
-                            startIcon={<Play size={16} />}
-                            onClick={() => resumeMutation.mutate(room.id)}
-                            disabled={resumeMutation.isPending}
-                            sx={{ fontWeight: 700, flex: 1 }}
-                          >
-                            Resume
-                          </Button>
-                          <Button
-                            variant="contained"
-                            color="error"
-                            startIcon={<Square size={16} />}
-                            onClick={() => endMutation.mutate(room.id)}
-                            disabled={endMutation.isPending}
-                            sx={{ fontWeight: 700, flex: 1 }}
-                          >
-                            End
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          startIcon={<Play size={16} />}
-                          fullWidth
-                          onClick={() => startMutation.mutate(room.id)}
-                          disabled={startMutation.isPending}
-                          sx={{ fontWeight: 700 }}
-                        >
-                          {startMutation.isPending
-                            ? 'Starting...'
-                            : 'Start Broadcast'}
-                        </Button>
-                      )}
-
-                      <Tooltip title="Manage Speaker Stage">
-                        <IconButton
-                          color="info"
-                          onClick={() => setActiveStageRoom(room)}
+                    <Box
+                      sx={{
+                        mt: 1,
+                        p: 1.5,
+                        borderRadius: 2.5,
+                        bgcolor: 'background.default',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>
+                            Broadcast controls
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {isLive ? 'On air — manage broadcast and microphone.' : isPaused ? 'Paused — resume when you are ready.' : 'Ready — start the broadcast when prepared.'}
+                          </Typography>
+                        </Box>
+                        <Chip
                           size="small"
-                        >
-                          <Mic size={18} />
-                        </IconButton>
-                      </Tooltip>
+                          icon={<Radio size={14} />}
+                          label={isLive ? 'On air' : isPaused ? 'Paused' : 'Ready'}
+                          color={isLive ? 'error' : isPaused ? 'warning' : 'primary'}
+                          variant={isLive ? 'filled' : 'outlined'}
+                          sx={{ fontWeight: 800, flexShrink: 0 }}
+                        />
+                      </Stack>
+                      <Grid container spacing={1.25}>
+                        {isLive ? (
+                          <>
+                            <Grid size={{ xs: 6 }}>
+                              <Button
+                                fullWidth
+                                variant="outlined"
+                                color="warning"
+                                startIcon={<Pause size={16} />}
+                                onClick={() => pauseMutation.mutate(room.id)}
+                                disabled={pauseMutation.isPending}
+                                sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2 }}
+                              >
+                                Pause Broadcast
+                              </Button>
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <Button
+                                fullWidth
+                                variant="contained"
+                                color="error"
+                                startIcon={<Square size={16} />}
+                                onClick={() => endMutation.mutate(room.id)}
+                                disabled={endMutation.isPending}
+                                sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2 }}
+                              >
+                                End Broadcast
+                              </Button>
+                            </Grid>
+                          </>
+                        ) : isPaused ? (
+                          <>
+                            <Grid size={{ xs: 6 }}>
+                              <Button
+                                fullWidth
+                                variant="contained"
+                                color="success"
+                                startIcon={<Play size={16} />}
+                                onClick={() => resumeMutation.mutate(room.id)}
+                                disabled={resumeMutation.isPending}
+                                sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2 }}
+                              >
+                                Resume Broadcast
+                              </Button>
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <Button
+                                fullWidth
+                                variant="contained"
+                                color="error"
+                                startIcon={<Square size={16} />}
+                                onClick={() => endMutation.mutate(room.id)}
+                                disabled={endMutation.isPending}
+                                sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2 }}
+                              >
+                                End Broadcast
+                              </Button>
+                            </Grid>
+                          </>
+                        ) : (
+                          <Grid size={{ xs: 12 }}>
+                            <Button
+                              variant="contained"
+                              color="primary"
+                              startIcon={<Play size={16} />}
+                              fullWidth
+                              onClick={() => startMutation.mutate(room.id)}
+                              disabled={startMutation.isPending}
+                              sx={{ fontWeight: 850, minHeight: 52, borderRadius: 2 }}
+                            >
+                              {startMutation.isPending ? 'Starting broadcast…' : 'Go Live'}
+                            </Button>
+                          </Grid>
+                        )}
 
-                      <IconButton
-                        color="error"
-                        onClick={() => deleteMutation.mutate(room.id)}
-                        disabled={deleteMutation.isPending}
-                        size="small"
-                      >
-                        <Trash2 size={18} />
-                      </IconButton>
-                    </Stack>
+                        {isLive || isPaused ? (
+                          <>
+                            <Grid size={{ xs: 6 }}>
+                              <Button
+                                fullWidth
+                                variant={liveMedia.roomId === room.id && liveMedia.microphoneEnabled ? 'outlined' : 'contained'}
+                                color={liveMedia.roomId === room.id && liveMedia.microphoneEnabled ? 'warning' : 'success'}
+                                startIcon={liveMedia.roomId === room.id && liveMedia.microphoneEnabled ? <MicOff size={16} /> : <Mic size={16} />}
+                                onClick={() => void toggleCardMic(room.id)}
+                                disabled={isPaused || (liveMedia.roomId === room.id && liveMedia.connecting)}
+                                sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2 }}
+                              >
+                                {isPaused
+                                  ? 'Speaking Paused'
+                                  : liveMedia.roomId === room.id && liveMedia.microphoneEnabled
+                                    ? 'Mute Microphone'
+                                    : liveMedia.roomId === room.id && liveMedia.connecting
+                                      ? 'Connecting…'
+                                      : 'Start Speaking'}
+                              </Button>
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <Button
+                                fullWidth
+                                variant="outlined"
+                                startIcon={<SlidersHorizontal size={16} />}
+                                onClick={() => navigate(`/rooms/${room.id}/live`)}
+                                sx={{ fontWeight: 800, minHeight: 48, borderRadius: 2 }}
+                              >
+                                Manage Live Room
+                              </Button>
+                            </Grid>
+                          </>
+                        ) : null}
+                      </Grid>
+
+                      <Stack direction="row" sx={{ justifyContent: 'flex-end', mt: 0.75 }}>
+                        <Tooltip title={isLive || isPaused ? 'End the broadcast before deleting this room' : 'Delete room'}>
+                          <span>
+                            <IconButton
+                              color="error"
+                              onClick={() => deleteMutation.mutate(room.id)}
+                              disabled={deleteMutation.isPending || isLive || isPaused}
+                              size="small"
+                            >
+                              <Trash2 size={18} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
@@ -389,103 +525,6 @@ export const LiveRoomsPage: React.FC = () => {
           })}
         </Grid>
       )}
-
-      {/* Speaker Stage Control Dialog */}
-      <Dialog
-        open={Boolean(activeStageRoom)}
-        onClose={() => setActiveStageRoom(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle
-          sx={{
-            fontWeight: 800,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-          }}
-        >
-          <Shield size={20} color={theme.palette.primary.main} />
-          Speaker Stage & Host Controls - {activeStageRoom?.title}
-        </DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2.5} sx={{ mt: 1 }}>
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                Invite User to Speaker Seat
-              </Typography>
-              <Stack direction="row" spacing={1}>
-                <TextField
-                  placeholder="Enter User UUID to promote as speaker"
-                  fullWidth
-                  size="small"
-                  value={inviteUserId}
-                  onChange={(e) => setInviteUserId(e.target.value)}
-                />
-                <Button
-                  variant="contained"
-                  startIcon={<UserPlus size={16} />}
-                  onClick={() =>
-                    activeStageRoom &&
-                    inviteMutation.mutate({
-                      roomId: activeStageRoom.id,
-                      userId: inviteUserId,
-                    })
-                  }
-                  disabled={!inviteUserId.trim() || inviteMutation.isPending}
-                  sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
-                >
-                  Invite
-                </Button>
-              </Stack>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                Speaker Seats Overview
-              </Typography>
-              <Stack spacing={1}>
-                <Box
-                  sx={{
-                    p: 1.5,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    sx={{ alignItems: 'center' }}
-                  >
-                    <UserCheck size={16} color={theme.palette.success.main} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Host (You)
-                    </Typography>
-                    <Chip label="HOST" size="small" color="primary" />
-                  </Stack>
-                  <Chip
-                    label="Mic Active"
-                    size="small"
-                    color="success"
-                    icon={<Volume2 size={12} />}
-                  />
-                </Box>
-              </Stack>
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setActiveStageRoom(null)}>
-            Close Controls
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Create Room Modal */}
       <Dialog

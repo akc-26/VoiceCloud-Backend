@@ -60,15 +60,15 @@ export class RoomGateway implements OnGatewayInit {
     }
   }
 
-  private resolveUserId(client: Socket): string {
-    return this.socketAuthService.getAuthenticatedUser(client).userId;
+  private async resolveUserId(client: Socket): Promise<string> {
+    return (await this.socketAuthService.ensureAuthenticatedUser(client)).userId;
   }
 
   private async assertRoomAccess(
     client: Socket,
     roomId: string,
   ): Promise<void> {
-    const userId = this.resolveUserId(client);
+    const userId = await this.resolveUserId(client);
     await this.roomStateService.assertRoomJoinable(roomId, userId);
     this.socketAuthService.assertJoinedRoom(client, roomId);
     await this.roomStateService.assertParticipantOrHost(roomId, userId);
@@ -83,7 +83,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: SpeakerQueueJoinDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.joinQueue(
         data.roomId,
@@ -120,7 +120,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: SpeakerQueueLeaveDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.leaveQueue(data.roomId, userId);
       const payload = {
@@ -153,7 +153,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: { roomId: string },
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.getQueue(data.roomId);
       return { success: true, queue: res.queue, count: res.count };
@@ -173,7 +173,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: SpeakerQueueReorderDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.reorderQueue(
         data.roomId,
@@ -212,7 +212,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: StageInviteDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.inviteSpeaker(
         data.roomId,
@@ -253,7 +253,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: StageAcceptInvitationDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.acceptInvitation(
         data.roomId,
@@ -302,7 +302,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: StageRejectInvitationDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       await this.roomStateService.rejectInvitation(data.roomId, userId);
       const payload = {
@@ -334,7 +334,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: StagePromoteDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.promoteListener(
         data.roomId,
@@ -384,7 +384,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: StageDemoteDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.demoteSpeaker(
         data.roomId,
@@ -434,7 +434,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: StageRemoveDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.removeSpeaker(
         data.roomId,
@@ -483,7 +483,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: StageMuteDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.setMuteSpeaker(
         data.roomId,
@@ -534,7 +534,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: StageUnmuteDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.setMuteSpeaker(
         data.roomId,
@@ -590,7 +590,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: UpdateRoomTopicDto,
   ) {
     try {
-      const userId = this.resolveUserId(client);
+      const userId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const res = await this.roomStateService.updateTopic(
         data.roomId,
@@ -626,7 +626,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: RoomAudienceModerationDto,
   ) {
     try {
-      const requesterId = this.resolveUserId(client);
+      const requesterId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const result = await this.roomStateService.inviteAudienceParticipant(
         data.roomId,
@@ -664,7 +664,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: RoomAudienceModerationDto,
   ) {
     try {
-      const requesterId = this.resolveUserId(client);
+      const requesterId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const result = await this.roomStateService.revokeAudienceInvitation(
         data.roomId,
@@ -698,7 +698,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: RoomAudienceModerationDto,
   ) {
     try {
-      const requesterId = this.resolveUserId(client);
+      const requesterId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const result = await this.roomStateService.kickParticipant(
         data.roomId,
@@ -739,7 +739,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: RoomAudienceModerationDto,
   ) {
     try {
-      const requesterId = this.resolveUserId(client);
+      const requesterId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const result = await this.roomStateService.banParticipant(
         data.roomId,
@@ -780,7 +780,7 @@ export class RoomGateway implements OnGatewayInit {
     @MessageBody() data: RoomAudienceModerationDto,
   ) {
     try {
-      const requesterId = this.resolveUserId(client);
+      const requesterId = await this.resolveUserId(client);
       await this.assertRoomAccess(client, data.roomId);
       const result = await this.roomStateService.unbanParticipant(
         data.roomId,

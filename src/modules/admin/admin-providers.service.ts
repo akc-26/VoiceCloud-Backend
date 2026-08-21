@@ -3,9 +3,10 @@ import {
   Logger,
   OnModuleInit,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
   ProviderConfig,
   ProviderCategory,
@@ -22,6 +23,7 @@ import { AdminAuditLogsService } from './admin-audit-logs.service';
 import { EncryptionService } from '../../common/services/encryption.service';
 import { ProviderTestConnectionService } from './provider-test-connection.service';
 import { RtcConfig, RtcProviderType } from '../rtc/entities/rtc-config.entity';
+import { resolveLiveKitProviderConfig } from '../rtc/livekit-config.util';
 
 const PUBLIC_PROVIDERS_CACHE = 'cache:provider_configs:public';
 
@@ -50,7 +52,7 @@ const DEFAULT_PROVIDERS = [
     config: {
       apiKey: 'LIVEKIT_API_KEY_DEFAULT',
       apiSecret: 'LIVEKIT_SECRET_DEFAULT',
-      host: 'wss://livekit.voicecloud.app',
+      serverUrl: 'wss://YOUR_PROJECT.livekit.cloud',
     },
     isEnabled: true,
     isActive: false,
@@ -498,6 +500,11 @@ export class AdminProvidersService implements OnModuleInit {
         dto.config,
       );
       provider.config = this.encryptionService.encryptConfig(mergedConfig);
+      provider.healthStatus = 'not_tested';
+      provider.lastTestedAt = undefined;
+      provider.lastLatencyMs = undefined;
+      provider.lastErrorMessage = null;
+      provider.statusDetails = {};
     }
 
     if (dto.name !== undefined) provider.name = dto.name;
@@ -515,6 +522,16 @@ export class AdminProvidersService implements OnModuleInit {
     }
 
     const updated = await this.providerRepo.save(provider);
+
+    if (
+      updated.category === ProviderCategory.RTC &&
+      updated.isActive &&
+      updated.isEnabled
+    ) {
+      await this.providerRepo.manager.transaction((manager) =>
+        this.syncRtcRuntimeConfig(manager, updated),
+      );
+    }
 
     await this.recordHistory(updated, 'Updated provider settings', userId);
     await this.invalidateCache(updated.category);
@@ -591,7 +608,17 @@ export class AdminProvidersService implements OnModuleInit {
       provider.lastErrorMessage = result.message;
     }
 
-    await this.providerRepo.save(provider);
+    const testedProvider = await this.providerRepo.save(provider);
+    if (
+      result.success &&
+      testedProvider.category === ProviderCategory.RTC &&
+      testedProvider.isActive &&
+      testedProvider.isEnabled
+    ) {
+      await this.providerRepo.manager.transaction((manager) =>
+        this.syncRtcRuntimeConfig(manager, testedProvider),
+      );
+    }
     await this.invalidateCache(provider.category);
 
     return {
@@ -699,8 +726,22 @@ export class AdminProvidersService implements OnModuleInit {
     );
     const newDecrypted = { ...currentDecrypted, ...dto.secretConfig };
     provider.config = this.encryptionService.encryptConfig(newDecrypted);
+    provider.healthStatus = 'not_tested';
+    provider.lastTestedAt = undefined;
+    provider.lastLatencyMs = undefined;
+    provider.lastErrorMessage = null;
+    provider.statusDetails = {};
 
     const updated = await this.providerRepo.save(provider);
+    if (
+      updated.category === ProviderCategory.RTC &&
+      updated.isActive &&
+      updated.isEnabled
+    ) {
+      await this.providerRepo.manager.transaction((manager) =>
+        this.syncRtcRuntimeConfig(manager, updated),
+      );
+    }
     await this.recordHistory(
       updated,
       dto.reason || 'Secret credential rotation',
@@ -751,8 +792,22 @@ export class AdminProvidersService implements OnModuleInit {
     provider.config = history.config;
     provider.isEnabled = history.isEnabled;
     provider.isActive = history.isActive;
+    provider.healthStatus = 'not_tested';
+    provider.lastTestedAt = undefined;
+    provider.lastLatencyMs = undefined;
+    provider.lastErrorMessage = null;
+    provider.statusDetails = {};
 
     const restored = await this.providerRepo.save(provider);
+    if (
+      restored.category === ProviderCategory.RTC &&
+      restored.isActive &&
+      restored.isEnabled
+    ) {
+      await this.providerRepo.manager.transaction((manager) =>
+        this.syncRtcRuntimeConfig(manager, restored),
+      );
+    }
     await this.recordHistory(
       restored,
       `Rolled back to version ${history.version}`,
@@ -792,6 +847,57 @@ export class AdminProvidersService implements OnModuleInit {
     }
   }
 
+  private async syncRtcRuntimeConfig(
+    manager: EntityManager,
+    selectedProvider: ProviderConfig,
+  ): Promise<void> {
+    const providerType = selectedProvider.providerType.trim().toLowerCase();
+    if (!Object.values(RtcProviderType).includes(providerType as RtcProviderType)) {
+      throw new NotFoundException(
+        `Unsupported RTC provider type '${selectedProvider.providerType}'`,
+      );
+    }
+
+    const rtcConfigRepo = manager.getRepository(RtcConfig);
+    let rtcConfig = await rtcConfigRepo.findOne({
+      where: { isActive: true },
+      order: { createdAt: 'DESC' },
+    });
+    if (!rtcConfig) {
+      rtcConfig = rtcConfigRepo.create({
+        activeProvider: providerType as RtcProviderType,
+        tokenExpiration: 3600,
+        recordingEnabled: true,
+        audioEnabled: true,
+        videoEnabled: false,
+        isActive: true,
+      });
+    }
+
+    const providerConfig = this.encryptionService.decryptConfig(
+      selectedProvider.config || {},
+    );
+    rtcConfig.activeProvider = providerType as RtcProviderType;
+
+    if (providerType === RtcProviderType.AGORA) {
+      rtcConfig.appId = String(providerConfig.appId || '');
+      rtcConfig.appCertificate = String(providerConfig.appCertificate || '');
+    } else if (providerType === RtcProviderType.LIVEKIT) {
+      const liveKit = resolveLiveKitProviderConfig(providerConfig);
+      rtcConfig.apiKey = liveKit.apiKey;
+      rtcConfig.secret = liveKit.apiSecret;
+      if (liveKit.tokenExpiration) rtcConfig.tokenExpiration = liveKit.tokenExpiration;
+    } else if (providerType === RtcProviderType.ZEGOCLOUD) {
+      rtcConfig.appId = String(providerConfig.appId || '');
+      rtcConfig.secret = String(providerConfig.serverSecret || providerConfig.secret || '');
+    }
+
+    if (Number.isSafeInteger(Number(providerConfig.tokenExpiration))) {
+      rtcConfig.tokenExpiration = Number(providerConfig.tokenExpiration);
+    }
+    await rtcConfigRepo.save(rtcConfig);
+  }
+
   private async setCategoryActive(
     category: ProviderCategory,
     activeId: string,
@@ -806,6 +912,15 @@ export class AdminProvidersService implements OnModuleInit {
           `Provider configuration '${activeId}' not found for category '${category}'`,
         );
       }
+      if (
+        category === ProviderCategory.RTC &&
+        selectedProvider.providerType.trim().toLowerCase() === RtcProviderType.LIVEKIT &&
+        selectedProvider.healthStatus !== 'healthy'
+      ) {
+        throw new BadRequestException(
+          'Test the LiveKit Project URL, API Key, and API Secret successfully before setting this provider active',
+        );
+      }
 
       await providerRepo.update({ category }, { isActive: false });
       await providerRepo.update(
@@ -814,53 +929,7 @@ export class AdminProvidersService implements OnModuleInit {
       );
 
       if (category === ProviderCategory.RTC) {
-        const providerType = selectedProvider.providerType.toLowerCase();
-        if (!Object.values(RtcProviderType).includes(providerType as RtcProviderType)) {
-          throw new NotFoundException(
-            `Unsupported RTC provider type '${selectedProvider.providerType}'`,
-          );
-        }
-
-        const rtcConfigRepo = manager.getRepository(RtcConfig);
-        let rtcConfig = await rtcConfigRepo.findOne({
-          where: { isActive: true },
-          order: { createdAt: 'DESC' },
-        });
-        if (!rtcConfig) {
-          rtcConfig = rtcConfigRepo.create({
-            activeProvider: providerType as RtcProviderType,
-            tokenExpiration: 3600,
-            recordingEnabled: true,
-            audioEnabled: true,
-            videoEnabled: false,
-            isActive: true,
-          });
-        }
-
-        const providerConfig = this.encryptionService.decryptConfig(
-          selectedProvider.config || {},
-        );
-        rtcConfig.activeProvider = providerType as RtcProviderType;
-        if (providerType === RtcProviderType.AGORA) {
-          rtcConfig.appId = String(providerConfig.appId || rtcConfig.appId || '');
-          rtcConfig.appCertificate = String(
-            providerConfig.appCertificate || rtcConfig.appCertificate || '',
-          );
-        } else if (providerType === RtcProviderType.LIVEKIT) {
-          rtcConfig.apiKey = String(providerConfig.apiKey || rtcConfig.apiKey || '');
-          rtcConfig.secret = String(
-            providerConfig.apiSecret || providerConfig.secret || rtcConfig.secret || '',
-          );
-        } else if (providerType === RtcProviderType.ZEGOCLOUD) {
-          rtcConfig.appId = String(providerConfig.appId || rtcConfig.appId || '');
-          rtcConfig.secret = String(
-            providerConfig.serverSecret || providerConfig.secret || rtcConfig.secret || '',
-          );
-        }
-        if (Number.isSafeInteger(Number(providerConfig.tokenExpiration))) {
-          rtcConfig.tokenExpiration = Number(providerConfig.tokenExpiration);
-        }
-        await rtcConfigRepo.save(rtcConfig);
+        await this.syncRtcRuntimeConfig(manager, selectedProvider);
       }
     });
   }

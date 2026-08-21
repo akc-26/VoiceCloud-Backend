@@ -1,0 +1,63 @@
+VC-WEB-PH05-R01 — Sandbox Acceptance Evidence
+===============================================
+
+Protected parent
+----------------
+Branch: VoiceCloud-Backend-VC-WEB-PH04-R03
+Commit: bd330734886cda3ebf2b1a268a6dfd63f7f6011a
+
+Executed source gates
+---------------------
+PASS — npm run web:ph01:source-check
+PASS — npm run web:ph02:source-check
+PASS — npm run web:ph03:source-check
+PASS — npm run web:ph04:source-check
+PASS — npm run web:ph05:source-check
+PASS — npm run wp09:r11:source-check
+  Admin source check: 7/7
+  Creator source check: 12/12
+  Backend authority source check: 14/14
+  RTC/security source check: 27/27
+  API parity: PASS (204 frontend calls mapped; 647 backend route/method operations inventoried)
+
+Syntax parser check
+-------------------
+PASS — 93 website/backend TS/TSX files parsed
+0 syntax diagnostics
+0 parser failures
+
+Protected-source comparison against PH04-R03
+---------------------------------------------
+Expected backend authority change:
+- src/modules/chat/chat.service.ts
+
+Expected website changes:
+- website/src/app/router/AppRouter.tsx
+- website/src/realtime/socket.client.ts
+- website/src/features/messaging/types.ts
+- website/src/features/rooms/*
+- website/src/components/rooms/*
+- website/src/pages/RoomDetailsPage.tsx
+- website/src/pages/RoomExperiencePage.tsx
+- website/src/styles/global.css
+
+Preserved:
+- admin/ unchanged
+- creator/ unchanged
+- shared/ unchanged
+- no database entity/schema/migration changes
+- centralized shared branding authority unchanged
+
+Important environment limitation
+--------------------------------
+The sandbox does not claim the dependency-backed project TypeScript check,
+Vite production build, or full Nest + Website + Admin + Creator monolith build.
+Those are intentionally required from the Windows acceptance script:
+  scripts\website\VC-WEB-PH05-ACCEPTANCE.cmd
+
+PH05 RTC/media boundary
+-----------------------
+PH05 implements server-authoritative listener room access, RTC join/rejoin/leave,
+/realtime presence, participants, room chat/reactions, and reconnect/rejoin UX.
+It does NOT fabricate provider-specific browser audio playback. Provider media
+attachment and speaker publishing/host controls remain PH06.

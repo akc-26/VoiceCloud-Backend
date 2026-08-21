@@ -1,0 +1,10 @@
+VC-WEB-PH05-R09 CORRECTIONS
+
+- Corrects all five stale Phase20 RTC test assumptions exposed by the R08 comprehensive Windows acceptance.
+- Stage-manager rejection assertion now includes authoritative co-host capability.
+- Active-speaker fixture is explicitly promoted to speaker authority before reporting speaking state.
+- Agora recording pause/resume tests now require fail-closed behavior because no official server-side Agora adapter is implemented.
+- RTC monitoring test uses the configured fixture provider instead of hard-coding AGORA.
+- Recording-job fixture resets before every test to remove test-order coupling.
+- PH05 source regression now guards all five Phase20 contracts.
+- No production runtime authority is weakened to satisfy legacy tests.

@@ -17,7 +17,7 @@ describe('RoomLifecycleService (WP08-02)', () => {
       speakerCount: 2,
     }) as Room;
 
-  it('starts only an offline room', () => {
+  it('starts an offline room and resets live counters', () => {
     const target = room(RoomLifecycleStatus.OFFLINE);
     const now = new Date('2026-08-05T12:00:00.000Z');
 
@@ -26,12 +26,25 @@ describe('RoomLifecycleService (WP08-02)', () => {
     expect(target.status).toBe(RoomLifecycleStatus.LIVE);
     expect(target.isLive).toBe(true);
     expect(target.startedAt).toEqual(now);
+    expect(target.listenerCount).toBe(0);
+    expect(target.speakerCount).toBe(1);
+  });
+
+  it('restarts an ended manual room in-place', () => {
+    const target = room(RoomLifecycleStatus.ENDED);
+    const now = new Date('2026-08-05T12:30:00.000Z');
+    service.applyStart(target, now);
+    expect(target.status).toBe(RoomLifecycleStatus.LIVE);
+    expect(target.isLive).toBe(true);
+    expect(target.endedAt).toBeNull();
+    expect(target.startedAt).toEqual(now);
+    expect(target.listenerCount).toBe(0);
+    expect(target.speakerCount).toBe(1);
   });
 
   it.each([
     RoomLifecycleStatus.LIVE,
     RoomLifecycleStatus.PAUSED,
-    RoomLifecycleStatus.ENDED,
   ])('rejects start while room is %s', (status) => {
     expect(() => service.applyStart(room(status))).toThrow(BadRequestException);
   });
@@ -64,7 +77,7 @@ describe('RoomLifecycleService (WP08-02)', () => {
     },
   );
 
-  it('treats ended as a terminal lifecycle state', () => {
+  it('keeps ended rooms closed to pause/resume/end until explicitly restarted', () => {
     const target = room(RoomLifecycleStatus.ENDED);
     expect(() => service.applyPause(target)).toThrow(BadRequestException);
     expect(() => service.applyResume(target)).toThrow(BadRequestException);

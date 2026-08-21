@@ -85,6 +85,76 @@ export class RtcService {
     private readonly realtimeRoomStateService: RealtimeRoomStateService,
   ) {}
 
+  private async assertRoomLiveInteraction(roomId: string): Promise<Room> {
+    const room = await this.roomRepository.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException(`Room ${roomId} not found`);
+    if (String(room.status).toLowerCase() !== 'live') {
+      throw new ForbiddenException(
+        String(room.status).toLowerCase() === 'paused'
+          ? 'Room interactions are disabled while the broadcast is paused'
+          : `Room interactions require a live broadcast (current status: ${room.status})`,
+      );
+    }
+    return room;
+  }
+
+  private async syncRoomCounts(roomId: string): Promise<void> {
+    try {
+      const redis = this.redisService.getClient();
+      const participantIds = await redis.smembers(`rtc:room:${roomId}:participants`);
+      const room = await this.roomRepository.findOne({ where: { id: roomId } });
+      if (!room) return;
+
+      const stageSpeakers = await this.redisStateService.getSpeakers(roomId);
+      const stageUserIds = new Set(stageSpeakers.map((speaker) => speaker.userId));
+      try {
+        const mirroredSpeakerIds = await redis.smembers(`rtc:room:${roomId}:speakers`);
+        mirroredSpeakerIds.forEach((id) => stageUserIds.add(id));
+      } catch (error) {
+        this.logger.warn(`Failed to read mirrored RTC speaker state: ${error}`);
+      }
+
+      let speakerCount = 0;
+      let listenerCount = 0;
+      for (const participantId of participantIds) {
+        if (participantId === room.hostId || stageUserIds.has(participantId)) {
+          speakerCount += 1;
+        } else {
+          listenerCount += 1;
+        }
+      }
+
+      room.speakerCount = speakerCount;
+      room.listenerCount = listenerCount;
+      await this.roomRepository.save(room);
+      this.eventsGateway.server?.to(roomId).emit('presence_updated', {
+        roomId,
+        participantCount: participantIds.length,
+        listenerCount,
+        speakerCount,
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to synchronize RTC room counts for ${roomId}: ${error}`);
+    }
+  }
+
+  private async patchRtcPresence(
+    roomId: string,
+    userId: string,
+    patch: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      const redis = this.redisService.getClient();
+      const key = `rtc:presence:${roomId}:${userId}`;
+      const raw = await redis.get(key);
+      if (!raw) return;
+      const current = JSON.parse(raw) as Record<string, unknown>;
+      await redis.set(key, JSON.stringify({ ...current, ...patch }), 'EX', 86400);
+    } catch (error) {
+      this.logger.warn(`Failed to patch RTC presence for ${roomId}/${userId}: ${error}`);
+    }
+  }
+
   private isAdminRole(role?: string): boolean {
     return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
   }
@@ -421,6 +491,12 @@ export class RtcService {
       try {
         await redis.set(`rtc:room:${dto.roomId}:active_session`, saved.id);
         await redis.sadd(`rtc:room:${dto.roomId}:speakers`, userId);
+        await this.redisStateService.setSpeaker(dto.roomId, {
+          userId,
+          isMuted: false,
+          role: 'host',
+          joinedStageAt: new Date().toISOString(),
+        });
       } catch (e) {
         this.logger.warn(`Redis session sync error: ${e}`);
       }
@@ -559,8 +635,55 @@ export class RtcService {
   }
 
   // 4. Speaking Controls
+  private async removeHandRaiseRequest(roomId: string, userId: string): Promise<void> {
+    const redis = this.redisService.getClient();
+    try {
+      const key = `rtc:room:${roomId}:hand_queue`;
+      const raw = await redis.lrange(key, 0, -1);
+      const keep = raw.filter((entry) => {
+        try {
+          return JSON.parse(entry)?.userId !== userId;
+        } catch {
+          return true;
+        }
+      });
+      const tx = redis.multi().del(key);
+      if (keep.length) tx.rpush(key, ...keep);
+      await tx.exec();
+    } catch (error) {
+      this.logger.warn(`Failed to update hand queue for ${roomId}/${userId}: ${error}`);
+    }
+  }
+
+  async getRoomStageState(managerId: string, roomId: string) {
+    await this.assertRoomStageManager(managerId, roomId);
+    const redis = this.redisService.getClient();
+    let handQueue: Array<{ userId: string; seatIndex?: number; timestamp?: number }> = [];
+    try {
+      const raw = await redis.lrange(`rtc:room:${roomId}:hand_queue`, 0, -1);
+      handQueue = raw.flatMap((entry) => {
+        try {
+          const parsed = JSON.parse(entry);
+          return parsed?.userId ? [parsed] : [];
+        } catch {
+          return [];
+        }
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to read hand queue for ${roomId}: ${error}`);
+    }
+    const speakers = await this.redisStateService.getSpeakers(roomId);
+    const participants = await this.getRoomParticipants(roomId);
+    const activeSession = await this.sessionRepository.findOne({
+      where: { roomId, status: RtcSessionStatus.ACTIVE },
+    });
+    return { roomId, handQueue, speakers, participants: participants.participants, activeSession };
+  }
+
   async raiseHand(userId: string, roomId: string, dto: RaiseHandDto) {
+    await this.assertRoomLiveInteraction(roomId);
     await this.validateSpeakerSeatIndex(dto.seatIndex);
+    await this.removeHandRaiseRequest(roomId, userId);
     const redis = this.redisService.getClient();
     if (redis) {
       try {
@@ -577,6 +700,8 @@ export class RtcService {
       }
     }
 
+    await this.patchRtcPresence(roomId, userId, { handRaised: true });
+
     this.eventsGateway.server?.emit('hand_raised', {
       roomId,
       userId,
@@ -588,6 +713,8 @@ export class RtcService {
   }
 
   async cancelRaiseHand(userId: string, roomId: string) {
+    await this.removeHandRaiseRequest(roomId, userId);
+    await this.patchRtcPresence(roomId, userId, { handRaised: false });
     this.eventsGateway.server?.emit('hand_rejected', {
       roomId,
       userId,
@@ -602,6 +729,7 @@ export class RtcService {
   }
 
   async approveSpeaker(hostId: string, roomId: string, dto: SpeakerActionDto) {
+    await this.assertRoomLiveInteraction(roomId);
     const seatIndex = dto.seatIndex ?? 1;
     await this.validateSpeakerSeatIndex(seatIndex);
     await this.assertRoomStageManager(hostId, roomId, {
@@ -645,6 +773,14 @@ export class RtcService {
       this.logger.warn(`Failed to mirror RTC speaker authority: ${error}`);
     }
 
+    await this.removeHandRaiseRequest(roomId, dto.targetUserId);
+    await this.patchRtcPresence(roomId, dto.targetUserId, {
+      handRaised: false,
+      role: SpeakerRole.SPEAKER,
+      isMuted: false,
+    });
+    await this.syncRoomCounts(roomId);
+
     this.eventsGateway.server?.emit('hand_approved', {
       roomId,
       targetUserId: dto.targetUserId,
@@ -667,9 +803,12 @@ export class RtcService {
   }
 
   async rejectSpeaker(hostId: string, roomId: string, dto: SpeakerActionDto) {
+    await this.assertRoomLiveInteraction(roomId);
     await this.assertRoomStageManager(hostId, roomId, {
       targetUserId: dto.targetUserId,
     });
+    await this.removeHandRaiseRequest(roomId, dto.targetUserId);
+    await this.patchRtcPresence(roomId, dto.targetUserId, { handRaised: false });
 
     this.eventsGateway.server?.emit('hand_rejected', {
       roomId,
@@ -685,10 +824,12 @@ export class RtcService {
   }
 
   async inviteSpeaker(hostId: string, roomId: string, dto: SpeakerActionDto) {
+    await this.assertRoomLiveInteraction(roomId);
     return this.approveSpeaker(hostId, roomId, dto);
   }
 
   async removeSpeaker(hostId: string, roomId: string, dto: SpeakerActionDto) {
+    await this.assertRoomLiveInteraction(roomId);
     await this.assertRoomStageManager(hostId, roomId, {
       targetUserId: dto.targetUserId,
     });
@@ -718,6 +859,11 @@ export class RtcService {
     }
 
     await this.redisStateService.removeSpeaker(roomId, dto.targetUserId);
+    await this.patchRtcPresence(roomId, dto.targetUserId, {
+      role: SpeakerRole.LISTENER,
+      isMuted: false,
+      isSpeaking: false,
+    });
     try {
       await this.redisService
         .getClient()
@@ -725,6 +871,8 @@ export class RtcService {
     } catch (error) {
       this.logger.warn(`Failed to remove mirrored RTC speaker authority: ${error}`);
     }
+
+    await this.syncRoomCounts(roomId);
 
     this.eventsGateway.server?.emit('speaker_left', {
       roomId,
@@ -740,6 +888,7 @@ export class RtcService {
   }
 
   async muteUser(hostId: string, roomId: string, dto: RtcMuteUserDto) {
+    await this.assertRoomLiveInteraction(roomId);
     await this.assertRoomStageManager(hostId, roomId, {
       targetUserId: dto.targetUserId,
     });
@@ -747,9 +896,21 @@ export class RtcService {
     const config = await this.getRtcConfig();
     const provider = this.providerFactory.getProvider(config.activeProvider);
     await provider.muteUser(config, roomId, dto.targetUserId, dto.mute);
+    await this.patchRtcPresence(roomId, dto.targetUserId, {
+      isMuted: dto.mute,
+      ...(dto.mute ? { isSpeaking: false } : {}),
+    });
+    const stageSpeaker = (await this.redisStateService.getSpeakers(roomId))
+      .find((speaker) => speaker.userId === dto.targetUserId);
+    if (stageSpeaker) {
+      await this.redisStateService.setSpeaker(roomId, {
+        ...stageSpeaker,
+        isMuted: dto.mute,
+      });
+    }
 
     const eventName = dto.mute ? 'microphone_muted' : 'microphone_unmuted';
-    this.eventsGateway.server?.emit(eventName, {
+    this.eventsGateway.broadcastToRoom(roomId, eventName, {
       roomId,
       targetUserId: dto.targetUserId,
       isMuted: dto.mute,
@@ -764,6 +925,7 @@ export class RtcService {
   }
 
   async lockSeat(hostId: string, roomId: string, dto: LockSeatDto) {
+    await this.assertRoomLiveInteraction(roomId);
     await this.assertRoomStageManager(hostId, roomId);
     await this.validateSpeakerSeatIndex(dto.seatIndex);
     const eventName = dto.lock ? 'seat_locked' : 'seat_unlocked';
@@ -1056,6 +1218,7 @@ export class RtcService {
     };
 
     const redis = this.redisService.getClient();
+    let newlyJoined = true;
     if (redis) {
       try {
         await redis.set(
@@ -1064,7 +1227,7 @@ export class RtcService {
           'EX',
           86400,
         );
-        await redis.sadd(`rtc:room:${dto.roomId}:participants`, userId);
+        newlyJoined = (await redis.sadd(`rtc:room:${dto.roomId}:participants`, userId)) === 1;
       } catch (e) {
         this.logger.warn(`Redis presence error: ${e}`);
       }
@@ -1073,7 +1236,7 @@ export class RtcService {
     const activeSession = await this.sessionRepository.findOne({
       where: { roomId: dto.roomId, status: RtcSessionStatus.ACTIVE },
     });
-    if (activeSession) {
+    if (activeSession && newlyJoined) {
       activeSession.concurrentUsers = (activeSession.concurrentUsers || 1) + 1;
       if (activeSession.concurrentUsers > (activeSession.peakAudience || 0)) {
         activeSession.peakAudience = activeSession.concurrentUsers;
@@ -1082,6 +1245,8 @@ export class RtcService {
         (activeSession.totalParticipants || 1) + 1;
       await this.sessionRepository.save(activeSession);
     }
+
+    await this.syncRoomCounts(dto.roomId);
 
     this.eventsGateway.server?.emit('participant_joined', {
       roomId: dto.roomId,
@@ -1096,6 +1261,9 @@ export class RtcService {
       userId,
       role,
       token: tokenResult.token,
+      provider: tokenResult.provider,
+      appId: tokenResult.appId,
+      serverUrl: tokenResult.serverUrl,
       expiresAt: tokenResult.expiresAt,
       presenceState,
     };
@@ -1103,10 +1271,11 @@ export class RtcService {
 
   async leaveRoom(userId: string, dto: LeaveRoomDto) {
     const redis = this.redisService.getClient();
+    let removed = true;
     if (redis) {
       try {
         await redis.del(`rtc:presence:${dto.roomId}:${userId}`);
-        await redis.srem(`rtc:room:${dto.roomId}:participants`, userId);
+        removed = (await redis.srem(`rtc:room:${dto.roomId}:participants`, userId)) === 1;
       } catch (e) {
         this.logger.warn(`Redis leave error: ${e}`);
       }
@@ -1115,10 +1284,12 @@ export class RtcService {
     const activeSession = await this.sessionRepository.findOne({
       where: { roomId: dto.roomId, status: RtcSessionStatus.ACTIVE },
     });
-    if (activeSession && activeSession.concurrentUsers > 0) {
+    if (activeSession && removed && activeSession.concurrentUsers > 0) {
       activeSession.concurrentUsers -= 1;
       await this.sessionRepository.save(activeSession);
     }
+
+    await this.syncRoomCounts(dto.roomId);
 
     this.eventsGateway.server?.emit('participant_left', {
       roomId: dto.roomId,
@@ -1163,6 +1334,8 @@ export class RtcService {
       }
     }
 
+    await this.syncRoomCounts(dto.roomId);
+
     this.eventsGateway.server?.emit('participant_reconnected', {
       roomId: dto.roomId,
       userId,
@@ -1176,6 +1349,9 @@ export class RtcService {
       userId,
       role,
       token: tokenResult.token,
+      provider: tokenResult.provider,
+      appId: tokenResult.appId,
+      serverUrl: tokenResult.serverUrl,
       expiresAt: tokenResult.expiresAt,
       presenceState,
     };
@@ -1205,6 +1381,8 @@ export class RtcService {
         this.logger.warn(`Redis kick error: ${e}`);
       }
     }
+
+    await this.syncRoomCounts(dto.roomId);
 
     this.eventsGateway.server?.emit('participant_force_disconnected', {
       roomId: dto.roomId,
@@ -1264,6 +1442,7 @@ export class RtcService {
 
   // 10. Active Speaker Detection
   async reportSpeakingState(userId: string, dto: SpeakingStateDto) {
+    if (dto.isSpeaking) await this.assertRoomLiveInteraction(dto.roomId);
     const role = await this.deriveAuthoritativeRtcRole(dto.roomId, userId);
     if (dto.isSpeaking && role === SpeakerRole.LISTENER) {
       throw new ForbiddenException(
@@ -1286,6 +1465,11 @@ export class RtcService {
         this.logger.warn(`Redis speaking state error: ${e}`);
       }
     }
+
+    await this.patchRtcPresence(dto.roomId, userId, {
+      role,
+      isSpeaking: dto.isSpeaking,
+    });
 
     this.eventsGateway.server?.emit('active_speaker_changed', {
       roomId: dto.roomId,

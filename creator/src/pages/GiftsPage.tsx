@@ -123,7 +123,7 @@ export const GiftsPage: React.FC = () => {
                       🪙 {Number(g.totalCoins ?? g.coinValue ?? 0).toLocaleString()} Coins
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      From {g.senderName || g.sender?.displayName || g.senderId || '—'}
+                      From {g.senderName || g.sender?.displayName || g.sender?.username || 'VoiceCloud user'}
                     </Typography>
                   </Box>
                 </CardContent>

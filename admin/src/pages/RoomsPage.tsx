@@ -64,7 +64,7 @@ export const RoomsPage: React.FC = () => {
           <MeetingRoomIcon color="primary" />
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>{row.title}</Typography>
-            <Typography variant="caption" color="text.secondary">{row.category} • Host: {row.hostName || row.hostUsername || row.hostId}</Typography>
+            <Typography variant="caption" color="text.secondary">{row.category} • Host: {row.hostName || row.hostUsername || 'VoiceCloud host'}</Typography>
           </Box>
         </Box>
       ),
@@ -74,7 +74,7 @@ export const RoomsPage: React.FC = () => {
     { id: 'status', label: 'Status', render: (row) => <StatusBadge status={String(row.status).toLowerCase()} /> },
     {
       id: 'actions', label: 'Actions', align: 'right', render: (row) => (
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
           <Button size="small" variant="outlined" startIcon={<VisibilityIcon />} onClick={() => navigate(`/rooms/${row.id}`)}>View</Button>
           {(String(row.status).toLowerCase() === 'live' || String(row.status).toLowerCase() === 'paused') && (
             <Button size="small" color="error" variant="outlined" startIcon={<HighlightOffIcon />} onClick={() => { setSelectedRoom(row); setDialogOpen(true); }}>Terminate</Button>

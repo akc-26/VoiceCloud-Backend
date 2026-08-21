@@ -60,8 +60,11 @@ export class ReactionsGateway implements OnGatewayInit {
     @MessageBody() data: EmojiReactionDto,
   ) {
     let userId: string;
+    let username: string | undefined;
     try {
-      userId = this.socketAuthService.getAuthenticatedUser(client).userId;
+      const authenticatedUser = await this.socketAuthService.ensureAuthenticatedUser(client);
+      userId = authenticatedUser.userId;
+      username = authenticatedUser.username;
     } catch (error) {
       return this.toFailure(error, SocketErrorCode.UNAUTHORIZED);
     }
@@ -76,6 +79,7 @@ export class ReactionsGateway implements OnGatewayInit {
 
     try {
       await this.roomStateService.assertRoomJoinable(data.roomId, userId);
+      await this.roomStateService.assertRoomInteractive(data.roomId);
       this.socketAuthService.assertJoinedRoom(client, data.roomId);
       await this.roomStateService.assertParticipantOrHost(data.roomId, userId);
     } catch (error) {
@@ -93,6 +97,7 @@ export class ReactionsGateway implements OnGatewayInit {
     const payload = {
       roomId: data.roomId,
       userId,
+      username: username || 'VoiceCloud user',
       emoji: data.emoji.trim(),
       timestamp: new Date().toISOString(),
     };
@@ -115,7 +120,7 @@ export class ReactionsGateway implements OnGatewayInit {
       userId,
     );
 
-    return { success: true, emoji: data.emoji.trim() };
+    return { success: true, emoji: data.emoji.trim(), reaction: payload };
   }
 
   // --- Gift Broadcast Events (Display Only) ---
@@ -128,7 +133,7 @@ export class ReactionsGateway implements OnGatewayInit {
   ) {
     let senderId: string;
     try {
-      senderId = this.socketAuthService.getAuthenticatedUser(client).userId;
+      senderId = (await this.socketAuthService.ensureAuthenticatedUser(client)).userId;
     } catch (error) {
       return this.toFailure(error, SocketErrorCode.UNAUTHORIZED);
     }

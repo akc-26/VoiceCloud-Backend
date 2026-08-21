@@ -14,6 +14,7 @@ import { Message } from './entities/message.entity';
 import { MessageReaction } from './entities/message-reaction.entity';
 import { MessageReport } from './entities/message-report.entity';
 import { VoiceNote } from './entities/voice-note.entity';
+import { User } from '../users/entities/user.entity';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { VoiceNote } from './entities/voice-note.entity';
       MessageReaction,
       MessageReport,
       VoiceNote,
+      User,
     ]),
     StorageModule,
     RedisModule,

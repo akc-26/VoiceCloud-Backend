@@ -317,42 +317,6 @@ export class RoomsService {
 
   async startRoom(id: string, userId: string): Promise<Room> {
     await this.assertApprovedHost(userId);
-    const existing = await this.findOne(id);
-    if (this.roomLifecycleService.normalize(existing.status) === RoomLifecycleStatus.ENDED) {
-      if (existing.hostId !== userId) {
-        throw new ForbiddenException('Only the host can restart this broadcast');
-      }
-      const restarted = this.roomRepository.create({
-        title: existing.title,
-        description: existing.description,
-        hostId: existing.hostId,
-        coverUrl: existing.coverUrl,
-        isLocked: existing.isLocked,
-        isLive: false,
-        status: RoomLifecycleStatus.OFFLINE,
-        audioQuality: existing.audioQuality,
-        startedAt: null,
-        endedAt: null,
-        language: existing.language,
-        category: existing.category,
-        listenerCount: 0,
-        speakerCount: 0,
-        giftActivity: 0,
-        popularityScore: existing.popularityScore || 100,
-        scheduledRoomId: null,
-        clubId: existing.clubId,
-        isPremium: existing.isPremium,
-        isTicketRequired: existing.isTicketRequired,
-        isSubscriberOnly: existing.isSubscriberOnly,
-        isInviteOnly: existing.isInviteOnly,
-        isVerifiedOnly: existing.isVerifiedOnly,
-        ticketPriceAmount: existing.ticketPriceAmount,
-        currency: existing.currency,
-      });
-      const savedRestart = await this.roomRepository.save(restarted);
-      this.broadcastLifecycleEvent(savedRestart, 'room.created', 'room_created', savedRestart);
-      return this.startRoom(savedRestart.id, userId);
-    }
     const updated = await this.transitionRoom(id, userId, 'start');
     await this.realtimeRoomStateService.openRoom(updated);
     const room = updated;

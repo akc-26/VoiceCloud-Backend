@@ -8,7 +8,7 @@ const ALLOWED_TRANSITIONS: Record<
   RoomLifecycleAction,
   readonly RoomLifecycleStatus[]
 > = {
-  start: [RoomLifecycleStatus.OFFLINE],
+  start: [RoomLifecycleStatus.OFFLINE, RoomLifecycleStatus.ENDED],
   pause: [RoomLifecycleStatus.LIVE],
   resume: [RoomLifecycleStatus.PAUSED],
   end: [RoomLifecycleStatus.LIVE, RoomLifecycleStatus.PAUSED],
@@ -49,7 +49,8 @@ export class RoomLifecycleService {
     room.isLive = true;
     room.startedAt = now;
     room.endedAt = null;
-    room.speakerCount = Math.max(room.speakerCount || 0, 1);
+    room.listenerCount = 0;
+    room.speakerCount = 1;
   }
 
   applyPause(room: Room): void {

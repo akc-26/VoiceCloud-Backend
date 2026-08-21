@@ -1,0 +1,79 @@
+VC-WEB-PH05-R12 CORRECTIVE PACKAGE
+Parent: VC-WEB-PH05-R11 uploaded source package
+
+Corrected scope
+1. Creator Pause / realtime authentication race
+   - Shared awaited socket-authentication promise is now used by connection and realtime handlers.
+   - Presence, room and reaction handlers no longer read socket identity before JWT verification completes.
+   - Security remains fail-closed for missing/invalid tokens.
+
+2. Creator /rooms broadcast controls UI
+   - Clear Ready / On air / Paused control state.
+   - Improved Go Live, Pause/Resume, End, microphone and Manage Live Room hierarchy/spacing.
+   - Removed a hard-coded live-card shadow in favor of the Creator theme.
+
+3. Creator schedule lifecycle + timezone
+   - Creator-local date/time editing and canonical ISO instant submission.
+   - Schedule cards expose create/start linked broadcast, edit date/time, pause/resume/end,
+     start speaking/mute and Open Console where applicable.
+   - scheduled_rooms.scheduledStartTime is migrated from timestamp to timestamptz.
+   - Legacy values are interpreted as UTC during migration; browsers display the same instant in local time.
+
+4. Creator room chat alignment
+   - Own-message detection uses the durable authenticated creator userId even when the optional profile object is not hydrated.
+   - Own messages render right; all other senders render left.
+
+5. Host mute / speaker state
+   - Existing provider-backed mute action remains authoritative.
+   - Creator stage visibly reports muted speaker state.
+   - Consumer speaker applies authoritative mute state, disables local microphone, and cannot re-enable it until unmuted.
+
+6. Consumer emoji + broadcast pause/end realtime behavior
+   - Reaction ACK now returns the authoritative reaction payload.
+   - One reconnect-presence recovery/retry is performed if transport reconnect lost room membership.
+   - ACK/socket duplicate reaction events are de-duplicated.
+   - Pause immediately disables live interaction controls and local speaking.
+   - End immediately closes RTC/realtime state, redirects to /rooms, and surfaces an ended-broadcast notice.
+
+7. Consumer room chat page growth
+   - Chat grid uses minmax(0,1fr), bounded viewport height, hidden outer overflow and internal vertical scrolling.
+
+8. Paused-room interaction authority
+   - Consumer chat/reactions/hand raise/speaker controls remain disabled when not LIVE.
+   - Creator invite/approve/mute/stage actions remain disabled while paused.
+   - Backend live-interaction authority remains enforced; no guard was weakened.
+
+Acceptance/regression additions
+- R12 source regression verifier: scripts/r12/r12-live-room-corrections-source-check.mjs
+- Realtime socket-auth race regression: src/common/events/realtime-socket-auth.r12.spec.ts
+- Scheduled timezone migration regression: src/database/migrations/scheduled-room-timezone-authority.spec.ts
+- Phase20 RTC fixture now represents an actual LIVE room, correcting the 7 R11 acceptance failures caused by undefined room status.
+- Comprehensive acceptance renamed to VC-WEB-PH05-R12 and includes the new R12 verifier/tests.
+
+Executed in this build workspace
+- PH01 source check: PASS
+- PH02 source check: PASS
+- PH03 source check: PASS
+- PH04 source check: PASS
+- PH05 source check: PASS
+- Backend constructor-contract audit: PASS (172 constructors; 0 mismatches)
+- R11 Admin source regression: PASS 7/7
+- R11 Creator source regression: PASS 12/12
+- R11 Backend authority source regression: PASS 14/14
+- R11 RTC/Security source regression: PASS 27/27
+- R11 API parity: PASS (220 frontend calls / 648 backend operations)
+- R12 live-room corrections source regression: PASS 16/16
+- Modified TypeScript/TSX parser pass: PASS 18/18
+
+Environment limitation
+This sandbox does not contain the locked npm package cache and cannot fetch all registry tarballs.
+An offline npm ci fails at the first uncached package (zustand-5.0.14). Therefore npm-dependent
+TypeScript/Jest/Vite/Nest gates must NOT be treated as passed here. Run the package acceptance command
+on the normal Windows development workstation before Git freeze:
+
+  scripts\website\VC-WEB-PH05-ACCEPTANCE.cmd
+
+Database deployment note
+The R12 schedule timezone correction includes migration:
+  1700000000014-Phase08ScheduledRoomTimezoneAuthority.ts
+Apply normal project migrations in environments where migrations are not automatically run.

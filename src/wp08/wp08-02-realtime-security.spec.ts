@@ -237,7 +237,7 @@ describe('WP08-02 realtime security and moderation contract', () => {
       getParticipantCount: jest.fn().mockResolvedValue(7),
     };
     const socketAuthService = {
-      getAuthenticatedUser: jest.fn().mockReturnValue({ userId: 'listener-1' }),
+      ensureAuthenticatedUser: jest.fn().mockResolvedValue({ userId: 'listener-1' }),
       assertJoinedRoom: jest.fn().mockImplementation(() => {
         throw {
           code: SocketErrorCode.NOT_IN_ROOM,

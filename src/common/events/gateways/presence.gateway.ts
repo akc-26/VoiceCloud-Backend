@@ -58,7 +58,7 @@ export class PresenceGateway implements OnGatewayInit {
     @MessageBody() data: PresenceJoinDto,
   ) {
     try {
-      const user = this.socketAuthService.getAuthenticatedUser(client);
+      const user = await this.socketAuthService.ensureAuthenticatedUser(client);
       if (!data?.roomId) {
         return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
       }
@@ -134,7 +134,7 @@ export class PresenceGateway implements OnGatewayInit {
     @MessageBody() data: PresenceLeaveDto,
   ) {
     try {
-      const user = this.socketAuthService.getAuthenticatedUser(client);
+      const user = await this.socketAuthService.ensureAuthenticatedUser(client);
       if (!data?.roomId) {
         return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
       }
@@ -193,7 +193,7 @@ export class PresenceGateway implements OnGatewayInit {
     @MessageBody() data: { roomId: string },
   ) {
     try {
-      const user = this.socketAuthService.getAuthenticatedUser(client);
+      const user = await this.socketAuthService.ensureAuthenticatedUser(client);
       if (!data?.roomId) {
         return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
       }
@@ -252,7 +252,7 @@ export class PresenceGateway implements OnGatewayInit {
     @MessageBody() data: TypingStatusDto,
   ) {
     try {
-      const user = this.socketAuthService.getAuthenticatedUser(client);
+      const user = await this.socketAuthService.ensureAuthenticatedUser(client);
       if (!data?.roomId) {
         return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
       }
@@ -294,9 +294,9 @@ export class PresenceGateway implements OnGatewayInit {
   @SubscribeMessage('presence:ping')
   @SubscribeMessage('heartbeat')
   @SubscribeMessage('ping')
-  handlePing(@ConnectedSocket() client: Socket, @MessageBody() data?: any) {
+  async handlePing(@ConnectedSocket() client: Socket, @MessageBody() data?: any) {
     try {
-      const user = this.socketAuthService.getAuthenticatedUser(client);
+      const user = await this.socketAuthService.ensureAuthenticatedUser(client);
       if (data?.roomId) {
         this.socketAuthService.assertJoinedRoom(client, data.roomId);
       }
@@ -319,7 +319,7 @@ export class PresenceGateway implements OnGatewayInit {
     @MessageBody() data: { roomId: string },
   ) {
     try {
-      const user = this.socketAuthService.getAuthenticatedUser(client);
+      const user = await this.socketAuthService.ensureAuthenticatedUser(client);
       if (!data?.roomId) {
         return this.failure(SocketErrorCode.ROOM_NOT_FOUND, 'Room ID is required');
       }

@@ -1,0 +1,15 @@
+VC-WEB-PH05-R08 CORRECTIONS
+Parent candidate: VC-WEB-PH05-R07
+Protected Git parent remains: VC-WEB-PH04-R03 / bd330734886cda3ebf2b1a268a6dfd63f7f6011a
+
+R08 corrects the Windows comprehensive-acceptance runner defect exposed by R07:
+- removes direct spawnSync('npm.cmd', ..., shell:false) post-install dispatch, which returned no child status on Windows and falsely marked every gate failed;
+- dispatches all post-install source checks, TypeScript, Jest, Vite and Nest commands through process.execPath and their real JavaScript entry points;
+- adds an up-front child-process dispatch probe;
+- reports missing dependency entry points and spawn errors explicitly instead of silently converting a null status to exit 1;
+- keeps non-fail-fast failure aggregation, but now aggregates real command/test/build results;
+- splits R11 source regressions and extended RTC/WP08 suites into independently visible gates;
+- keeps the R07 RoomsService constructor correction and repository-wide constructor-contract audit;
+- preserves all R05/R06 live-room, LiveKit, Creator, realtime, identity, and MUI-v9 corrections.
+
+No database schema/entity/migration changes.

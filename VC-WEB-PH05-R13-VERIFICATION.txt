@@ -1,0 +1,33 @@
+VC-WEB-PH05-R13 VERIFICATION RECORD
+
+User workstation R12 failures corrected
+- Backend/shared TypeScript failure in phase3a-realtime.spec.ts: handlePing() is now awaited.
+- WP08 private participant-count failure: mock now implements ensureAuthenticatedUser().
+
+Executed in this workspace
+- PH01 source check: PASS
+- PH02 source check: PASS
+- PH03 source check: PASS
+- PH04 source check: PASS
+- PH05 source check: PASS
+- Backend constructor-contract audit: PASS (172 constructors, 0 mismatches)
+- R12 live-room corrections verifier: PASS 16/16
+- R13 live-room corrections verifier: PASS 9/9
+- R11 Admin source regression: PASS 7/7
+- R11 Creator source regression: PASS 12/12
+- R11 Backend authority regression: PASS 14/14
+- R11 RTC/Security regression: PASS 27/27
+- R11 API parity: PASS (220 frontend calls / 648 backend operations)
+- Modified TS/TSX transpile/parser check: PASS 8/8
+- R13 acceptance/source scripts: Node syntax PASS
+
+Dependency-backed limitation in this workspace
+- npm ci cannot complete because the sandbox has no registry access / complete npm cache.
+- Offline npm ci specifically fails on uncached zustand-5.0.14.
+- Therefore Jest, full TypeScript project checks, Vite builds, Nest build, and complete integrated acceptance must be executed on the normal Windows workstation.
+
+Required workstation command
+  scripts\website\VC-WEB-PH05-ACCEPTANCE.cmd
+
+Do not Git-freeze R13 unless that command ends with:
+  [PASS] VC-WEB-PH05-R13 acceptance commands completed successfully.

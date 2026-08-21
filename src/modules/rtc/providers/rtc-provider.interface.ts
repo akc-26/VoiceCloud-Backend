@@ -12,6 +12,7 @@ export interface RtcTokenResult {
   token: string;
   provider: string;
   appId?: string;
+  serverUrl?: string;
   roomId: string;
   userId: string;
   role: SpeakerRole;

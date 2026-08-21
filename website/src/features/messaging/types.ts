@@ -17,6 +17,7 @@ export interface ChatMessage {
   id: string;
   conversationId: string;
   senderId: string;
+  sender?: { id?: string; username?: string; displayName?: string; avatarUrl?: string | null } | null;
   type: MessageType;
   content?: string | null;
   attachments?: Array<{ url: string; type: string; name?: string; size?: number; mimeType?: string }> | null;
@@ -24,6 +25,7 @@ export interface ChatMessage {
   isPinned: boolean;
   isEdited: boolean;
   deliveryStatus: 'sent' | 'delivered' | 'read';
+  reactions?: Array<{ id?: string; messageId?: string; userId: string; emoji: string }>;
   createdAt: string;
   updatedAt: string;
 }

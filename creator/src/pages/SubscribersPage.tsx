@@ -426,7 +426,7 @@ export const SubscribersPage: React.FC = () => {
               value={form.monthlyPrice}
               onChange={(e) => setForm((current) => ({ ...current, monthlyPrice: e.target.value }))}
               type="number"
-              inputProps={{ min: 0, step: '0.01' }}
+              slotProps={{ htmlInput: { min: 0, step: '0.01' } }}
               fullWidth
               required
             />
@@ -435,7 +435,7 @@ export const SubscribersPage: React.FC = () => {
               value={form.yearlyPrice}
               onChange={(e) => setForm((current) => ({ ...current, yearlyPrice: e.target.value }))}
               type="number"
-              inputProps={{ min: 0, step: '0.01' }}
+              slotProps={{ htmlInput: { min: 0, step: '0.01' } }}
               fullWidth
             />
             <TextField

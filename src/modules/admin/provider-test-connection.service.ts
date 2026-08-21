@@ -6,6 +6,8 @@ import {
 import { EncryptionService } from '../../common/services/encryption.service';
 import axios from 'axios';
 import * as net from 'net';
+import * as crypto from 'crypto';
+import { liveKitHttpBaseUrl, resolveLiveKitProviderConfig } from '../rtc/livekit-config.util';
 
 export interface TestConnectionResult {
   success: boolean;
@@ -121,19 +123,85 @@ export class ProviderTestConnectionService {
     }
 
     if (providerType === 'livekit') {
-      const apiKey = config.apiKey || config.livekitApiKey;
-      const apiSecret = config.apiSecret || config.livekitApiSecret || config.secret;
-      const serverUrl = config.url || config.serverUrl || config.wsUrl;
-      if (!apiKey || !apiSecret || !serverUrl) {
-        return { success: false, message: 'Missing LiveKit URL, API Key, or API Secret' };
+      const liveKit = resolveLiveKitProviderConfig(config);
+      if (!liveKit.apiKey || !liveKit.apiSecret || !liveKit.serverUrl) {
+        return {
+          success: false,
+          message: 'Missing LiveKit Project URL, API Key, or API Secret',
+          details: {
+            required: ['serverUrl', 'apiKey', 'apiSecret'],
+            serverUrlConfigured: Boolean(liveKit.serverUrl),
+            apiKeyConfigured: Boolean(liveKit.apiKey),
+            apiSecretConfigured: Boolean(liveKit.apiSecret),
+          },
+        };
       }
-      if (!/^wss?:\/\//i.test(String(serverUrl))) {
-        return { success: false, message: 'LiveKit server URL must use ws:// or wss://' };
+      if (!/^wss?:\/\//i.test(liveKit.serverUrl)) {
+        return { success: false, message: 'LiveKit Project URL must use ws:// or wss://' };
       }
+      if (/DEFAULT|PLACEHOLDER|YOUR_|voicecloud\.app/i.test(`${liveKit.serverUrl}${liveKit.apiKey}${liveKit.apiSecret}`)) {
+        return {
+          success: false,
+          message: 'LiveKit configuration still contains placeholder/default values',
+        };
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const encodedHeader = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+      const encodedPayload = Buffer.from(JSON.stringify({
+        iss: liveKit.apiKey,
+        sub: 'voicecloud-provider-health-check',
+        nbf: now - 5,
+        exp: now + 90,
+        video: { roomList: true },
+      })).toString('base64url');
+      const signature = crypto
+        .createHmac('sha256', liveKit.apiSecret)
+        .update(`${encodedHeader}.${encodedPayload}`)
+        .digest('base64url');
+      const token = `${encodedHeader}.${encodedPayload}.${signature}`;
+      const endpoint = `${liveKitHttpBaseUrl(liveKit.serverUrl)}/twirp/livekit.RoomService/ListRooms`;
+
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        });
+      } catch (error) {
+        return {
+          success: false,
+          message: `LiveKit server could not be reached: ${(error as Error).message}`,
+          details: { serverUrl: liveKit.serverUrl, liveConnectivityVerified: false },
+        };
+      }
+
+      if (!response.ok) {
+        const detail = (await response.text()).slice(0, 300);
+        return {
+          success: false,
+          message: `LiveKit rejected the configured project credentials (${response.status})`,
+          details: {
+            serverUrl: liveKit.serverUrl,
+            apiKeyPrefix: `${liveKit.apiKey.slice(0, 6)}...`,
+            liveConnectivityVerified: false,
+            providerResponse: detail,
+          },
+        };
+      }
+
       return {
         success: true,
-        message: 'LiveKit credential and server URL structure validated; runtime room connectivity still requires a real RTC session test',
-        details: { apiKeyPrefix: String(apiKey).substring(0, 6) + '...', serverUrl, liveConnectivityVerified: false },
+        message: 'LiveKit connection verified successfully with the configured Project URL, API Key, and API Secret',
+        details: {
+          apiKeyPrefix: `${liveKit.apiKey.slice(0, 6)}...`,
+          serverUrl: liveKit.serverUrl,
+          liveConnectivityVerified: true,
+        },
       };
     }
 

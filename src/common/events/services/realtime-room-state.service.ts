@@ -262,6 +262,25 @@ export class RealtimeRoomStateService {
     return state;
   }
 
+  async assertRoomInteractive(roomId: string): Promise<Room> {
+    const room = await this.roomRepository.findOne({ where: { id: roomId } });
+    if (!room) {
+      throw {
+        code: SocketErrorCode.ROOM_NOT_FOUND,
+        message: 'Room not found',
+      };
+    }
+    if (room.status !== RoomLifecycleStatus.LIVE) {
+      throw {
+        code: SocketErrorCode.INVALID_ROOM_STATE,
+        message: room.status === RoomLifecycleStatus.PAUSED
+          ? 'Room interactions are disabled while the broadcast is paused'
+          : `Room interactions are disabled while the room is ${room.status}`,
+      };
+    }
+    return room;
+  }
+
   async assertRoomJoinable(
     roomId: string,
     userId?: string,
@@ -1337,12 +1356,24 @@ export class RealtimeRoomStateService {
       const room = await this.roomRepository.findOne({ where: { id: roomId } });
       if (!room) return;
 
-      const speakerCount = this.redisStateService
-        ? (await this.redisStateService.getSpeakers(roomId)).length
-        : state.speakers.size;
+      const speakerIds = new Set(
+        this.redisStateService
+          ? (await this.redisStateService.getSpeakers(roomId)).map((speaker) => speaker.userId)
+          : Array.from(state.speakers.keys()),
+      );
+      const presentUserIds = this.redisStateService
+        ? new Set(
+            (await this.redisStateService.getRoomParticipantsStrict(roomId)).map(
+              (participant) => participant.userId,
+            ),
+          )
+        : new Set(state.participants.keys());
+      const activeSpeakerCount = Array.from(speakerIds).filter((userId) =>
+        presentUserIds.has(userId),
+      ).length;
 
-      room.speakerCount = speakerCount;
-      room.listenerCount = Math.max(participantCount - speakerCount, 0);
+      room.speakerCount = activeSpeakerCount;
+      room.listenerCount = Math.max(participantCount - activeSpeakerCount, 0);
       await this.roomRepository.save(room);
     } catch (error) {
       this.logger.warn(

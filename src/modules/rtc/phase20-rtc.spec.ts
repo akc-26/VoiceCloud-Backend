@@ -33,11 +33,12 @@ import { AdminSettingsService } from '../admin/admin-settings.service';
 import { RealtimeRoomStateService } from '../../common/events/services/realtime-room-state.service';
 
 describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
+  const originalFetch = global.fetch;
   let service: RtcService;
   let qualityService: RtcQualityService;
   let factory: RtcProviderFactory;
   let adminSettingsService: { getOperationalSettings: jest.Mock };
-  let redisStateService: { isModerator: jest.Mock };
+  let redisStateService: { isModerator: jest.Mock; isSpeaker: jest.Mock };
 
   const mockConfig: RtcConfig = {
     id: '1',
@@ -54,6 +55,8 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
     id: 'room-101',
     name: 'Voice Stage 101',
     hostId: 'host-user-1',
+    status: 'live',
+    isLive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   } as unknown as Room;
@@ -122,8 +125,14 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockRecordingJob.status = RecordingJobStatus.RECORDING;
     process.env.NODE_ENV = 'test';
     process.env.ENABLE_RTC_MOCK_PROVIDER = 'true';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ rooms: [] }),
+    }) as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -192,10 +201,23 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
         {
           provide: DynamicConfigService,
           useValue: {
-            getActiveProviderConfig: jest.fn().mockResolvedValue(null),
+            getActiveProviderConfig: jest.fn().mockResolvedValue({
+              providerType: 'livekit',
+              healthStatus: 'healthy',
+              config: {
+                serverUrl: 'wss://example.livekit.cloud',
+                apiKey: mockConfig.apiKey,
+                apiSecret: mockConfig.secret,
+              },
+            }),
             getProviderConfig: jest.fn().mockResolvedValue({
               providerType: 'livekit',
-              config: { host: 'wss://example.livekit.cloud' },
+              healthStatus: 'healthy',
+              config: {
+                serverUrl: 'wss://example.livekit.cloud',
+                apiKey: mockConfig.apiKey,
+                apiSecret: mockConfig.secret,
+              },
             }),
           },
         },
@@ -234,6 +256,10 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
         return Promise.resolve(mockSession);
       return Promise.resolve(mockConfig);
     });
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
   });
 
   describe('RTC Provider Abstraction & Switching', () => {
@@ -387,7 +413,9 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
         service.approveSpeaker('ordinary-user', 'room-101', {
           targetUserId: 'speaker-user-1',
         }),
-      ).rejects.toThrow('Only room host or authorized moderator');
+      ).rejects.toThrow(
+        'Only room host, authorized co-host, or authorized moderator can manage the RTC stage',
+      );
     });
 
     it('allows an explicitly authorized moderator to approve a speaker', async () => {
@@ -423,7 +451,9 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
   });
 
   describe('Active Speaker Detection', () => {
-    it('should report active speaking state and update active speaker in Redis', async () => {
+    it('should report active speaking state for an authoritative speaker and update active speaker in Redis', async () => {
+      redisStateService.isSpeaker.mockResolvedValueOnce(true);
+
       const res = await service.reportSpeakingState('user-1', {
         roomId: 'room-101',
         isSpeaking: true,
@@ -439,19 +469,19 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
   });
 
   describe('Cloud Recording Pause & Resume Lifecycle', () => {
-    it('should pause an active cloud recording job', async () => {
-      const res = await service.pauseRecording('host-user-1', {
-        jobId: 'job-505',
-      });
-      expect(res.status).toEqual(RecordingJobStatus.PAUSED);
+    it('fails closed when Agora recording pause has no authoritative server adapter', async () => {
+      await expect(
+        service.pauseRecording('host-user-1', { jobId: 'job-505' }),
+      ).rejects.toThrow(/official server-side Agora adapter/);
+      expect(mockRecordingJob.status).toEqual(RecordingJobStatus.RECORDING);
     });
 
-    it('should resume a paused cloud recording job', async () => {
+    it('fails closed when Agora recording resume has no authoritative server adapter', async () => {
       mockRecordingJob.status = RecordingJobStatus.PAUSED;
-      const res = await service.resumeRecording('host-user-1', {
-        jobId: 'job-505',
-      });
-      expect(res.status).toEqual(RecordingJobStatus.RECORDING);
+      await expect(
+        service.resumeRecording('host-user-1', { jobId: 'job-505' }),
+      ).rejects.toThrow(/official server-side Agora adapter/);
+      expect(mockRecordingJob.status).toEqual(RecordingJobStatus.PAUSED);
     });
   });
 
@@ -475,7 +505,7 @@ describe('Phase 20 - Enterprise RTC Infrastructure Integration', () => {
     it('should generate admin RTC monitoring stats', async () => {
       const stats = await service.getAdminMonitoringStats();
       expect(stats.activeRoomsCount).toBeGreaterThanOrEqual(0);
-      expect(stats.activeProvider).toEqual(RtcProviderType.AGORA);
+      expect(stats.activeProvider).toEqual(mockConfig.activeProvider);
       expect(stats.averageRtt).toBeDefined();
     });
   });

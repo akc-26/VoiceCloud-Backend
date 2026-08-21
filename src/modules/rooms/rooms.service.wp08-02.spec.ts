@@ -14,6 +14,7 @@ import { ScheduledRoom } from './entities/scheduled-room.entity';
 import { RoomLifecycleStatus } from './enums/room-lifecycle-status.enum';
 import { RoomLifecycleService } from './room-lifecycle.service';
 import { RoomsService } from './rooms.service';
+import { RoomAuthorityService } from './room-authority.service';
 
 describe('RoomsService WP08-02 lifecycle authority', () => {
   let service: RoomsService;
@@ -117,6 +118,7 @@ describe('RoomsService WP08-02 lifecycle authority', () => {
       realtimeRoomStateService as unknown as RealtimeRoomStateService,
       dataSource,
       hostsService as unknown as HostsService,
+      { assertOwnerOrCoHost: jest.fn().mockResolvedValue(undefined) } as unknown as RoomAuthorityService,
     );
   });
 
@@ -244,6 +246,24 @@ describe('RoomsService WP08-02 lifecycle authority', () => {
     expect(result.isLive).toBe(true);
     expect(linked.status).toBe(ScheduledRoomStatus.LIVE);
     expect(scheduledRoomRepository.save).toHaveBeenCalledWith(linked);
+    expect(realtimeRoomStateService.openRoom).toHaveBeenCalledWith(result);
+  });
+
+
+  it('restarts an ended manual room on the same room id without cloning it', async () => {
+    const target = room(RoomLifecycleStatus.ENDED);
+    target.scheduledRoomId = null;
+    target.endedAt = new Date('2026-08-05T12:00:00.000Z');
+    transactionRoomRepository.findOne.mockResolvedValue(target);
+    scheduledRoomRepository.findOne.mockResolvedValue(null);
+
+    const result = await service.startRoom('room-1', 'host-1');
+
+    expect(result.id).toBe('room-1');
+    expect(result.status).toBe(RoomLifecycleStatus.LIVE);
+    expect(result.endedAt).toBeNull();
+    expect(transactionRoomRepository.create).not.toHaveBeenCalled();
+    expect(roomRepository.create).not.toHaveBeenCalled();
     expect(realtimeRoomStateService.openRoom).toHaveBeenCalledWith(result);
   });
 

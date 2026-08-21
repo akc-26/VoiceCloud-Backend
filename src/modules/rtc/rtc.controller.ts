@@ -440,6 +440,18 @@ export class RtcController {
     return this.rtcService.forceDisconnectParticipant(hostId, dto);
   }
 
+  @Get('rooms/:roomId/stage')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get authoritative live-room stage, hand queue, participants and active session' })
+  @ApiParam({ name: 'roomId', description: 'Room ID' })
+  async getRoomStageState(
+    @CurrentUser('userId') userId: string,
+    @Param('roomId') roomId: string,
+  ) {
+    return this.rtcService.getRoomStageState(userId, roomId);
+  }
+
   @Get('rooms/:roomId/participants')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

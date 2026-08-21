@@ -85,7 +85,7 @@ export class ScheduledRoom {
 
   @ApiProperty({ description: 'Scheduled start time' })
   @Index()
-  @Column({ type: 'timestamp' })
+  @Column({ type: 'timestamptz' })
   @Type(() => Date)
   @IsDate()
   scheduledStartTime: Date;

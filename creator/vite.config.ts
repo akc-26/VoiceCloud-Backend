@@ -6,6 +6,7 @@ export default defineConfig({
   base: '/creator/',
   plugins: [react()],
   root: path.resolve(__dirname),
+  envDir: path.resolve(__dirname, '..'),
   publicDir: path.resolve(__dirname, '../shared/branding/public'),
   build: {
     outDir: path.resolve(__dirname, '../dist/creator'),

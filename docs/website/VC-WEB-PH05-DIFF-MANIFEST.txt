@@ -1,0 +1,62 @@
+VC-WEB-PH05-R11 DIFF MANIFEST
+Parent: VoiceCloud-Backend-VC-WEB-PH04-R03 @ bd330734886cda3ebf2b1a268a6dfd63f7f6011a
+
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/VC-WEB-PH05-BASELINE.txt and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/VC-WEB-PH05-BASELINE.txt differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/AnalyticsPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/AnalyticsPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/AnnouncementsPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/AnnouncementsPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/MessagingPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/MessagingPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/ModerationPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/ModerationPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/ProviderConfigsPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/ProviderConfigsPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/ReferralPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/ReferralPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/ReportsPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/ReportsPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/RoomDetailPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/RoomDetailPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/RoomsPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/RoomsPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/UserDetailPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/UserDetailPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/admin/src/pages/WalletPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/admin/src/pages/WalletPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/creator/src/pages/GiftsPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/creator/src/pages/GiftsPage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/creator/src/pages/LiveRoomConsolePage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/creator/src/pages/LiveRoomConsolePage.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/creator/src/pages/LiveRoomsPage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/creator/src/pages/LiveRoomsPage.tsx differ
+- Only in /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/creator/src/services: creator-live-media.service.ts
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/docs/website/VC-WEB-PH05-DIFF-MANIFEST.txt and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/docs/website/VC-WEB-PH05-DIFF-MANIFEST.txt differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/docs/website/VC-WEB-PH05-IMPLEMENTATION-REPORT.md and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/docs/website/VC-WEB-PH05-IMPLEMENTATION-REPORT.md differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/docs/website/VC-WEB-PH05-MANUAL-QA.md and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/docs/website/VC-WEB-PH05-MANUAL-QA.md differ
+- Only in /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/docs/website: VC-WEB-PH05-R06-COMPLETE-ACCEPTANCE-AUDIT.md
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/package.json and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/package.json differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/scripts/website/VC-WEB-PH05-ACCEPTANCE.cmd and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/scripts/website/VC-WEB-PH05-ACCEPTANCE.cmd differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/scripts/website/web-ph05-source-check.mjs and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/scripts/website/web-ph05-source-check.mjs differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/src/common/events/gateways/reactions.gateway.ts and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/src/common/events/gateways/reactions.gateway.ts differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/src/modules/admin/admin-providers.service.ts and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/src/modules/admin/admin-providers.service.ts differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/src/modules/admin/provider-test-connection.service.ts and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/src/modules/admin/provider-test-connection.service.ts differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/src/modules/chat/chat.module.ts and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/src/modules/chat/chat.module.ts differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/src/modules/chat/chat.service.ts and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/src/modules/chat/chat.service.ts differ
+- Only in /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/src/modules/rtc: livekit-config.util.ts
+- Only in /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/src/modules/rtc: livekit-provider.runtime.spec.ts
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/src/modules/rtc/providers/livekit.provider.ts and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/src/modules/rtc/providers/livekit.provider.ts differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/website/src/components/rooms/RoomChatPanel.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/website/src/components/rooms/RoomChatPanel.tsx differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/website/src/features/messaging/types.ts and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/website/src/features/messaging/types.ts differ
+- Files /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R04/website/src/pages/RoomExperiencePage.tsx and /mnt/data/work_ph05_r05/VoiceCloud-Backend-VC-WEB-PH05-R06/website/src/pages/RoomExperiencePage.tsx differ
+
+R07 incremental additions:
+- src/modules/rooms/rooms.service.wp08-02.spec.ts: current RoomAuthorityService constructor mock
+- scripts/website/backend-constructor-contract-check.mjs: repository-wide constructor drift gate
+- src/modules/admin/provider-test-connection.livekit.spec.ts: Admin LiveKit credential/connectivity regression
+- acceptance expanded with WP08-02 + R11 RTC runtime suites
+
+R08 incremental additions:
+- scripts/website/web-ph05-comprehensive-acceptance.mjs: cross-platform direct Node 23-gate non-fail-fast runner
+- scripts/website/VC-WEB-PH05-ACCEPTANCE.cmd: locked install + comprehensive runner handoff
+
+R09 incremental corrections:
+- src/modules/rtc/phase20-rtc.spec.ts: all five stale RTC authority/provider assertions corrected to current protected runtime behavior
+- scripts/website/web-ph05-source-check.mjs: durable regression guards for the five Phase20 contracts
+- docs/website/VC-WEB-PH05-R09-COMPLETE-ACCEPTANCE-AUDIT.md: R08 evidence and R09 correction mapping
+
+
+R11 consolidated runtime corrections:
+- creator/src/services/live-room-realtime.service.ts: authenticated Socket.IO readiness before room commands
+- website/src/realtime/socket.client.ts + website/src/features/rooms/room-realtime.ts: authenticated consumer socket readiness
+- src/common/events/services/realtime-room-state.service.ts + reactions gateway + chat service + rtc service: LIVE-only interaction authority
+- creator/src/pages/LiveRoomsPage.tsx + LiveRoomConsolePage.tsx: broadcast controls, pause/realtime continuity, bounded/side-aware chat and stage mute state
+- creator/src/pages/SchedulePage.tsx + creator API: creator-local scheduling, edit, linked live-room lifecycle/media/console controls
+- website/src/pages/RoomExperiencePage.tsx + RoomChatPanel.tsx + global.css: realtime pause/resume/end, emoji handling, automatic ended-room exit and bounded chat
+- scripts/website/web-ph05-source-check.mjs: durable regression guards for all R11 runtime corrections

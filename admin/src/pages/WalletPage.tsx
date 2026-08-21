@@ -109,7 +109,7 @@ export const WalletPage: React.FC = () => {
     { id: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status.toLowerCase()} /> },
     {
       id: 'actions', label: 'Actions', align: 'right', render: (row) => (
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
+        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
           <IconButton size="small" onClick={() => navigate(`/wallet/payouts/${row.id}`)} title="View complete payout details"><VisibilityIcon /></IconButton>
           {row.status === 'PENDING' && <><Button size="small" color="success" startIcon={<CheckCircleIcon />} onClick={() => actOnPayout(row, 'approve')}>Approve</Button><Button size="small" color="error" startIcon={<CancelIcon />} onClick={() => actOnPayout(row, 'reject')}>Reject</Button></>}
           {row.status === 'APPROVED' && <Button size="small" color="primary" startIcon={<PaymentsIcon />} onClick={() => actOnPayout(row, 'process')}>Settle</Button>}

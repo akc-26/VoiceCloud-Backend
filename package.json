@@ -159,7 +159,16 @@
     "web:ph03:source-check": "node scripts/website/web-ph03-source-check.mjs",
     "web:ph03:acceptance": "npm run web:ph01:source-check && npm run web:ph02:source-check && npm run web:ph03:source-check && npm run typecheck:website && npm run build:website",
     "web:ph04:source-check": "node scripts/website/web-ph04-source-check.mjs",
-    "web:ph04:acceptance": "npm run web:ph01:source-check && npm run web:ph02:source-check && npm run web:ph03:source-check && npm run web:ph04:source-check && npm run typecheck:website && npm run build:website"
+    "web:ph04:acceptance": "npm run web:ph01:source-check && npm run web:ph02:source-check && npm run web:ph03:source-check && npm run web:ph04:source-check && npm run typecheck:website && npm run build:website",
+    "web:ph05:source-check": "node scripts/website/web-ph05-source-check.mjs",
+    "web:ph05:acceptance": "npm run web:ph01:source-check && npm run web:ph02:source-check && npm run web:ph03:source-check && npm run web:ph04:source-check && npm run web:ph05:source-check && npm run typecheck:website && npm run typecheck:creator && npm run typecheck:admin && npm run typecheck:backend && npm run test:web:ph05:runtime && npm run build:website && npm run build:creator && npm run build:admin && npm run wp09:r11:source-check && npm run build",
+    "typecheck:creator": "tsc -p creator/tsconfig.json --noEmit",
+    "typecheck:admin": "tsc -p admin/tsconfig.json --noEmit",
+    "typecheck:backend": "tsc -p tsconfig.json --noEmit",
+    "test:web:ph05:runtime": "jest --runInBand --runTestsByPath src/modules/rtc/livekit-provider.runtime.spec.ts src/modules/admin/provider-test-connection.livekit.spec.ts src/modules/rooms/room-lifecycle.service.spec.ts src/modules/rooms/rooms.service.wp08-02.spec.ts src/common/events/realtime-room-access.wp08-02.spec.ts",
+    "web:backend:constructor-check": "node scripts/website/backend-constructor-contract-check.mjs",
+    "test:web:ph05:extended": "npm run test:wp08:02 && jest --runInBand --runTestsByPath src/modules/rtc/r11-rtc-role-authority.spec.ts src/modules/rtc/phase20-rtc.spec.ts",
+    "web:ph05:comprehensive-audit": "node scripts/website/web-ph05-comprehensive-acceptance.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

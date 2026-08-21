@@ -408,7 +408,7 @@ export const MessagingPage: React.FC = () => {
                 <TableRow>
                   <TableCell>Attachment Name / URL</TableCell>
                   <TableCell>Type</TableCell>
-                  <TableCell>Sender ID</TableCell>
+                  <TableCell>Sender</TableCell>
                   <TableCell>Conversation ID</TableCell>
                   <TableCell>Uploaded At</TableCell>
                 </TableRow>
@@ -437,7 +437,7 @@ export const MessagingPage: React.FC = () => {
                       <TableCell>
                         <Chip label={(att.type || 'attachment').toUpperCase()} size="small" />
                       </TableCell>
-                      <TableCell>{att.senderId?.substring(0, 8) || 'N/A'}</TableCell>
+                      <TableCell>{att.sender?.displayName || att.sender?.username || 'VoiceCloud user'}</TableCell>
                       <TableCell>{att.conversationId?.substring(0, 8) || 'N/A'}</TableCell>
                       <TableCell>
                         {att.createdAt ? new Date(att.createdAt).toLocaleString() : 'N/A'}
@@ -536,7 +536,7 @@ export const MessagingPage: React.FC = () => {
             {selectedConversation?.members?.map((m: any) => (
               <Box key={m.id} sx={{ py: 0.5, borderBottom: '1px solid #eee' }}>
                 <Typography variant="body2">
-                  User ID: {m.userId} | Role: <strong>{m.role}</strong>
+                  {m.user?.displayName || m.user?.username || 'VoiceCloud user'} | Role: <strong>{m.role}</strong>
                 </Typography>
               </Box>
             ))}

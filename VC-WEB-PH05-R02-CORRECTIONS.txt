@@ -1,0 +1,6 @@
+VC-WEB-PH05-R02 BLOCKING LIVE-ROOM CORRECTION
+
+Parent: VoiceCloud-Backend-VC-WEB-PH04-R03 @ bd330734886cda3ebf2b1a268a6dfd63f7f6011a
+Supersedes: PH05-R01 candidate (do not freeze R01)
+
+Corrects host browser microphone publication, authoritative listener/speaker counts, duplicate End->Start room creation, Creator live control console, and the paired consumer RTC audio/stage workflow required for end-to-end verification.
