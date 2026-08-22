@@ -46,6 +46,8 @@ const gates = [
   ['PH03 protected discovery/social source check', [step('scripts/website/web-ph03-source-check.mjs')]],
   ['PH04 protected communities/messaging source check', [step('scripts/website/web-ph04-source-check.mjs')]],
   ['PH05 live-room source check', [step('scripts/website/web-ph05-source-check.mjs')]],
+  ['PH06 host room management source check', [step('scripts/website/web-ph06-source-check.mjs')]],
+  ['PH06-R02 complete RTC runtime correction source regression', [step('scripts/ph06-r02/ph06-r02-rtc-runtime-source-check.mjs')]],
   ['Backend constructor-contract audit', [step('scripts/website/backend-constructor-contract-check.mjs')]],
   ['R12 live-room/runtime correction source regression', [step('scripts/r12/r12-live-room-corrections-source-check.mjs')]],
   ['R13 acceptance/runtime correction source regression', [step('scripts/r13/r13-live-room-corrections-source-check.mjs')]],
@@ -127,7 +129,7 @@ console.log('[PASS] Cross-platform Node command-dispatch probe');
 const failures = [];
 for (let index = 0; index < gates.length; index += 1) {
   const [name, steps] = gates[index];
-  console.log(`\n[VC-WEB-PH05-R14][${index + 1}/${gates.length}] ${name}...`);
+  console.log(`\n[VC-WEB-PH06-R02][${index + 1}/${gates.length}] ${name}...`);
   let gateFailed = false;
   const stepFailures = [];
 
@@ -149,7 +151,7 @@ for (let index = 0; index < gates.length; index += 1) {
 }
 
 console.log('\n============================================================');
-console.log('VC-WEB-PH05-R14 COMPREHENSIVE ACCEPTANCE SUMMARY');
+console.log('VC-WEB-PH06-R02 COMPREHENSIVE ACCEPTANCE SUMMARY');
 console.log('============================================================');
 if (failures.length) {
   console.error(`${failures.length} gate(s) failed:`);
@@ -159,9 +161,9 @@ if (failures.length) {
       console.error(`    * ${stepFailure}`);
     }
   }
-  console.error('\n[FAIL] VC-WEB-PH05-R14 comprehensive acceptance failed.');
+  console.error('\n[FAIL] VC-WEB-PH06-R02 comprehensive acceptance failed.');
   process.exit(1);
 }
 
 console.log(`All ${gates.length} post-install acceptance gates passed.`);
-console.log('[PASS] VC-WEB-PH05-R14 acceptance commands completed successfully.');
+console.log('[PASS] VC-WEB-PH06-R02 acceptance commands completed successfully.');

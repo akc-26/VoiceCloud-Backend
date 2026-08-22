@@ -33,6 +33,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: appLogger,
+    // Required for authoritative RTC webhook verification (LiveKit signs the
+    // SHA-256 of the exact raw request body, not a re-serialized JSON object).
+    rawBody: true,
   });
 
   const expressApp = app.getHttpAdapter().getInstance();

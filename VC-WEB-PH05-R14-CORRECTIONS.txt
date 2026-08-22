@@ -1,0 +1,20 @@
+VC-WEB-PH05-R14 — LiveKit browser SDK production loading correction
+
+Authoritative parent: VC-WEB-PH05-R13 / cbaab4b719369d3c0cb6fd7dadaa13ab94058e5b
+
+Reported runtime failure:
+  Unable to load LiveKit browser SDK from https://cdn.jsdelivr.net/npm/livekit-client@2.22.0/dist/livekit-client.umd.js
+
+Root cause:
+  The shared browser RTC loader dynamically injects the pinned jsDelivr LiveKit UMD bundle, while production HTTP hardening previously emitted Content-Security-Policy: script-src 'self'. In production that policy blocks the external script before RTC room.connect() can execute.
+
+Correction:
+  - Preserve production CSP.
+  - Add only https://cdn.jsdelivr.net to script-src, matching the existing pinned LiveKit SDK origin.
+  - Do not add wildcard script origins or unsafe-eval.
+  - Keep LiveKit pinned at 2.22.0.
+  - Add R14 source regression coverage so CSP/RTC loader origin mismatches fail acceptance.
+  - Preserve all R13 room, realtime, schedule, chat, security, and authority corrections.
+
+Acceptance:
+  scripts\website\VC-WEB-PH05-ACCEPTANCE.cmd

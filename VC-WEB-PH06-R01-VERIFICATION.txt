@@ -1,0 +1,39 @@
+VC-WEB-PH06-R01 VERIFICATION RECORD
+===================================
+
+Baseline
+--------
+VC-WEB-PH05-R14 (explicitly used as requested; R14 was not yet separately workstation-tested).
+PH06 is intended to be workstation-tested together with the carried R14 correction.
+
+Source/regression gates executed in assistant environment
+---------------------------------------------------------
+PASS - VC-WEB-PH01 protected foundation source check
+PASS - VC-WEB-PH02 protected authentication source check
+PASS - VC-WEB-PH03 protected discovery/social source check
+PASS - VC-WEB-PH04 protected communities/messaging source check
+PASS - VC-WEB-PH05 live-room source check
+PASS - VC-WEB-PH06 source check: 16/16
+PASS - Backend constructor contract check: 172 constructors, 0 mismatches
+PASS - R12 live-room/runtime corrections: 16/16
+PASS - R13 acceptance/runtime corrections: 9/9
+PASS - R14 LiveKit browser/CSP regression: 5/5
+PASS - R11 Admin source regression: 7/7
+PASS - R11 Creator source regression: 12/12
+PASS - R11 Backend authority source regression: 14/14
+PASS - R11 RTC/Security source regression: 27/27
+PASS - R11 API parity source regression: 220 inventoried frontend calls mapped; 648 backend route/method operations inventoried by the retained checker
+PASS - Modified PH06 TypeScript/TSX parser/transpile sanity: 14/14
+
+Dependency-backed acceptance status in assistant environment
+------------------------------------------------------------
+NOT CLAIMED AS PASSED.
+The extracted baseline contains no node_modules. A normal npm ci attempt could not complete in the assistant container. A follow-up `npm ci --offline --ignore-scripts` failed deterministically with npm ENOTCACHED because `zustand-5.0.14.tgz` is not present in the container npm cache. Any partial node_modules directory was removed before packaging.
+
+Therefore the authoritative workstation acceptance remains:
+  scripts\website\VC-WEB-PH06-ACCEPTANCE.cmd
+
+Required final line:
+  [PASS] VC-WEB-PH06-R01 acceptance commands completed successfully.
+
+That command includes preserved PH01-PH05 source checks, PH06 source check, constructor audit, R12/R13/R14 regressions, Website/Creator/Admin/Backend TypeScript, focused RTC tests, WP08 room/realtime/security tests, RTC authority tests, Website/Creator/Admin builds, R11 authority/API regressions, Nest build, and full monolith build.

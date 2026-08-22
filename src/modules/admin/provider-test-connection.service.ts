@@ -116,9 +116,14 @@ export class ProviderTestConnectionService {
         return { success: false, message: 'Missing valid Agora App ID or App Certificate' };
       }
       return {
-        success: true,
-        message: 'Agora credential structure validated; runtime media connectivity still requires a real RTC session test',
-        details: { appIdPrefix: String(appId).substring(0, 6) + '...', liveConnectivityVerified: false },
+        success: false,
+        message: 'Agora credentials are structurally present, but this VoiceCloud build does not include an operational Agora server/browser RTC adapter. Use LiveKit for production voice rooms.',
+        details: {
+          appIdPrefix: String(appId).substring(0, 6) + '...',
+          liveConnectivityVerified: false,
+          runtimeAdapterAvailable: false,
+          operationalProvider: 'livekit',
+        },
       };
     }
 
@@ -212,9 +217,14 @@ export class ProviderTestConnectionService {
         return { success: false, message: 'Missing ZEGOCLOUD App ID or Server Secret' };
       }
       return {
-        success: true,
-        message: 'ZEGOCLOUD credential structure validated; runtime media connectivity still requires a real RTC session test',
-        details: { appId, liveConnectivityVerified: false },
+        success: false,
+        message: 'ZEGOCLOUD credentials are structurally present, but this VoiceCloud build does not include an operational ZEGOCLOUD server/browser RTC adapter. Use LiveKit for production voice rooms.',
+        details: {
+          appId,
+          liveConnectivityVerified: false,
+          runtimeAdapterAvailable: false,
+          operationalProvider: 'livekit',
+        },
       };
     }
 

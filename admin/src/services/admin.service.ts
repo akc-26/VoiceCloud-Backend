@@ -53,18 +53,34 @@ export type UpdateStreamingInfrastructureSettings = Omit<
 >;
 
 
+export interface RtcMonitoringActiveSession {
+  id: string;
+  roomId: string;
+  hostId: string;
+  provider: string;
+  status: string;
+  qualityProfile: string;
+  concurrentUsers: number;
+  activeSpeakersCount: number;
+  startTime: string;
+  recordingStatus: 'recording' | 'idle';
+}
+
 export interface RtcMonitoringStats {
   activeRoomsCount: number;
   connectedParticipantsCount: number;
   activeProvider: string;
   providerStatus: string;
-  averageRtt: number;
-  averagePacketLoss: number;
+  averageRtt: number | null;
+  averagePacketLoss: number | null;
   recordingStatus: string;
   activeRecordingsCount: number;
-  connectionFailures: number;
-  reconnectionCount: number;
+  recordingCapability: 'egress_adapter_required' | 'unavailable';
+  connectionFailures: number | null;
+  reconnectionCount: number | null;
   activeSpeakersCount: number;
+  telemetryCompleteness: 'measured' | 'no-data';
+  activeSessions: RtcMonitoringActiveSession[];
 }
 
 export interface ProviderConfigData {

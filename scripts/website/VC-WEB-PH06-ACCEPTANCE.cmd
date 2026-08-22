@@ -8,12 +8,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [VC-WEB-PH05-R14] Installing locked dependencies...
+echo [VC-WEB-PH06-R02] Installing locked dependencies...
 call npm ci
 if errorlevel 1 goto :dependency_failed
 
-echo [VC-WEB-PH05-R14] Running direct cross-platform comprehensive acceptance...
-node scripts\website\web-ph05-comprehensive-acceptance.mjs
+echo [VC-WEB-PH06-R02] Running direct cross-platform comprehensive acceptance...
+node scripts\website\web-ph06-comprehensive-acceptance.mjs
 set "ACCEPTANCE_RC=%ERRORLEVEL%"
 popd
 exit /b %ACCEPTANCE_RC%

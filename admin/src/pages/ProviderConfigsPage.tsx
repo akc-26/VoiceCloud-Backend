@@ -81,7 +81,7 @@ const LIVEKIT_CONFIG_TEMPLATE = {
 };
 
 const DEFAULT_PROVIDER_TYPE: Record<string, string> = {
-  rtc: 'agora',
+  rtc: 'livekit',
   storage: 'minio',
   payment: 'razorpay',
   firebase: 'firebase',
@@ -113,6 +113,9 @@ const extractApiErrorMessage = (error: any, fallback: string): string => {
   if (Array.isArray(message)) return message.join(', ');
   return typeof message === 'string' && message.trim() ? message : fallback;
 };
+
+const isOperationalRtcProvider = (provider: Pick<ProviderConfigData, 'category' | 'providerType'>): boolean =>
+  provider.category !== 'rtc' || provider.providerType.trim().toLowerCase() === 'livekit';
 
 export const ProviderConfigsPage: React.FC = () => {
   const addToast = useNotificationsStore((state) => state.addToast);
@@ -218,7 +221,7 @@ export const ProviderConfigsPage: React.FC = () => {
       });
       setConfigJson(
         activeTab === 'rtc'
-          ? JSON.stringify({ appId: 'AGORA_APP_ID', appCertificate: 'AGORA_APP_CERTIFICATE' }, null, 2)
+          ? JSON.stringify(LIVEKIT_CONFIG_TEMPLATE, null, 2)
           : '{\n  "apiKey": "SECRET_KEY_HERE"\n}',
       );
     }
@@ -532,6 +535,15 @@ export const ProviderConfigsPage: React.FC = () => {
                         variant="outlined"
                         sx={{ fontWeight: 700 }}
                       />
+                      {p.category === 'rtc' && !isOperationalRtcProvider(p) ? (
+                        <Chip
+                          size="small"
+                          label="RUNTIME ADAPTER NOT AVAILABLE"
+                          color="warning"
+                          variant="outlined"
+                          sx={{ fontWeight: 700 }}
+                        />
+                      ) : null}
                       {p.isSandbox ? (
                         <Chip size="small" label="Sandbox" color="warning" variant="outlined" />
                       ) : (
@@ -609,8 +621,9 @@ export const ProviderConfigsPage: React.FC = () => {
                           color="primary"
                           startIcon={<PlayArrowIcon />}
                           onClick={() => handleSetActive(p.id, p.name)}
+                          disabled={!isOperationalRtcProvider(p)}
                         >
-                          Set Active
+                          {isOperationalRtcProvider(p) ? 'Set Active' : 'Unavailable'}
                         </Button>
                       )}
                       <Button
@@ -742,6 +755,14 @@ export const ProviderConfigsPage: React.FC = () => {
                   Use <strong>serverUrl</strong> (for example, wss://YOUR_PROJECT.livekit.cloud),
                   <strong> apiKey</strong>, and <strong>apiSecret</strong>. The Test action performs a real
                   RoomService connectivity check before the provider is considered healthy.
+                </Alert>
+              ) : null}
+              {selectedProvider?.category === 'rtc' &&
+              selectedProvider?.providerType?.trim().toLowerCase() !== 'livekit' ? (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  This provider profile can be stored for future adapter work, but it cannot be activated for
+                  VoiceCloud browser voice rooms in this build. Creator Studio and the consumer website use the
+                  operational LiveKit runtime adapter.
                 </Alert>
               ) : null}
               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>

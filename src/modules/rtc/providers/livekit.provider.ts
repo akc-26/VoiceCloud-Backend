@@ -403,6 +403,7 @@ export class LiveKitProvider implements IRtcProvider {
     config: RtcConfig,
     headers: Record<string, string>,
     _body: unknown,
+    rawBody?: Buffer,
   ): boolean {
     try {
       const { apiKey, apiSecret } = this.requireLegacyCredentials(config);
@@ -425,13 +426,24 @@ export class LiveKitProvider implements IRtcProvider {
       }
       const claims = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
-      ) as { iss?: string; exp?: number; nbf?: number };
+      ) as { iss?: string; exp?: number; nbf?: number; sha256?: string };
       const now = Math.floor(Date.now() / 1000);
+      if (
+        claims.iss !== apiKey ||
+        typeof claims.exp !== 'number' ||
+        claims.exp <= now ||
+        (typeof claims.nbf === 'number' && claims.nbf > now + 5) ||
+        !claims.sha256 ||
+        !rawBody
+      ) {
+        return false;
+      }
+
+      const bodyHash = crypto.createHash('sha256').update(rawBody).digest();
+      const claimedHash = Buffer.from(claims.sha256, 'base64');
       return (
-        claims.iss === apiKey &&
-        typeof claims.exp === 'number' &&
-        claims.exp > now &&
-        (typeof claims.nbf !== 'number' || claims.nbf <= now + 5)
+        bodyHash.length === claimedHash.length &&
+        crypto.timingSafeEqual(bodyHash, claimedHash)
       );
     } catch (error) {
       this.logger.warn(`LiveKit webhook verification failed: ${(error as Error).message}`);

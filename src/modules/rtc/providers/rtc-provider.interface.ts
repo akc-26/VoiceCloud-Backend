@@ -89,6 +89,7 @@ export interface IRtcProvider
     config: RtcConfig,
     headers: Record<string, string>,
     body: unknown,
+    rawBody?: Buffer,
   ): boolean;
 }
 

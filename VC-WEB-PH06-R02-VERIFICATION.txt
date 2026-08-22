@@ -1,0 +1,70 @@
+VC-WEB-PH06-R02 VERIFICATION RECORD
+===================================
+
+Baseline
+--------
+VC-WEB-PH06-R01 (includes R14 correction + PH06 implementation)
+
+Purpose
+-------
+Correct complete RTC configuration/runtime authority and new-laptop real-mode database startup diagnostics.
+
+Source/regression checks executed in the delivery environment
+-------------------------------------------------------------
+PASS - VC-WEB-PH01 protected foundation source check
+PASS - VC-WEB-PH02 authentication source check
+PASS - VC-WEB-PH03 discovery/social source check
+PASS - VC-WEB-PH04 communities/messaging source check
+PASS - VC-WEB-PH05 live-room source check
+PASS - VC-WEB-PH06 host room management source check (16/16)
+PASS - VC-WEB-PH06-R02 complete RTC runtime correction source check (17/17)
+PASS - Backend constructor contract check (172 constructors; 0 mismatches)
+PASS - R12 live-room corrections (16/16)
+PASS - R13 live-room corrections (9/9)
+PASS - R14 LiveKit browser/CSP regression (5/5)
+PASS - R11 Admin QA source check (7/7)
+PASS - R11 Creator QA source check (12/12)
+PASS - R11 Backend authority source check (14/14)
+PASS - R11 RTC/security source check (27/27)
+PASS - R11 API parity: 220 frontend calls mapped to 648 backend route/method operations
+PASS - Modified RTC TypeScript/TSX parser check (14/14)
+PASS - start-local-full-real.mjs syntax check
+PASS - PH06-R02 regression/acceptance script syntax checks
+
+Corrective coverage
+-------------------
+- LiveKit is the only RTC provider allowed to report operational health/activation.
+- Agora/ZEGOCLOUD remain stored-profile capable but runtime fail-closed and cannot become active authority.
+- Legacy RTC config mutation cannot bypass the LiveKit runtime restriction.
+- Admin RTC page no longer defaults to fake Agora/operational state.
+- Admin RTC page no longer contains fabricated live-channel/RTT/recording rows.
+- Admin RTC monitoring loads safely with no provider configured.
+- Browser LiveKit loader uses pinned primary + fallback origins, optional runtime override and browser support validation.
+- Production CSP explicitly permits only the pinned SDK origins required by the loader.
+- LiveKit webhook validation checks token authority plus SHA-256 of the exact raw request body.
+- Nest raw-body capture enabled for provider webhook verification.
+- LiveKit recording capability honestly reports Egress/output adapter requirement.
+- Real local startup preflights PostgreSQL schema and returns deterministic bootstrap/restore guidance.
+- LiveKit token, participant-state, remove and mute provider runtime remains real/fail-closed rather than fabricated.
+- Creator Studio and Website remain aligned to server-authoritative LiveKit RTC roles.
+
+Dependency-backed acceptance status in this environment
+-------------------------------------------------------
+NOT CLAIMED. This package workspace intentionally has no node_modules tree and the delivery environment does not have the complete locked npm dependency cache. Therefore TypeScript project checks, Jest suites and Vite/Nest production builds must be executed by the workstation acceptance runner after `npm ci`.
+
+Required workstation acceptance
+-------------------------------
+scripts\website\VC-WEB-PH06-ACCEPTANCE.cmd
+
+Required final result
+---------------------
+[PASS] VC-WEB-PH06-R02 acceptance commands completed successfully.
+
+New-laptop fresh database sequence
+----------------------------------
+npm run database:bootstrap
+npm run migration:status
+npm run build
+node scripts/start-local-full-real.mjs
+
+IMPORTANT: database:bootstrap is for a completely fresh/empty database only. It refuses non-empty application schemas. Restore an existing database and use normal migrations when reproducing an existing deployment.

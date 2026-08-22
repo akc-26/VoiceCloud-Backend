@@ -1,0 +1,15 @@
+VC-WEB-PH06-R01 BASELINE RECORD
+===============================
+
+Working baseline supplied for PH06 implementation:
+- Package: VC-WEB-PH05-R14
+- R14 purpose: PH05 live-room/runtime corrections plus pinned LiveKit CDN/CSP compatibility correction.
+- User instruction for this phase: use R14 as the baseline even though R14 has not yet been separately workstation-tested; test R14 and PH06 together after PH06 completion.
+
+PH06 implementation policy:
+- Preserve all PH01-PH05 and R12-R14 corrective behavior.
+- Do not replace canonical backend room/RTC/scheduled-room/poll/quiz authority with frontend-only state.
+- Creator Studio and Admin behavior remain preserved; PH06 adds host room management to the consumer website.
+- WEB-PH06 design authority: screens 031 through 040 in docs/website/VC-WEB-DESIGN-PHASE-MAP-R01.md.
+
+Delivery revision: VC-WEB-PH06-R01

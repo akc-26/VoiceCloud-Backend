@@ -87,4 +87,21 @@ describe('ProviderTestConnectionService LiveKit authority', () => {
     expect(result.message).toContain('LiveKit rejected the configured project credentials (401)');
     expect(result.details?.liveConnectivityVerified).toBe(false);
   });
+  it('does not report Agora or ZEGOCLOUD as operational when their runtime adapters are unavailable', async () => {
+    const service = new ProviderTestConnectionService(encryptionService);
+    const agoraResult = await service.testProvider({
+      ...provider({ appId: 'AGORA_APP_ID_REAL', appCertificate: 'AGORA_CERT_REAL' }),
+      providerType: 'agora',
+    } as ProviderConfig);
+    const zegoResult = await service.testProvider({
+      ...provider({ appId: '123456789', serverSecret: 'ZEGO_SERVER_SECRET_REAL' }),
+      providerType: 'zegocloud',
+    } as ProviderConfig);
+
+    expect(agoraResult.success).toBe(false);
+    expect(agoraResult.details?.runtimeAdapterAvailable).toBe(false);
+    expect(zegoResult.success).toBe(false);
+    expect(zegoResult.details?.runtimeAdapterAvailable).toBe(false);
+  });
+
 });

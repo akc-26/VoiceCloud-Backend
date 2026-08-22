@@ -28,37 +28,76 @@ export interface BrowserRtcSession {
   participantCount(): number;
 }
 
-const DEFAULT_LIVEKIT_SDK =
-  'https://cdn.jsdelivr.net/npm/livekit-client@2.22.0/dist/livekit-client.umd.js';
+const DEFAULT_LIVEKIT_SDK_URLS = [
+  'https://cdn.jsdelivr.net/npm/livekit-client@2.22.0/dist/livekit-client.umd.min.js',
+  'https://unpkg.com/livekit-client@2.22.0/dist/livekit-client.umd.js',
+] as const;
 
 let sdkPromise: Promise<any> | null = null;
 
-function configuredSdkUrl(): string {
-  const override = (window as typeof window & { __VOICECLOUD_LIVEKIT_CLIENT_URL__?: string })
-    .__VOICECLOUD_LIVEKIT_CLIENT_URL__;
-  return override?.trim() || DEFAULT_LIVEKIT_SDK;
+function configuredSdkUrls(explicitUrl?: string): string[] {
+  const runtimeOverride = (window as typeof window & {
+    __VOICECLOUD_LIVEKIT_CLIENT_URL__?: string;
+  }).__VOICECLOUD_LIVEKIT_CLIENT_URL__;
+  const preferred = explicitUrl?.trim() || runtimeOverride?.trim();
+  const urls = preferred
+    ? [preferred, ...DEFAULT_LIVEKIT_SDK_URLS]
+    : [...DEFAULT_LIVEKIT_SDK_URLS];
+  return Array.from(new Set(urls.filter(Boolean)));
 }
 
-function loadLiveKitSdk(url = configuredSdkUrl()): Promise<any> {
-  const existing = (window as any).LivekitClient;
-  if (existing) return Promise.resolve(existing);
-  if (sdkPromise) return sdkPromise;
-  sdkPromise = new Promise((resolve, reject) => {
+function loadLiveKitScript(url: string): Promise<any> {
+  return new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = url;
     script.async = true;
     script.crossOrigin = 'anonymous';
+    script.referrerPolicy = 'no-referrer';
+    script.dataset.voicecloudLivekitSdk = url;
     script.onload = () => {
       const sdk = (window as any).LivekitClient;
-      if (sdk) resolve(sdk);
-      else reject(new Error('LiveKit browser SDK loaded without exposing LivekitClient'));
+      if (sdk) {
+        resolve(sdk);
+        return;
+      }
+      script.remove();
+      reject(new Error(`LiveKit browser SDK loaded from ${url} without exposing LivekitClient`));
     };
-    script.onerror = () => reject(new Error(`Unable to load LiveKit browser SDK from ${url}`));
+    script.onerror = () => {
+      script.remove();
+      reject(new Error(`Unable to load LiveKit browser SDK from ${url}`));
+    };
     document.head.appendChild(script);
-  }).catch((error) => {
+  });
+}
+
+function loadLiveKitSdk(explicitUrl?: string): Promise<any> {
+  const existing = (window as any).LivekitClient;
+  if (existing) return Promise.resolve(existing);
+  if (sdkPromise) return sdkPromise;
+
+  const urls = configuredSdkUrls(explicitUrl);
+  sdkPromise = (async () => {
+    const failures: string[] = [];
+    for (const url of urls) {
+      try {
+        const sdk = await loadLiveKitScript(url);
+        if (typeof sdk.isBrowserSupported === 'function' && !sdk.isBrowserSupported()) {
+          throw new Error('This browser does not provide the WebRTC APIs required by LiveKit');
+        }
+        return sdk;
+      } catch (error) {
+        failures.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    throw new Error(
+      `Unable to load the LiveKit browser SDK. Tried ${urls.join(', ')}. ${failures.join(' | ')}`,
+    );
+  })().catch((error) => {
     sdkPromise = null;
     throw error;
   });
+
   return sdkPromise;
 }
 

@@ -56,3 +56,13 @@ export async function sendRoomReaction(roomId: string, emoji: string): Promise<A
     throw error;
   }
 }
+
+export async function inviteRoomParticipant(roomId: string, targetUserId: string): Promise<AckResult> {
+  const socket = await ensureRealtimeConnection();
+  return emitWithAck(socket, 'room:invite_participant', { roomId, targetUserId });
+}
+
+export async function revokeRoomParticipantInvitation(roomId: string, targetUserId: string): Promise<AckResult> {
+  const socket = await ensureRealtimeConnection();
+  return emitWithAck(socket, 'room:revoke_invitation', { roomId, targetUserId });
+}

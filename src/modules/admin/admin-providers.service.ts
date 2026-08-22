@@ -912,14 +912,25 @@ export class AdminProvidersService implements OnModuleInit {
           `Provider configuration '${activeId}' not found for category '${category}'`,
         );
       }
-      if (
-        category === ProviderCategory.RTC &&
-        selectedProvider.providerType.trim().toLowerCase() === RtcProviderType.LIVEKIT &&
-        selectedProvider.healthStatus !== 'healthy'
-      ) {
-        throw new BadRequestException(
-          'Test the LiveKit Project URL, API Key, and API Secret successfully before setting this provider active',
-        );
+      if (category === ProviderCategory.RTC) {
+        const rtcProviderType = selectedProvider.providerType.trim().toLowerCase();
+        const developmentMockAllowed =
+          rtcProviderType === RtcProviderType.DEFAULT_MOCK &&
+          process.env.NODE_ENV !== 'production' &&
+          process.env.ENABLE_RTC_MOCK_PROVIDER === 'true';
+
+        if (rtcProviderType !== RtcProviderType.LIVEKIT && !developmentMockAllowed) {
+          throw new BadRequestException(
+            `RTC provider '${selectedProvider.providerType}' is not operational in this VoiceCloud build. Configure, test, and activate LiveKit for browser voice rooms.`,
+          );
+        }
+        if (selectedProvider.healthStatus !== 'healthy') {
+          throw new BadRequestException(
+            rtcProviderType === RtcProviderType.LIVEKIT
+              ? 'Test the LiveKit Project URL, API Key, and API Secret successfully before setting this provider active'
+              : 'Test the explicitly enabled development RTC mock before setting it active',
+          );
+        }
       }
 
       await providerRepo.update({ category }, { isActive: false });

@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronDown, Globe2, Menu, Search } from 'lucide-react';
+import { Bell, ChevronDown, Globe2, Menu, Mic2, Search } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { useWebsiteAuthStore } from '@/auth/auth.store';
@@ -81,6 +81,7 @@ export function WebsiteHeader() {
                 <Bell size={19} />{unread.data?.unreadCount ? <span className="vc-notification-badge">{unread.data.unreadCount > 99 ? '99+' : unread.data.unreadCount}</span> : null}
               </button>
               {user?.isGuest ? <button className="vc-header__upgrade" type="button" onClick={() => navigate('/auth/guest/upgrade')}>Upgrade Guest</button> : null}
+              {user?.role === 'CREATOR' || user?.isCreatorEnabled ? <button className="vc-header__host" type="button" onClick={() => navigate('/host/rooms')}><Mic2 size={16}/> My Rooms</button> : null}
               <button className="vc-profile-button" type="button" onClick={() => navigate('/me')}>
                 {user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : <span>{user?.displayName?.[0] ?? 'V'}</span>}
                 <strong>{user?.displayName ?? 'My Profile'}</strong>

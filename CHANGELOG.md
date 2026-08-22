@@ -1,3 +1,11 @@
+# VC-WEB-PH06-R01
+
+- Implemented consumer-website Host room management for WEB-PH06 designs 031-040: My Rooms, Create Room, Schedule Room, privacy/access settings, invitations, speaker mode, Host controls, participants, polls and quiz.
+- Reused canonical backend `/rooms`, `/scheduled-rooms`, `/rtc`, `/polls`, `/quizzes`, `/users/search` and authenticated `/realtime` room-invitation authority; no fabricated Host runtime data or parallel persistence was introduced.
+- Added LiveKit-preflight + RTC-session broadcast start, linked scheduled-room lifecycle including Pause/Resume/End, browser-local scheduling timezone handling, authoritative stage queue/speaker mute/remove/invite controls, and consumer-only invitation search filtering.
+- Extended the existing live RoomExperience with Host controls and realtime-invalidated polls/quizzes while preserving PH05/R12/R13 behavior for chat/reactions/reconnect/pause/end and R14 LiveKit/CSP correction.
+- Added `web-ph06-source-check.mjs`, `VC-WEB-PH06-ACCEPTANCE.cmd`, comprehensive acceptance runner, implementation report and manual QA.
+
 # VC-WEB-PH05-R13
 
 - Corrects the two workstation acceptance regressions reported against R12: the async heartbeat spec now awaits `handlePing`, and the WP08 private participant-count test uses the awaited `ensureAuthenticatedUser` contract.

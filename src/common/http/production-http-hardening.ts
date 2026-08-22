@@ -52,7 +52,7 @@ export function registerProductionSecurityHeaders(
           "object-src 'none'",
           "frame-ancestors 'none'",
           "form-action 'self'",
-          "script-src 'self'",
+          "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com",
           "style-src 'self' 'unsafe-inline' https:",
           "img-src 'self' data: blob: https:",
           "font-src 'self' data: https:",

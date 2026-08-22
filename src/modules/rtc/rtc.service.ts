@@ -345,7 +345,15 @@ export class RtcService {
       !this.isRtcMockAllowed()
     ) {
       throw new BadRequestException(
-        'RTC mock provider is disabled. Activate Agora, LiveKit, or ZEGOCLOUD.',
+        'RTC mock provider is disabled. Configure, test, and activate LiveKit.',
+      );
+    }
+    if (
+      config.activeProvider !== RtcProviderType.LIVEKIT &&
+      config.activeProvider !== RtcProviderType.DEFAULT_MOCK
+    ) {
+      throw new BadRequestException(
+        `RTC provider '${config.activeProvider}' has no operational VoiceCloud browser runtime adapter. Configure, test, and activate LiveKit.`,
       );
     }
 
@@ -359,6 +367,15 @@ export class RtcService {
     ) {
       throw new BadRequestException(
         'RTC mock provider can only be enabled explicitly in non-production development.',
+      );
+    }
+    if (
+      dto.activeProvider &&
+      dto.activeProvider !== RtcProviderType.LIVEKIT &&
+      dto.activeProvider !== RtcProviderType.DEFAULT_MOCK
+    ) {
+      throw new BadRequestException(
+        `RTC provider '${dto.activeProvider}' has no operational VoiceCloud browser runtime adapter. Use the Admin provider workflow to configure, test, and activate LiveKit.`,
       );
     }
     const config = await this.getRtcConfig();
@@ -1091,6 +1108,7 @@ export class RtcService {
     providerName: string,
     headers: Record<string, string>,
     body: unknown,
+    rawBody?: Buffer,
   ) {
     this.logger.log(
       `Received RTC Webhook callback for provider ${providerName}`,
@@ -1101,7 +1119,7 @@ export class RtcService {
     }
     const provider = this.providerFactory.getProvider(providerName);
 
-    const isValid = provider.verifyWebhookSignature(config, headers, body);
+    const isValid = provider.verifyWebhookSignature(config, headers, body, rawBody);
     if (!isValid) {
       throw new ForbiddenException('Invalid webhook signature');
     }
@@ -1560,7 +1578,13 @@ export class RtcService {
 
   // 12. Admin RTC Monitoring Stats
   async getAdminMonitoringStats() {
-    const config = await this.getRtcConfig();
+    // Monitoring must remain readable before an RTC provider has been configured.
+    // Runtime mutation paths still call getRtcConfig() and fail closed when no
+    // operational provider exists.
+    const config = await this.configRepository.findOne({
+      where: { isActive: true },
+      order: { createdAt: 'DESC' },
+    });
     const activeSessionsCount = await this.sessionRepository.count({
       where: { status: RtcSessionStatus.ACTIVE },
     });
@@ -1568,16 +1592,18 @@ export class RtcService {
     const activeSessions = await this.sessionRepository.find({
       where: { status: RtcSessionStatus.ACTIVE },
       take: 10,
+      order: { startTime: 'DESC' },
     });
 
     const totalParticipants = activeSessions.reduce(
-      (acc, s) => acc + (s.concurrentUsers || 0),
+      (acc, session) => acc + (session.concurrentUsers || 0),
       0,
     );
 
     const recordingJobs = await this.recordingJobRepository.find({
       where: { status: RecordingJobStatus.RECORDING },
     });
+    const recordingRoomIds = new Set(recordingJobs.map((job) => job.roomId));
 
     const recentMetrics = await this.qualityRepository
       .createQueryBuilder('m')
@@ -1601,24 +1627,41 @@ export class RtcService {
 
     return {
       activeRoomsCount: activeSessionsCount,
-      connectedParticipantsCount: Math.max(
-        activeSessionsCount,
-        totalParticipants,
-      ),
-      activeProvider: config.activeProvider,
-      providerStatus: 'configured',
+      connectedParticipantsCount: totalParticipants,
+      activeProvider: config?.activeProvider ?? 'unconfigured',
+      providerStatus: config ? 'configured' : 'not_configured',
       averageRtt: avgRtt,
       averagePacketLoss: avgPacketLoss,
       recordingStatus: recordingJobs.length > 0 ? 'recording' : 'idle',
       activeRecordingsCount: recordingJobs.length,
+      recordingCapability:
+        config?.activeProvider === RtcProviderType.LIVEKIT
+          ? 'egress_adapter_required'
+          : 'unavailable',
       connectionFailures: null,
-      reconnectionCount: null,
-      telemetryCompleteness: recentMetrics.length > 0 ? 'measured' : 'no-data',
-      activeSpeakersCount: activeSessions.reduce(
-        (acc, s) => acc + (s.activeSpeakersList?.length || 0),
+      reconnectionCount: activeSessions.reduce(
+        (acc, session) => acc + (session.reconnectionCount || 0),
         0,
       ),
-      activeSessions,
+      telemetryCompleteness: recentMetrics.length > 0 ? 'measured' : 'no-data',
+      activeSpeakersCount: activeSessions.reduce(
+        (acc, session) => acc + (session.activeSpeakersList?.length || 0),
+        0,
+      ),
+      activeSessions: activeSessions.map((session) => ({
+        id: session.id,
+        roomId: session.roomId,
+        hostId: session.hostId,
+        provider: session.provider,
+        status: session.status,
+        qualityProfile: session.qualityProfile,
+        concurrentUsers: session.concurrentUsers,
+        activeSpeakersCount: session.activeSpeakersList?.length || 0,
+        startTime: session.startTime,
+        recordingStatus: recordingRoomIds.has(session.roomId)
+          ? 'recording'
+          : 'idle',
+      })),
     };
   }
 }

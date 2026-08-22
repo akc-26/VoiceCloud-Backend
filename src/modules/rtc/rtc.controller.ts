@@ -1,3 +1,5 @@
+import type { Request } from 'express';
+import type { RawBodyRequest } from '@nestjs/common';
 import {
   Controller,
   Get,
@@ -7,6 +9,7 @@ import {
   Param,
   Query,
   Headers,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -278,8 +281,9 @@ export class RtcController {
     @Param('provider') provider: string,
     @Headers() headers: Record<string, string>,
     @Body() body: unknown,
+    @Req() request: RawBodyRequest<Request>,
   ) {
-    return this.rtcService.handleWebhook(provider, headers, body);
+    return this.rtcService.handleWebhook(provider, headers, body, request.rawBody);
   }
 
   // 6. Recording Infrastructure

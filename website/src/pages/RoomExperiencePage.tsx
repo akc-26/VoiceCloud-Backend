@@ -19,6 +19,9 @@ import { DiscoveryError, DiscoveryLoading } from '@/components/discovery/Discove
 import { RoomChatPanel } from '@/components/rooms/RoomChatPanel';
 import { RoomParticipantsPanel } from '@/components/rooms/RoomParticipantsPanel';
 import { RoomReactionBar } from '@/components/rooms/RoomReactionBar';
+import { RoomHostControls } from '@/components/hosting/RoomHostControls';
+import { RoomPollsPanel } from '@/components/hosting/RoomPollsPanel';
+import { RoomQuizPanel } from '@/components/hosting/RoomQuizPanel';
 import { isConsumerVisibleUser } from '@/features/discovery/consumer-users';
 import { profileApi } from '@/features/discovery/discovery.api';
 import { roomArtwork } from '@/features/discovery/presentation';
@@ -216,7 +219,11 @@ export function RoomExperiencePage() {
       await leaveRoomRuntime(roomId).catch(() => undefined);
     } finally {
       reset();
-      navigate('/rooms', { replace: true, state: { notice: 'The live broadcast ended.' } });
+      if (room.data?.hostId === currentUser?.id) {
+        navigate('/host/rooms', { replace: true, state: { notice: 'The live broadcast ended.' } });
+      } else {
+        navigate('/rooms', { replace: true, state: { notice: 'The live broadcast ended.' } });
+      }
     }
   }
 
@@ -374,6 +381,10 @@ export function RoomExperiencePage() {
     socket.on('chat_reaction_added', refreshMessages);
     socket.on('chat_reaction_removed', refreshMessages);
     socket.on('reaction:broadcast', reaction);
+    const refreshPolls = () => { void qc.invalidateQueries({ queryKey: ['ph06', 'polls', roomId] }); };
+    const refreshQuiz = () => { void qc.invalidateQueries({ queryKey: ['ph06', 'quiz', roomId] }); };
+    ['poll:created','poll:started','poll:stopped','poll:voted','poll:deleted'].forEach((event) => socket.on(event, refreshPolls));
+    ['quiz:created','quiz:started','quiz:round_started','quiz:completed'].forEach((event) => socket.on(event, refreshQuiz));
     socket.on('disconnect', disconnected);
     socket.on('connect', connected);
     socket.on('hand_approved', approved);
@@ -396,6 +407,8 @@ export function RoomExperiencePage() {
       socket.off('chat_reaction_added', refreshMessages);
       socket.off('chat_reaction_removed', refreshMessages);
       socket.off('reaction:broadcast', reaction);
+      ['poll:created','poll:started','poll:stopped','poll:voted','poll:deleted'].forEach((event) => socket.off(event, refreshPolls));
+      ['quiz:created','quiz:started','quiz:round_started','quiz:completed'].forEach((event) => socket.off(event, refreshQuiz));
       socket.off('disconnect', disconnected);
       socket.off('connect', connected);
       socket.off('hand_approved', approved);
@@ -490,6 +503,7 @@ export function RoomExperiencePage() {
   const item = room.data;
   const isLive = String(item.status || '').toLowerCase() === 'live';
   const isPaused = String(item.status || '').toLowerCase() === 'paused';
+  const isHost = item.hostId === currentUser?.id || role === 'host';
   if (connectionState === 'failed') {
     return <div className="vc-page-width vc-ph05-page"><section className="vc-room-runtime-failure"><ShieldCheck /><span className="vc-eyebrow">Room access</span><h1>{accessIssue?.title || 'Unable to enter the room'}</h1><p>{accessIssue?.message || 'VoiceCloud could not establish this room session.'}</p><div><button className="vc-button vc-button--primary" onClick={() => void establish()}><RefreshCw />Try again</button><button className="vc-button vc-button--secondary" onClick={() => navigate(`/rooms/${roomId}`)}><ArrowLeft />Room details</button></div></section></div>;
   }
@@ -530,6 +544,13 @@ export function RoomExperiencePage() {
     <div className="vc-page-width vc-room-live-layout">
       <RoomParticipantsPanel participants={participantViews} loading={participants.isFetching} />
       <RoomChatPanel messages={messages.data?.messages ?? []} currentUserId={currentUser?.id} sending={sendMessage.isPending || !conversation.data} disabled={!isLive} onSend={(content) => isLive && sendMessage.mutate(content)} onReact={(messageId, emoji) => isLive && reactMessage.mutate({ messageId, emoji })} />
+    </div>
+    <div className="vc-page-width vc-ph06-live-tools">
+      {isHost ? <RoomHostControls roomId={roomId} participants={participantViews} status={item.status} /> : null}
+      <div className="vc-ph06-live-tools__interactive">
+        <RoomPollsPanel roomId={roomId} isHost={isHost} enabled={isLive && connectionState === 'connected'} />
+        <RoomQuizPanel roomId={roomId} isHost={isHost} enabled={isLive && connectionState === 'connected'} />
+      </div>
     </div>
     {connectionState === 'reconnecting' ? <div className="vc-room-reconnect-banner"><RefreshCw /><div><strong>Reconnecting to VoiceCloud</strong><span>Restoring authoritative room access, presence and RTC role…</span></div><button onClick={() => void reconnect()}>Retry now</button></div> : null}
   </div>;

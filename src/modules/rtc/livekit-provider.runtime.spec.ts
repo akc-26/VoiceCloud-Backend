@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { LiveKitProvider } from './providers/livekit.provider';
 import { SpeakerRole } from './entities/rtc-speaker-history.entity';
@@ -105,4 +106,33 @@ describe('LiveKitProvider runtime authority', () => {
     expect(result.role).toBe(SpeakerRole.LISTENER);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it('verifies LiveKit webhook JWT signature, issuer, expiry and raw-body SHA-256', () => {
+    const dynamicConfigService = {
+      getActiveProviderConfig: jest.fn(),
+      getProviderConfig: jest.fn(),
+    } as any;
+    const provider = new LiveKitProvider(dynamicConfigService);
+    const rawBody = Buffer.from(JSON.stringify({ event: 'participant_joined', room: { name: 'room-1' } }));
+    const now = Math.floor(Date.now() / 1000);
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({
+      iss: 'legacy-key',
+      nbf: now - 5,
+      exp: now + 60,
+      sha256: crypto.createHash('sha256').update(rawBody).digest('base64'),
+    })).toString('base64url');
+    const signature = crypto
+      .createHmac('sha256', 'legacy-secret')
+      .update(`${header}.${payload}`)
+      .digest('base64url');
+    const auth = `Bearer ${header}.${payload}.${signature}`;
+
+    expect(
+      provider.verifyWebhookSignature(runtimeConfig, { authorization: auth }, JSON.parse(rawBody.toString()), rawBody),
+    ).toBe(true);
+    expect(
+      provider.verifyWebhookSignature(runtimeConfig, { authorization: auth }, {}, Buffer.from('{"tampered":true}')),
+    ).toBe(false);
+  });
+
 });
